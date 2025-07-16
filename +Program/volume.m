@@ -172,6 +172,13 @@ classdef volume < handle
         end
         
         function data = read(obj, cursor, varargin)
+            % DK Error checker
+            if isempty(obj.read_class)
+                error(['Read failed: The volume object is not properly initialized. ' ...
+                       'The file reader helper is missing. Try reloading the volume.']);
+            end
+            % DK End
+
             create_cursor = ~isempty(varargin);
             have_cursor = exist('cursor', 'var') ...
                 && isa(cursor, 'Program.GUI.cursor');
@@ -188,6 +195,17 @@ classdef volume < handle
 
             data = obj.read_class.read(obj, ...
                 'cursor', cursor);
+
+            % DK Empty warning
+            if isempty(data)
+                %warning(['Read operation returned empty data. The requested slice or frame ' ...
+                %         'might be out of bounds or contain no valid data.']);
+                cursor_details = sprintf('Z:%d, T:%d, C:%d', cursor.z, cursor.t, cursor.c);
+                warning(['Read operation returned empty data for cursor at %s. ' ...
+                         'The requested slice or frame might be out of bounds or contain no valid data.'], ...
+                         cursor_details);
+            end
+            % DK End
 
             % Some formats return double arrays on chunk read.
             % Check for this and if so, correct the datatype.
@@ -340,11 +358,32 @@ classdef volume < handle
                 chunking_method = 'slicewise';
             end
 
-            obj.write_chunk( ...
-                target_path, ...
-                'method', chunking_method, ...
-                'helper', target_helper, ...
-                'dtype', target_dtype);
+            %%%--- DK IMPROVEMENT ---%%%
+            % Added a try-catch block to gracefully handle errors during file writing.
+            % If the conversion fails, it deletes the corrupted file and provides a clear error.
+            try
+                obj.write_chunk( ...
+                    target_path, ...
+                    'method', chunking_method, ...
+                    'helper', target_helper, ...
+                    'dtype', target_dtype);
+            catch ME
+                % If writing fails, delete the incomplete new file
+                if isfile(target_path)
+                    delete(target_path);
+                end
+                % Rethrow the error with more context
+                new_error = MException('Volume:ConvertFailed', ...
+                    'Failed to write data to new file format. The original error was: %s', ME.message);
+                throw(new_error);
+            end
+            %%%--- END IMPROVEMENT DK ---%%%
+
+            % obj.write_chunk( ...
+            %     target_path, ...
+            %     'method', chunking_method, ...
+            %     'helper', target_helper, ...
+            %     'dtype', target_dtype);
             
             % Finally, return a new volume instance referencing the new file
             % (assuming Program.Data.volume is how you normally construct one)
@@ -373,6 +412,17 @@ classdef volume < handle
                 error('You must supply the ''arr'' parameter with data to write.');
             end
             
+            % DK Error checker - check image size
+            writeDataSize = size(p.Results.arr);
+            expectedHeight = obj.ny;
+            expectedWidth = obj.nx;
+            if writeDataSize(1) ~= expectedHeight || writeDataSize(2) ~= expectedWidth
+                error(['Write failed: The dimensions of the input array (%d x %d) do not match ' ...
+                       'the expected slice dimensions of the volume (%d x %d).'], ...
+                       writeDataSize(1), writeDataSize(2), expectedHeight, expectedWidth);
+            end
+            % DK End
+
             % Now call the helper's write method
             obj.read_obj.write('mode', p.Results.mode, ...
                                't', p.Results.t, ...
@@ -417,6 +467,13 @@ classdef volume < handle
                     out = cell2mat(cellfun(@(x)(x.gamma), obj.channels,'UniformOutput', false));
                     
                 otherwise
+                    %%%--- DK IMPROVEMENT ---%%%
+                    % The 'otherwise' case now provides a helpful warning to the user
+                    % when an invalid property is requested.
+                    warning('Volume:get:UnknownQuery', ...
+                        'The requested property "%s" is not recognized. Valid options are: ''rgbw'', ''gfp'', ''dic'', ''gamma''.', ...
+                        query);
+                    %%%--- DK END IMPROVEMENT ---%%%
             end
         end
 
