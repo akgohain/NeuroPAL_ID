@@ -54,6 +54,23 @@ classdef Illustration
             is_circle_weak = ~isempty(answer{7}) && lower(answer{7}(1)) == 'y';
             is_circle_all = ~isempty(answer{8}) && lower(answer{8}(1)) == 'y';
             
+            %%%% --- BEGIN EDIT: Add file save dialog --- %%%%
+            % Define the file formats for the save dialog
+            filter = {'*.pdf', 'PDF File (*.pdf)'; ...
+                        '*.png', 'PNG Image (*.png)'; ...
+                        '*.jpg;*.jpeg', 'JPEG Image (*.jpg, *.jpeg)'};
+
+            % Open the save dialog
+            [fileName, pathName] = uiputfile(filter, 'Save Image As', [file '.pdf']);
+
+            % Exit if the user clicks "Cancel"
+            if isequal(fileName, 0)
+                return;
+            end
+            fullPath = fullfile(pathName, fileName);
+            [~, baseName, fileExt] = fileparts(fullPath);
+            %%%% --- END EDIT --- %%%%
+
             % Sanitize the input values.
             if start_z < 1 || start_z > max_z
                 start_z = 1;
@@ -138,7 +155,13 @@ classdef Illustration
                 neuron_name = arrayfun(@(x) x.annotation, neurons, 'UniformOutput' , false);
                 neuron_pos(:,1:2) = neuron_pos(:,1:2) * image_size;
                 neuron_conf = arrayfun(@(x) x.annotation_confidence, neurons);
-                neuron_on = arrayfun(@(x) x.is_annotation_on, neurons);
+
+                % neuron_on = arrayfun(@(x) x.is_annotation_on, neurons);
+                %%%% --- BEGIN BUG FIX: Handle inconsistent data types --- %%%%
+                % Set 'UniformOutput' to false to handle mixed logical/NaN types.
+                neuron_on = arrayfun(@(x) x.is_annotation_on, neurons, 'UniformOutput', false);
+                %%%% --- END BUG FIX --- %%%%
+
                 neuron_emphasized = arrayfun(@(x) x.is_emphasized, neurons);
             end
             
@@ -211,13 +234,23 @@ classdef Illustration
                     end
                     
                     % Is the neuron ON/OFF?
-                    if ~isnan(neuron_on(k))
-                        if neuron_on(k)
+                    % if ~isnan(neuron_on(k))
+                    %     if neuron_on(k)
+                    %         name = [name '-ON'];
+                    %     else
+                    %         name = [name '-OFF'];
+                    %     end
+                    % end
+                    %%%% --- BEGIN BUG FIX: Use cell array indexing --- %%%%
+                    % Is the neuron ON/OFF? Use {k} to access cell content.
+                    if ~isnan(neuron_on{k})
+                        if neuron_on{k}
                             name = [name '-ON'];
                         else
                             name = [name '-OFF'];
                         end
                     end
+                    %%%% --- END BUG FIX --- %%%%
                     
                     % Is the user confident about the ID?
                     if neuron_conf(k) < 1
@@ -261,12 +294,36 @@ classdef Illustration
                     page_num = length(Z_MIPs) - page;
                 end
                 
-                % Save the file.
-                save_file = [file '_' num2str(page_num) '.pdf'];
-                fig.Renderer = 'Painters';
-                orient(fig, 'landscape');
-                print(fig, '-dpdf', '-fillpage', save_file);
+                %%%% --- BEGIN EDIT: Save file based on user's format choice --- %%%%
+                % Construct the output filename with page number
+                save_file = fullfile(pathName, [baseName '_' num2str(page_num) fileExt]);
+                
+                % Use a switch statement to handle different file formats
+                switch lower(fileExt)
+                    case '.pdf'
+                        % Use Painters renderer for vector graphics (good for PDF)
+                        fig.Renderer = 'Painters';
+                        orient(fig, 'landscape');
+                        print(fig, '-dpdf', '-fillpage', save_file);
+                    case '.png'
+                        % Use default renderer, specify resolution for PNG
+                        print(fig, '-dpng', '-r300', save_file);
+                    case {'.jpg', '.jpeg'}
+                        % Use default renderer, specify resolution for JPEG
+                        print(fig, '-djpeg', '-r300', save_file);
+                    otherwise
+                        warning('Unsupported file format: %s', fileExt);
+                end
+                
                 close(fig);
+                %%%% --- END EDIT --- %%%%
+
+                % Save the file.
+                % save_file = [file '_' num2str(page_num) '.pdf'];
+                % fig.Renderer = 'Painters';
+                % orient(fig, 'landscape');
+                % print(fig, '-dpdf', '-fillpage', save_file);
+                % close(fig);
             end
         end
     end
