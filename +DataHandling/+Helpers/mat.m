@@ -111,13 +111,22 @@ classdef mat
                     arr = obj.(main_var);
 
                     native_dims = size(arr);
+                    
+                    % Ensure we have at least 4 dimensions for compatibility
+                    while length(native_dims) < 4
+                        native_dims(end+1) = 1;
+                    end
+                    
                     metadata = struct( ...
                         'nx', {native_dims(1)}, ...
                         'ny', {native_dims(2)}, ...
                         'nz', {native_dims(3)}, ...
                         'nc', {native_dims(4)}, ...
-                        'native_dims', {native_dims}, ...
-                        'dtype_str', {class(obj.data)});
+                        'native_dims', {native_dims});
+                    
+                    % Fix the dtype_str field - it was trying to access obj.data
+                    metadata.dtype_str = class(arr);
+                    
                     if length(native_dims) > 4
                         metadata.nt = native_dims(5);
                     else
@@ -127,24 +136,28 @@ classdef mat
                         metadata.channels = channels;
                     end
 
-                    md_fields = cfg.default.fields.md_volume;
-
-                    % Check for additional metadata fields from config
-                    for i = 1:numel(md_fields)
-                        field = md_fields{i};
-                        if ~isfield(metadata, field)
-                            % Try to extract from file if present
-                            if isprop(obj, field)
-                                metadata.(field) = obj.(field);
-                            elseif isfield(arr, field)
-                                metadata.(field) = arr.(field);
-                            else
-                                metadata.(field) = [];
+                    % Only try to get config if Program.config exists
+                    try
+                        md_fields = cfg.default.fields.md_volume;
+                        % Check for additional metadata fields from config
+                        for i = 1:numel(md_fields)
+                            field = md_fields{i};
+                            if ~isfield(metadata, field)
+                                % Try to extract from file if present
+                                if isprop(obj, field)
+                                    metadata.(field) = obj.(field);
+                                elseif isfield(arr, field)
+                                    metadata.(field) = arr.(field);
+                                else
+                                    metadata.(field) = [];
+                                end
                             end
                         end
+                        metadata = rmfield(metadata, setdiff(fieldnames(metadata), md_fields));
+                    catch
+                        % If Program.config doesn't exist, just return basic metadata
+                        warning('Program.config not available, returning basic metadata only');
                     end
-
-                    metadata = rmfield(metadata, setdiff(fieldnames(metadata), md_fields));
 
                 case 'Program.volume'
                     metadata = DataHandling.Helpers.mat.get_metadata(obj.read_obj);
@@ -185,15 +198,15 @@ classdef mat
             end
 
             % Find main variable by largest size in file (might change later idk)
-            info = whos(target_file);
+            info = whos(obj);  % FIXED: was target_file, should be obj
             if isempty(info)
-                error('No variables found in MAT file to write to.');
+                error('No variables found in MAT file to read from.');
             end
             [~, idx] = max([info.bytes]);
             main_var = info(idx).name;
             
-            if strcmp(p.Results.mode, 'chunk') || ~all(structfun(@isempty, cursor))
-                if length(size(obj.volume)) < 5
+            if exist('p', 'var') && (strcmp(p.Results.mode, 'chunk') || ~all(structfun(@isempty, cursor)))
+                if length(size(obj.(main_var))) < 5
                     arr = obj.(main_var)( ...
                         cursor.x1:cursor.x2, ...
                         cursor.y1:cursor.y2, ...
