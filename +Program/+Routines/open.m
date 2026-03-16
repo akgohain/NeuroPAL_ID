@@ -189,11 +189,11 @@ function open(path)
     if ~isempty(neurons)
         app.image_neurons = neurons;
         Program.GUIHandling.gui_lock(app, 'enable', 'neuron_gui');
-        fprintf('DEBUG: Set app.image_neurons with %d neurons\n', length(neurons.neurons));
+        Program.Helpers.debug_log('DEBUG: Set app.image_neurons with %d neurons\n', length(neurons.neurons));
     elseif contains(filename,'.nwb')
         % For NWB files, even if neurons is empty, don't override with empty object
         % The loadNP function should have already tried to load from NWB
-        fprintf('DEBUG: NWB file detected but no neurons loaded\n');
+        Program.Helpers.debug_log('DEBUG: NWB file detected but no neurons loaded\n');
         
         % Check for legacy NWB neuron data format for backwards compatibility
         nwb_data = nwbRead(filename);
@@ -208,7 +208,7 @@ function open(path)
         app.image_neurons = Neurons.Image([], worm.body, 'scale', app.image_um_scale');
     else
         app.image_neurons = Neurons.Image([], worm.body, 'scale', app.image_um_scale');
-        fprintf('DEBUG: Created empty Neurons.Image object\n');
+        Program.Helpers.debug_log('DEBUG: Created empty Neurons.Image object\n');
     end
 
     % Restrict the slider to the z stack.
