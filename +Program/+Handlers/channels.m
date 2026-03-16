@@ -345,22 +345,25 @@ classdef channels
 
             if nc > 3
                 white = struct('idx', indices.white, 'settings', Program.Handlers.channels.get_processing_info('white'));
-                if ismember('white', references)
-                    white.bool = app.(sprintf(Program.Handlers.channels.handles{'pp_cb'}, Program.Helpers.decode_references('white'))).Value;
+                white_reference = Program.Helpers.decode_references('white');
+                if ismember('white', references) && ~isempty(white_reference)
+                    white.bool = app.(sprintf(Program.Handlers.channels.handles{'pp_cb'}, white_reference)).Value;
                 else
                     white.bool = 0;
                 end
     
                 dic = struct('idx', indices.dic, 'settings', Program.Handlers.channels.get_processing_info('dic'));
-                if ismember('dic', references)
-                    dic.bool = app.(sprintf(Program.Handlers.channels.handles{'pp_cb'}, Program.Helpers.decode_references('dic'))).Value;
+                dic_reference = Program.Helpers.decode_references('dic');
+                if ismember('dic', references) && ~isempty(dic_reference)
+                    dic.bool = app.(sprintf(Program.Handlers.channels.handles{'pp_cb'}, dic_reference)).Value;
                 else
                     dic.bool = 0;
                 end
     
                 gfp = struct('idx', indices.gfp, 'settings', Program.Handlers.channels.get_processing_info('gfp'));
-                if ismember('gfp', references)
-                    gfp.bool = app.(sprintf(Program.Handlers.channels.handles{'pp_cb'}, Program.Helpers.decode_references('gfp'))).Value;
+                gfp_reference = Program.Helpers.decode_references('gfp');
+                if ismember('gfp', references) && ~isempty(gfp_reference)
+                    gfp.bool = app.(sprintf(Program.Handlers.channels.handles{'pp_cb'}, gfp_reference)).Value;
                 else
                     gfp.bool = 0;
                 end
@@ -654,6 +657,7 @@ classdef channels
                     otherwise
                         target_reference = Program.Helpers.decode_references(query);
                         if ~isempty(target_reference)
+                            target_reference = target_reference(1);
                             target_component_string = sprintf(Program.Handlers.channels.handles{'pp_dd'}, target_reference);
                         else
                             idx = [];
