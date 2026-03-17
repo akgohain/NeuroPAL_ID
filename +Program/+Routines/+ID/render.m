@@ -20,6 +20,13 @@ function render()
 
     % Determine the channel=color assignments for displaying.
     color_indices = [red, green, blue];
+    Program.Helpers.debug_event('IDRender', ...
+        'channels rgb=[%d %d %d] w=%d dic=%d gfp=%d checks=%s gamma=%s image_size=%s', ...
+        red, green, blue, white, dic, gfp, ...
+        mat2str([app.RCheckBox.Value app.GCheckBox.Value app.BCheckBox.Value ...
+                 app.WCheckBox.Value app.DICCheckBox.Value app.GFPCheckBox.Value]), ...
+        mat2str(app.image_gamma(:)'), ...
+        mat2str(size(app.image_data)));
 
     % Draw the 3 color channels.
     app.image_view = app.image_data(:,:,:,color_indices);
@@ -99,6 +106,7 @@ function render()
         end
     end
     app.image_view = double(app.image_view)/double(max(app.image_view(:)));
+    Program.Helpers.debug_array_summary('IDRender', 'image_view', app.image_view);
 
     % Redraw the max projection.
     % Note: the image only shows RGB. We added the other channels
@@ -108,4 +116,3 @@ function render()
     % Redraw the Z-slice.
     Program.Routines.ID.get_slice(app.ZSlider, app.image_view, app.XY);
 end
-

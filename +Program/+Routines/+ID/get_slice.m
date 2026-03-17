@@ -18,6 +18,9 @@ function get_slice(slider, view, ax)
     if app.image_prefs.is_Z_flip
         z = size(app.image_data,3) - z + 1;
     end
+    Program.Helpers.debug_event('IDSlice', ...
+        'z_gui=%d z_data=%d is_Z_flip=%d z_center=%d', ...
+        z_num, z, app.image_prefs.is_Z_flip, app.image_prefs.z_center);
 
     % Where are we in Z?
     background_color = [0.94,0.94,0.94];
@@ -43,6 +46,7 @@ function get_slice(slider, view, ax)
     cla(ax);
     % Create the slice at z for displaying in the axis.
     xy = squeeze(view(:,:,z,:,:));
+    Program.Helpers.debug_array_summary('IDSlice', 'xy_slice', xy);
     % Display the current slice in the XY axis.
     gui_image = image(xy, 'Parent', ax); hold(ax, 'on');
 
