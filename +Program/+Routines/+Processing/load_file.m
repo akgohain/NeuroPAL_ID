@@ -1,6 +1,8 @@
 function load_file(mode, path)
             app = Program.app;
             window = Program.window;
+            Program.Helpers.debug_event('ProcLoad', ...
+                'mode=%s path=%s', string(mode), string(path));
 
             d = uiprogressdlg(window,"Title","NeuroPAL ID","Message","Initializing Processing Tab...",'Indeterminate','off');    
             app.flags = struct();
@@ -29,6 +31,14 @@ function load_file(mode, path)
 
                     prefs = app.proc_image.prefs;
                     gammas = prefs.gamma;
+                    Program.Helpers.debug_event('ProcLoad', ...
+                        'image prefs: size=%s gamma=%s is_Z_flip=%d RGBW=%s DIC=%s GFP=%s', ...
+                        mat2str(vol_size), ...
+                        mat2str(gammas(:)'), ...
+                        Program.Helpers.struct_field(prefs, 'is_Z_flip', 0), ...
+                        mat2str(Program.Helpers.struct_field(prefs, 'RGBW', [])), ...
+                        mat2str(Program.Helpers.struct_field(prefs, 'DIC', [])), ...
+                        mat2str(Program.Helpers.struct_field(prefs, 'GFP', [])));
 
                     % Using intmax is faster as it avoids loading the
                     % entire variable, but it also distorts the histograms.
@@ -92,30 +102,18 @@ function load_file(mode, path)
             set(app.proc_xEditField, 'Enable', 'off');
             set(app.proc_yEditField, 'Enable', 'off');
     
-            if isempty(gammas)
-                app.tl_GammaEditField.Value = 1;
-                app.tm_GammaEditField.Value = 1;
-                app.tr_GammaEditField.Value = 1;
-                app.bl_GammaEditField.Value = 1;
-                app.bm_GammaEditField.Value = 1;
-                app.br_GammaEditField.Value = 1;
-            else
-                for n=1:size(gammas, 2)
-                    switch n
-                        case 1
-                            app.tl_GammaEditField.Value = gammas(1);
-                        case 2
-                            app.tm_GammaEditField.Value = gammas(2);
-                        case 3
-                            app.tr_GammaEditField.Value = gammas(3);
-                        case 4
-                            app.bl_GammaEditField.Value = gammas(4);
-                        case 5
-                            app.bm_GammaEditField.Value = gammas(5);
-                        case 6
-                            app.br_GammaEditField.Value = gammas(6);
-                    end
-                end
+            gammas = Program.Helpers.expand_gamma( ...
+                gammas, ...
+                length(Program.GUIHandling.pos_prefixes));
+            for n=1:length(Program.GUIHandling.pos_prefixes)
+                app.(sprintf('%s_GammaEditField', Program.GUIHandling.pos_prefixes{n})).Value = gammas(n);
+            end
+
+            if mode == "image"
+                synced = Program.Helpers.sync_processing_from_main(app, mat_file);
+                Program.Helpers.debug_event('ProcLoad', ...
+                    'sync_processing_from_main=%d final_gammas=%s', ...
+                    synced, mat2str(gammas(:)'));
             end
     
             d.Value = 5 / 5;
@@ -141,4 +139,3 @@ function load_file(mode, path)
 
             Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
 end
-

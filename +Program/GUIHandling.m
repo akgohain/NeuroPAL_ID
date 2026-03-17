@@ -656,8 +656,8 @@ classdef GUIHandling
 
             package = p.Results.package;
             
-            x = app.proc_xSlider.Value;
-            y = min(max(round(app.proc_xSlider.Value), 1), app.proc_xSlider.Limits(2));
+            x = min(max(round(app.proc_xSlider.Value), 1), app.proc_xSlider.Limits(2));
+            y = min(max(round(app.proc_ySlider.Value), 1), app.proc_ySlider.Limits(2));
             z = min(max(round(app.proc_zSlider.Value), 1), app.proc_zSlider.Limits(2));
             c_bools = Program.Handlers.channels.get_bools('array');
             c_max = Program.Handlers.channels.get_max_idx();
@@ -696,6 +696,9 @@ classdef GUIHandling
                             case 'Colormap'
                                 safe_c = Program.Validation.noskip_index(c_max);
                                 slice = app.proc_image.data(:, :, :, c_load);
+                                Program.Helpers.debug_event('ProcVolume', ...
+                                    'request=array mode=colormap mip=1 coords=%s c_load=%s', ...
+                                    mat2str(package.coords), mat2str(c_load));
                             case 'Video'
                                 slice = app.retrieve_frame(package.coords(4));
                         end
@@ -705,6 +708,15 @@ classdef GUIHandling
                                 safe_c = Program.Validation.noskip_index(c_max);
                                 [~, ~, nz_data, ~] = size(app.proc_image, 'data');
                                 z_idx = min(package.coords(3), nz_data);
+                                prefs = app.proc_image.prefs;
+                                if isfield(prefs, 'is_Z_flip') && prefs.is_Z_flip
+                                    z_idx = nz_data - z_idx + 1;
+                                end
+                                Program.Helpers.debug_event('ProcVolume', ...
+                                    'request=array mode=colormap mip=0 coords=%s z_gui=%d z_data=%d is_Z_flip=%d c_load=%s', ...
+                                    mat2str(package.coords), package.coords(3), z_idx, ...
+                                    isfield(prefs, 'is_Z_flip') && prefs.is_Z_flip, ...
+                                    mat2str(c_load));
                                 slice = app.proc_image.data(:, :, z_idx, c_load);
                                 if ndims(slice) == 3
                                     slice = reshape(slice, size(slice,1), size(slice,2), 1, size(slice,3));
@@ -723,6 +735,7 @@ classdef GUIHandling
                     slice(:, :, :, missing_rgb) = 0;
                     slice(:, :, :, [find(~ismember(c_load, c_bools))]) = 0;
                     package.array = slice;
+                    Program.Helpers.debug_array_summary('ProcVolume', 'slice', package.array);
 
                 case 'coords'
                     package.coords(1) = min(max(round(package.dims(1)-app.proc_ySlider.Value), 1), app.proc_ySlider.Limits(2));
@@ -845,14 +858,17 @@ classdef GUIHandling
                     max_val = max(app.proc_image.data, [], "all");
 
                     chunk_prefs = app.proc_image.prefs;
-                    for c=1:app.video_info.nc
-                        app.(sprintf("%s_GammaEditField", Program.GUIHandling.pos_prefixes{c})).Value = chunk_prefs.gamma(c);
+                    chunk_gammas = Program.Helpers.expand_gamma( ...
+                        chunk_prefs.gamma, ...
+                        length(Program.GUIHandling.pos_prefixes));
+                    for c=1:length(Program.GUIHandling.pos_prefixes)
+                        app.(sprintf("%s_GammaEditField", Program.GUIHandling.pos_prefixes{c})).Value = chunk_gammas(c);
                     end
 
                 case 'video'
                     max_val = max(app.retrieve_frame(app.proc_tSlider.Value), [], "all");
                     
-                    for c=1:app.video_info.nc
+                    for c=1:length(Program.GUIHandling.pos_prefixes)
                         app.(sprintf("%s_GammaEditField", Program.GUIHandling.pos_prefixes{c})).Value = 1;
                     end
             end
@@ -882,13 +898,15 @@ classdef GUIHandling
                 tick_step = 0.2;
                 start_tick = 0;
             else
-                new_limits = [1 max(2, max_val)];
+                new_limits = [0 max(2, max_val)];
                 tick_step = max(1, round(max_val/5));
-                start_tick = 1;
+                start_tick = 0;
             end
 
             app.ProcNoiseThresholdKnob.Limits = new_limits;
             app.ProcNoiseThresholdField.Limits = new_limits;
+            app.ProcNoiseThresholdKnob.Value = new_limits(1);
+            app.ProcNoiseThresholdField.Value = new_limits(1);
             app.ProcNoiseThresholdKnob.MajorTicks = unique([start_tick:tick_step:new_limits(2), new_limits(2)]);
             app.ProcNoiseThresholdKnob.MajorTickLabels = string(app.ProcNoiseThresholdKnob.MajorTicks);
             Program.GUIHandling.shorten_knob_labels(app);

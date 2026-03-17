@@ -684,21 +684,31 @@ classdef channels
 
             else
                 app = Program.app;
-                query = Program.Helpers.short_to_long(query);
                 grid_pfx = Program.Handlers.channels.names{'histogram_grid'};
 
-                for pfx=1:length(grid_pfx)
-                    label = sprintf("%s_Label", grid_pfx{pfx});
-                    if contains(app.(label).Text, query)
-                        slider_vals = app.(sprintf("%s_hist_slider", grid_pfx{pfx})).Value;
-                        hist_limit = app.(sprintf("%s_hist_slider", grid_pfx{pfx})).Limits(2);   
+                query_text = lower(string(Program.Helpers.short_to_long(query)));
+                switch query_text
+                    case "red"
+                        row = 1;
+                    case "green"
+                        row = 2;
+                    case "blue"
+                        row = 3;
+                    otherwise
+                        row = Program.Helpers.decode_references(char(query_text));
+                end
 
-                        info_struct = struct( ...
-                            'gamma', {app.(sprintf("%s_GammaEditField", grid_pfx{pfx})).Value}, ...
-                            'low_high_in', {[slider_vals(1)/hist_limit slider_vals(2)/hist_limit]}, ...
-                            'low_high_out', {[]});
-                        return
-                    end
+                if ~isempty(row) && row >= 1 && row <= length(grid_pfx)
+                    slider_handle = sprintf("%s_hist_slider", grid_pfx{row});
+                    gamma_handle = sprintf("%s_GammaEditField", grid_pfx{row});
+                    slider_vals = app.(slider_handle).Value;
+                    hist_limit = app.(slider_handle).Limits(2);
+
+                    info_struct = struct( ...
+                        'gamma', {app.(gamma_handle).Value}, ...
+                        'low_high_in', {[slider_vals(1)/hist_limit slider_vals(2)/hist_limit]}, ...
+                        'low_high_out', {[]});
+                    return
                 end
 
                 info_struct = struct( ...
