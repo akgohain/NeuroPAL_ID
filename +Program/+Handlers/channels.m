@@ -11,8 +11,8 @@ classdef channels
             'pp_ref', {'proc_c%.f_ref'}, ...                                % Reference dropdowns.
             'pp_grid', {'EditChannelsGrid'}, ...                            % Grid.
             'pp_button', {'EditChannelsButton'}, ...                        % Edit channel button.
-            'pp_down', {{'1', 'down', '⮟'}}, ...                           % Buttons that move channels up in the grid.
-            'pp_up', {{'-1', 'up', '⮝'}});                                 % Buttons that move channels down in the grid.
+            'pp_down', {{'1', 'down', 'dn', '↓', '⮟'}}, ...                % Buttons that move channels down in the grid.
+            'pp_up', {{'-1', 'up', '↑', '⮝'}});                            % Buttons that move channels up in the grid.
 
         % Dictionary of channel colors and their respective fluorophores.
         fluorophore_map = dictionary( ...
@@ -466,40 +466,28 @@ classdef channels
 
         function edit_channels()
             app = Program.app;
-            state = app.EditChannelsButton.Text;
+            handles = Program.Handlers.channels.get_handles();
+            edit_width = {'1x', 360};
+            edit_columns = {15, 105, 92, 28, 28, 38};
+            app.ProcessingGridLayout.ColumnWidth = edit_width;
+            app.proc_channel_grid.ColumnWidth = edit_columns;
 
-            switch state
-                case "Edit Channels"
-                    app.EditChannelsButton.Text = "Done Editing";
+            for c=1:length(app.proc_channel_grid.RowHeight)
+                dd_handle = sprintf(Program.Handlers.channels.handles{'pp_dd'}, c);
+                up_handle = sprintf(handles.up, c);
+                down_handle = sprintf(handles.down, c);
+                delete_handle = sprintf(handles.delete, c);
 
-                    for c=1:length(app.proc_channel_grid.RowHeight)
-                        dd_handle = sprintf(Program.Handlers.channels.handles{'pp_dd'}, c);
-                        ef_handle = sprintf(Program.Handlers.channels.handles{'pp_ef'}, c);
-        
-                        app.(ef_handle).Value = app.(dd_handle).Value;
-        
-                        app.(ef_handle).Visible = 'on';
-                        app.(dd_handle).Visible = 'off';
-                    end
+                app.(dd_handle).Visible = 'on';
+                app.(down_handle).Text = '↓';
+                app.(up_handle).Text = '↑';
+                app.(up_handle).Visible = 'on';
+                app.(down_handle).Visible = 'on';
+                app.(delete_handle).Visible = 'on';
+            end
 
-                case "Done Editing"
-                    app.EditChannelsButton.Text = "Edit Channels";
-
-                    new_channel_list = {};
-                    
-                    for c=1:length(app.proc_channel_grid.RowHeight)
-                        ef_handle = sprintf(Program.Handlers.channels.handles{'pp_ef'}, c);
-                        new_channel_list{end+1} = app.(ef_handle).Value;
-                        app.(ef_handle).Visible = 'off';
-                    end
-                    
-                    for c=1:length(app.proc_channel_grid.RowHeight)
-                        ef_handle = sprintf(Program.Handlers.channels.handles{'pp_ef'}, c);
-                        dd_handle = sprintf(Program.Handlers.channels.handles{'pp_dd'}, c);
-                        app.(dd_handle).Items = new_channel_list;
-                        app.(dd_handle).Value = app.(ef_handle).Value;
-                        app.(dd_handle).Visible = 'on';
-                    end
+            if isprop(app, 'EditChannelsButton') && isvalid(app.EditChannelsButton)
+                app.EditChannelsButton.Visible = 'off';
             end
         end
 
@@ -561,27 +549,33 @@ classdef channels
             app.(ef).Visible = 'off';
 
             down = uibutton( ...
-                "Text", app.proc_c1_down.Text, ...
+                "Text", '↓', ...
+                "Tooltip", app.proc_c1_down.Tooltip, ...
                 "Parent", app.proc_c1_down.Parent, ...
                 "ButtonPushedFcn", @(src, event) Program.Routines.GUI.move_channel(event));
             down.Layout.Row = tc;
             down.Layout.Column = 4;
+            down.Visible = 'on';
 
             up = uibutton( ...
-                "Text", app.proc_c1_up.Text, ...
+                "Text", '↑', ...
+                "Tooltip", app.proc_c1_up.Tooltip, ...
                 "Parent", app.proc_c1_up.Parent, ...
                 "ButtonPushedFcn", @(src, event) Program.Routines.GUI.move_channel(event));
             up.Layout.Row = tc;
             up.Layout.Column = 5;
+            up.Visible = 'on';
 
             del = uibutton( ...
                 "Text", app.proc_c1_delete.Text, ...
+                "Tooltip", app.proc_c1_delete.Tooltip, ...
                 "FontWeight", app.proc_c1_delete.FontWeight, ...
                 "BackgroundColor", app.proc_c1_delete.BackgroundColor, ...
                 "Parent", app.proc_c1_delete.Parent, ...
                 "ButtonPushedFcn", @(src, event) Program.Routines.GUI.delete_channel(tc));
             del.Layout.Row = tc;
             del.Layout.Column = 6;
+            del.Visible = 'on';
         end
     end
 

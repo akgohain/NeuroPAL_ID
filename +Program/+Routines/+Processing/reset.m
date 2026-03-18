@@ -31,13 +31,10 @@ function reset()
 
     app.proc_xSlider.Limits = [1, nx];
     app.proc_ySlider.Limits = [1, ny];
-    app.proc_hor_zSlider.Limits = [1, nz];
-    app.proc_vert_zSlider.Limits = [1, nz];
 
     app.proc_xSlider.Value = round(nx/2);
     app.proc_ySlider.Value = round(ny/2);
-    app.proc_hor_zSlider.Value = round(nz/2);
-    app.proc_vert_zSlider.Value = round(nz/2);
+    Program.Helpers.configure_processing_zsliders(app, nz, round(nz/2));
 
     d.Message = "Redrawing clean volume...";
     app.flags = struct();
@@ -53,4 +50,3 @@ function reset()
 
     close(d);
 end
-

@@ -796,22 +796,19 @@ classdef GUIHandling
             if strcmp(mode, 'hard')
                 app.proc_xSlider.Limits = [1, nx];
                 app.proc_ySlider.Limits = [1, ny];
-                app.proc_zSlider.Limits = [1, nz];
-                app.proc_hor_zSlider.Limits = [1, nz];
-                app.proc_vert_zSlider.Limits = [1, nz];
 
                 app.proc_xSlider.Value = round(app.proc_xSlider.Limits(2)/2);
                 app.proc_ySlider.Value = round(app.proc_ySlider.Limits(2)/2);
-                app.proc_zSlider.Value = round(app.proc_zSlider.Limits(2)/2);
+                z_value = round(nz/2);
                 app.proc_tSlider.Value = 1;
     
                 app.proc_xEditField.Value = app.proc_xSlider.Value;
                 app.proc_yEditField.Value = app.proc_ySlider.Value;
-                app.proc_zEditField.Value = app.proc_zSlider.Value;
                 app.proc_tEditField.Value = app.proc_tSlider.Value;
-    
-                app.proc_hor_zSlider.Value = round(app.proc_hor_zSlider.Limits(2)/2);
-                app.proc_vert_zSlider.Value = round(app.proc_vert_zSlider.Limits(2)/2);
+
+                Program.Helpers.configure_processing_zsliders(app, nz, z_value);
+            else
+                app.proc_zEditField.Value = min(max(round(app.proc_zSlider.Value), 1), app.proc_zSlider.Limits(2));
             end
         end
 
@@ -887,7 +884,7 @@ classdef GUIHandling
             for comp=1:length(Program.GUIHandling.cm_exclusive_gui)
                 app.(Program.GUIHandling.cm_exclusive_gui{comp}).Enable = strcmp(app.VolumeDropDown.Value, 'Colormap');
             end
-            app.ProcessingGridLayout.ColumnWidth = {'1x', 282};
+            app.ProcessingGridLayout.ColumnWidth = {'1x', 360};
         end
 
         function set_thresholds(app, max_val)
@@ -919,18 +916,10 @@ classdef GUIHandling
         end
 
         function shorten_knob_labels(app)
-            fixedLabels = cell(size(app.ProcNoiseThresholdKnob.MajorTickLabels));
-            for n = 1:length(app.ProcNoiseThresholdKnob.MajorTickLabels)
-                currentTick = app.ProcNoiseThresholdKnob.MajorTickLabels{n};
-                currentTickNumeric = str2double(currentTick);
-                
-                if length(currentTick) > 3
-                    exponent = floor(log10(currentTickNumeric));
-                    base = currentTickNumeric / 10^exponent;
-                    currentTick = [num2str(base, '%.1f') 'e' num2str(exponent)];
-                end
-                
-                fixedLabels{n} = currentTick;
+            majorTicks = app.ProcNoiseThresholdKnob.MajorTicks;
+            fixedLabels = cell(size(majorTicks));
+            for n = 1:length(majorTicks)
+                fixedLabels{n} = local_format_knob_tick(majorTicks(n));
             end
         
             app.ProcNoiseThresholdKnob.MajorTickLabels = fixedLabels;
@@ -1226,4 +1215,23 @@ classdef GUIHandling
         end
 
     end
+end
+
+function label = local_format_knob_tick(value)
+    value = round(double(value));
+    if value == 0
+        label = '0';
+        return
+    end
+
+    sign_prefix = '';
+    if value < 0
+        sign_prefix = '-';
+        value = abs(value);
+    end
+
+    digits = char(string(value));
+    reversed_digits = fliplr(digits);
+    reversed_digits = regexprep(reversed_digits, '(\d{3})(?=\d)', '$1,');
+    label = [sign_prefix, fliplr(reversed_digits)];
 end

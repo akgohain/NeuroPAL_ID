@@ -213,18 +213,12 @@ function open(path)
 
     % Restrict the slider to the z stack.
     num_z_slices = size(app.image_data, 3);
-    z_slices = 1:num_z_slices;
     if num_z_slices <= 1
         uialert(app.CELL_ID, 'The image is not a volume!', ...
             'Image Not a Volume', 'Icon', 'error');
         return;
-    else
-        z_labels = arrayfun(@(z) num2str(z, '%.1f'), ...
-            (z_slices-1) * info.scale(3), 'UniformOutput', false);
     end
-    app.ZSlider.Limits = [1, num_z_slices];
-    app.ZSlider.MajorTicks = z_slices;
-    app.ZSlider.MajorTickLabels = z_labels;
+    Program.Helpers.configure_main_zslider(app, num_z_slices);
 
     % Setup the z-axis orientation.
     app.ZCenterEditField.Value = round((prefs.z_center - 1) * info.scale(3), 1);
@@ -315,4 +309,3 @@ function open(path)
     set(app.ProcessingButton, 'Visible', 'off');
     drawnow;
 end
-
