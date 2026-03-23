@@ -51,7 +51,7 @@ classdef histograms
                     end
                     
                     if max(chan_hist, [], 'all') <= 1
-                        chan_hist = chan_hist * app.ProcNoiseThresholdKnob.Limits(2);
+                        chan_hist = chan_hist * Program.GUIHandling.proc_threshold_raw_max(app);
                     end
 
                     [h_panel, h_label, h_axes] = Program.Handlers.histograms.get_gui(c);
@@ -100,4 +100,3 @@ classdef histograms
         end
     end
 end
-

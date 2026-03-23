@@ -16,10 +16,9 @@ function set_bounds()
         new_max = intmax(frame_class);
     end
 
-    app.ProcNoiseThresholdKnob.Limits(2) = new_max;
+    setappdata(app.CELL_ID, 'proc_threshold_raw_max', double(max(new_max, 1)));
     for p=1:length(pfx)
         handle = sprintf('%s_hist_slider', pfx{p});
         app.(handle).Limits(2) = new_max;
     end
 end
-

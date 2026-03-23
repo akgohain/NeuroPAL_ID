@@ -183,6 +183,8 @@ classdef GUIHandling
                         app.(sprintf('%s_GammaEditField', Program.GUIHandling.pos_prefixes{pos})).Enable = state;
                     end
 
+                    Program.GUIHandling.set_threshold_stepper_state(app, state);
+
             end
 
             for comp=1:length(gui_components)
@@ -620,7 +622,7 @@ classdef GUIHandling
                         end
 
                         if max(chan_hist, [], 'all') <= 1
-                            chan_hist = chan_hist * app.ProcNoiseThresholdKnob.Limits(2);
+                            chan_hist = chan_hist * Program.GUIHandling.proc_threshold_raw_max(app);
                         end
                         
                         if any(ismember(app.nameMap.keys(), num2str(c)))
@@ -888,38 +890,156 @@ classdef GUIHandling
         end
 
         function set_thresholds(app, max_val)
-            max_val = cast(max_val, 'double');
-            
-            if max_val <= 1.0
-                new_limits = [0 1];
-                tick_step = 0.2;
-                start_tick = 0;
-            else
-                new_limits = [0 max(2, max_val)];
-                tick_step = max(1, round(max_val/5));
-                start_tick = 0;
-            end
+            raw_max = cast(max(max_val, 1), 'double');
+            setappdata(app.CELL_ID, 'proc_threshold_raw_max', raw_max);
 
-            app.ProcNoiseThresholdKnob.Limits = new_limits;
-            app.ProcNoiseThresholdField.Limits = new_limits;
-            app.ProcNoiseThresholdKnob.Value = new_limits(1);
-            app.ProcNoiseThresholdField.Value = new_limits(1);
-            app.ProcNoiseThresholdKnob.MajorTicks = unique([start_tick:tick_step:new_limits(2), new_limits(2)]);
+            threshold_limits = [0 100];
+            hist_limits = [0 raw_max];
+
+            app.ProcNoiseThresholdKnob.Limits = threshold_limits;
+            app.ProcNoiseThresholdField.Limits = threshold_limits;
+            app.ProcNoiseThresholdKnob.Value = threshold_limits(1);
+            app.ProcNoiseThresholdField.Value = threshold_limits(1);
+            app.ProcNoiseThresholdField.ValueDisplayFormat = '%.0f%%';
+            app.ProcNoiseThresholdKnob.MajorTicks = 0:20:100;
             app.ProcNoiseThresholdKnob.MajorTickLabels = string(app.ProcNoiseThresholdKnob.MajorTicks);
             Program.GUIHandling.shorten_knob_labels(app);
+            Program.GUIHandling.install_threshold_stepper(app);
+            Program.GUIHandling.set_proc_threshold_value(app, threshold_limits(1), false);
 
             for pos=1:length(Program.GUIHandling.pos_prefixes)
-                app.(sprintf('%s_hist_slider', Program.GUIHandling.pos_prefixes{pos})).Limits = new_limits;
-                app.(sprintf('%s_hist_slider', Program.GUIHandling.pos_prefixes{pos})).Value = new_limits;
-                app.(sprintf('%s_hist_ax', Program.GUIHandling.pos_prefixes{pos})).XLim = new_limits;
+                app.(sprintf('%s_hist_slider', Program.GUIHandling.pos_prefixes{pos})).Limits = hist_limits;
+                app.(sprintf('%s_hist_slider', Program.GUIHandling.pos_prefixes{pos})).Value = hist_limits;
+                app.(sprintf('%s_hist_ax', Program.GUIHandling.pos_prefixes{pos})).XLim = hist_limits;
             end
+        end
+
+        function install_threshold_stepper(app)
+            grid = app.ProcThresholdKnobGrid;
+            app.ProcNoiseThresholdKnob.Visible = 'off';
+            app.ProcThresholdManipulationLabel.Text = 'Background Threshold (%)';
+            app.ProcThresholdManipulationLabel.Tooltip = ...
+                'Global threshold on the combined displayed channels, expressed as a percent of the current intensity range.';
+
+            grid.ColumnWidth = {'1x', 92, 24, '1x'};
+            grid.RowHeight = {22, 22};
+
+            app.ProcNoiseThresholdField.Layout.Row = [1 2];
+            app.ProcNoiseThresholdField.Layout.Column = 2;
+            app.ProcNoiseThresholdField.ValueChangedFcn = @(src, event) ...
+                Program.GUIHandling.handle_threshold_field_changed(app, src);
+            app.ProcNoiseThresholdField.Tooltip = ...
+                'Global threshold on the combined processing preview (% of current intensity range).';
+
+            app.ProcThresholdGrid.RowHeight{2} = 52;
+
+            handles = Program.GUIHandling.threshold_stepper_handles(app);
+            if isempty(handles)
+                up_button = uibutton(grid, 'push');
+                up_button.Layout.Row = 1;
+                up_button.Layout.Column = 3;
+                up_button.FontSize = 11;
+                up_button.Text = char(9650);
+                up_button.Tooltip = 'Increase background threshold by 1%.';
+                up_button.ButtonPushedFcn = @(src, event) ...
+                    Program.GUIHandling.step_proc_threshold(app, 1);
+
+                down_button = uibutton(grid, 'push');
+                down_button.Layout.Row = 2;
+                down_button.Layout.Column = 3;
+                down_button.FontSize = 11;
+                down_button.Text = char(9660);
+                down_button.Tooltip = 'Decrease background threshold by 1%.';
+                down_button.ButtonPushedFcn = @(src, event) ...
+                    Program.GUIHandling.step_proc_threshold(app, -1);
+
+                handles = struct('up', up_button, 'down', down_button);
+                setappdata(app.CELL_ID, 'proc_threshold_stepper', handles);
+            else
+                handles.up.Parent = grid;
+                handles.down.Parent = grid;
+                handles.up.Layout.Row = 1;
+                handles.up.Layout.Column = 3;
+                handles.down.Layout.Row = 2;
+                handles.down.Layout.Column = 3;
+            end
+
+            Program.GUIHandling.set_threshold_stepper_state(app, app.ProcNoiseThresholdField.Enable);
+        end
+
+        function set_threshold_stepper_state(app, state)
+            handles = Program.GUIHandling.threshold_stepper_handles(app);
+            if isempty(handles)
+                return
+            end
+
+            handles.up.Enable = state;
+            handles.down.Enable = state;
+        end
+
+        function handles = threshold_stepper_handles(app)
+            handles = [];
+            if ~isappdata(app.CELL_ID, 'proc_threshold_stepper')
+                return
+            end
+
+            handles = getappdata(app.CELL_ID, 'proc_threshold_stepper');
+            if ~isstruct(handles) || ~isfield(handles, 'up') || ~isfield(handles, 'down')
+                handles = [];
+                return
+            end
+
+            if ~isvalid(handles.up) || ~isvalid(handles.down)
+                rmappdata(app.CELL_ID, 'proc_threshold_stepper');
+                handles = [];
+            end
+        end
+
+        function handle_threshold_field_changed(app, src)
+            Program.GUIHandling.set_proc_threshold_value(app, src.Value, true);
+        end
+
+        function step_proc_threshold(app, direction)
+            Program.GUIHandling.set_proc_threshold_value( ...
+                app, app.ProcNoiseThresholdField.Value + direction, true);
+        end
+
+        function set_proc_threshold_value(app, value, redraw)
+            limits = app.ProcNoiseThresholdField.Limits;
+            value = min(max(round(double(value)), limits(1)), limits(2));
+
+            app.ProcNoiseThresholdField.Value = value;
+            app.ProcNoiseThresholdKnob.Value = value;
+
+            if redraw
+                Program.Routines.Processing.render();
+            end
+        end
+
+        function value = proc_threshold_raw_max(app)
+            if isappdata(app.CELL_ID, 'proc_threshold_raw_max')
+                value = double(getappdata(app.CELL_ID, 'proc_threshold_raw_max'));
+            else
+                value = 1;
+            end
+
+            value = max(value, 1);
+        end
+
+        function value = proc_threshold_raw_value(app, raw_max)
+            if nargin < 2
+                raw_max = Program.GUIHandling.proc_threshold_raw_max(app);
+            end
+
+            raw_max = max(double(raw_max), 1);
+            value = (double(app.ProcNoiseThresholdField.Value) / 100) * raw_max;
         end
 
         function shorten_knob_labels(app)
             majorTicks = app.ProcNoiseThresholdKnob.MajorTicks;
             fixedLabels = cell(size(majorTicks));
             for n = 1:length(majorTicks)
-                fixedLabels{n} = local_format_knob_tick(majorTicks(n));
+                fixedLabels{n} = sprintf('%.0f%%', majorTicks(n));
             end
         
             app.ProcNoiseThresholdKnob.MajorTickLabels = fixedLabels;

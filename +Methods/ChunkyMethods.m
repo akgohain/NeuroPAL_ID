@@ -502,9 +502,11 @@ classdef ChunkyMethods
                 t_array = raw.array;
                 raw.array = uint16(double(intmax('uint16')) * double(raw.array)/double(max(raw.array(:))));
                 raw.array = double(raw.array)/double(max(raw.array(:)));
-                threshold_value = (app.ProcNoiseThresholdKnob.Value/double(max(t_array, [], 'all')))*double(max(raw.array, [], 'all'));
+                threshold_value = Program.GUIHandling.proc_threshold_raw_value( ...
+                    app, double(max(raw.array, [], 'all')));
             else
-                threshold_value = app.ProcNoiseThresholdKnob.Value;
+                threshold_value = Program.GUIHandling.proc_threshold_raw_value( ...
+                    app, double(max(raw.array, [], 'all')));
             end
 
             % Threshold.
