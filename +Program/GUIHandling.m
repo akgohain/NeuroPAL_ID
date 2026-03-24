@@ -590,6 +590,7 @@ classdef GUIHandling
         function histogram_handler(app, mode, image)
             raw = Program.GUIHandling.get_active_volume(app, 'request', 'array');
             nc = size(raw.array, 4);
+            state = Program.Handlers.channels.processing_state(app);
 
             if nc < 4
                 app.bl_hist_panel.Parent = app.CELL_ID;
@@ -624,15 +625,17 @@ classdef GUIHandling
                         if max(chan_hist, [], 'all') <= 1
                             chan_hist = chan_hist * Program.GUIHandling.proc_threshold_raw_max(app);
                         end
-                        
-                        if any(ismember(app.nameMap.keys(), num2str(c)))
+
+                        source_match = find([state.rows.source_idx] == c & [state.rows.enabled], 1);
+                        if ~isempty(source_match)
+                            row = state.rows(source_match);
                             h_panel = sprintf("%s_hist_panel", Program.GUIHandling.pos_prefixes{c});
                             h_label = sprintf("%s_Label", Program.GUIHandling.pos_prefixes{c});
                             h_axes = sprintf("%s_hist_ax", Program.GUIHandling.pos_prefixes{c});
 
                             app.(h_panel).Visible = 'on';
-                            app.(h_label).Text = sprintf("%s Channel", app.nameMap(num2str(c)));
-                            histogram(app.(h_axes), chan_hist, 'FaceColor', app.shortMap(num2str(c)), 'EdgeColor', app.shortMap(num2str(c)));
+                            app.(h_label).Text = sprintf("%s Channel", row.role_name);
+                            histogram(app.(h_axes), chan_hist, 'FaceColor', row.color, 'EdgeColor', row.color);
                             app.(h_axes).XLim = [app.HidezerointensitypixelsCheckBox.Value, app.(h_axes).XLim(2)];
        
                             if c >= 4
@@ -661,8 +664,9 @@ classdef GUIHandling
             x = min(max(round(app.proc_xSlider.Value), 1), app.proc_xSlider.Limits(2));
             y = min(max(round(app.proc_ySlider.Value), 1), app.proc_ySlider.Limits(2));
             z = min(max(round(app.proc_zSlider.Value), 1), app.proc_zSlider.Limits(2));
-            c_bools = Program.Handlers.channels.get_bools('array');
-            c_max = Program.Handlers.channels.get_max_idx();
+            channel_state = Program.Handlers.channels.processing_state(app);
+            c_bools = channel_state.enabled_source_indices;
+            c_max = channel_state.max_source_idx;
             c_load = 1:c_max;
             t = app.proc_tSlider.Value;
 
@@ -732,7 +736,10 @@ classdef GUIHandling
                         end
                     end
 
-                    rgb = Program.GUIHandling.get_rgb;
+                    rgb = [ ...
+                        channel_state.r.source_idx, ...
+                        channel_state.g.source_idx, ...
+                        channel_state.b.source_idx];
                     missing_rgb = rgb(~ismember(rgb, c_load));
                     slice(:, :, :, missing_rgb) = 0;
                     slice(:, :, :, [find(~ismember(c_load, c_bools))]) = 0;
@@ -745,14 +752,6 @@ classdef GUIHandling
             end
 
             Program.Handlers.loading.done();
-        end
-
-        function rgb = get_rgb()
-            app = Program.ProgramInfo.app;
-            rgb = [ ...
-                find(ismember(app.proc_c1_dropdown.Items, app.proc_c1_dropdown.Value)) ...
-                find(ismember(app.proc_c2_dropdown.Items, app.proc_c2_dropdown.Value)) ...
-                find(ismember(app.proc_c3_dropdown.Items, app.proc_c3_dropdown.Value))];
         end
 
         function set_gui_limits(app, mode, dims)
@@ -886,7 +885,6 @@ classdef GUIHandling
             for comp=1:length(Program.GUIHandling.cm_exclusive_gui)
                 app.(Program.GUIHandling.cm_exclusive_gui{comp}).Enable = strcmp(app.VolumeDropDown.Value, 'Colormap');
             end
-            app.ProcessingGridLayout.ColumnWidth = {'1x', 360};
         end
 
         function set_thresholds(app, max_val)

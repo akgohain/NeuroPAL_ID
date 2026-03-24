@@ -68,11 +68,8 @@ classdef ChunkyMethods
 
         function output_slice = apply_slice(app, action, slice)
             % Apply operation to a slice.
-            RGBW = [ ...
-                find(ismember(app.proc_c1_dropdown.Items, app.proc_c1_dropdown.Value)), ...
-                find(ismember(app.proc_c2_dropdown.Items, app.proc_c2_dropdown.Value)), ...
-                find(ismember(app.proc_c3_dropdown.Items, app.proc_c3_dropdown.Value)), ...
-                find(ismember(app.proc_c4_dropdown.Items, app.proc_c4_dropdown.Value))];
+            state = Program.Handlers.channels.processing_state(app);
+            RGBW = [state.r.source_idx, state.g.source_idx, state.b.source_idx, state.white.source_idx];
 
             if size(slice, 4) < max(RGBW)
                 RGBW = 1:size(slice, 4);
@@ -249,7 +246,8 @@ classdef ChunkyMethods
                 channel = channel.Source.Tag;
             end
 
-            ch_idx = [str2num(app.ProcRDropDown.Value), str2num(app.ProcGDropDown.Value), str2num(app.ProcBDropDown.Value)];
+            state = Program.Handlers.channels.processing_state(app);
+            ch_idx = [state.r.source_idx, state.g.source_idx, state.b.source_idx];
             size_selection = app.DropperradiusSpinner.Value;
             sigma_gauss = app.SigmagaussEditField.Value;
             rgb = ch_idx(1:3);
@@ -329,7 +327,8 @@ classdef ChunkyMethods
             output = vol;
 
             % Grab processing tab values.
-            ch_idx = [str2num(app.ProcRDropDown.Value), str2num(app.ProcGDropDown.Value), str2num(app.ProcBDropDown.Value)];
+            state = Program.Handlers.channels.processing_state(app);
+            ch_idx = [state.r.source_idx, state.g.source_idx, state.b.source_idx];
             size_selection = app.DropperradiusSpinner.Value;
             sigma_gauss = app.SigmagaussEditField.Value;
             rgb = ch_idx(1:3);
@@ -485,73 +484,30 @@ classdef ChunkyMethods
 
         function frame = load_proc_image(app)
             frame = struct('xy', {[]}, 'yz', {[]}, 'xz', {[]});
-            rgb = [str2num(app.ProcRDropDown.Value), str2num(app.ProcGDropDown.Value), str2num(app.ProcBDropDown.Value)];
-            if isempty(rgb)
-                app.ProcRDropDown.Value = '1';
-                app.ProcGDropDown.Value = '2';
-                app.ProcBDropDown.Value = '3';
-                app.ProcWDropDown.Value = '4';
-                rgb = [1, 2, 3];
-            end
-
-            % Grab current volume.
             raw = Program.GUIHandling.get_active_volume(app, 'request', 'all');
-            [raw.array, raw.dims] = Program.Validation.pad_rgb(raw.array);
-            
-            if strcmp(raw.state, 'colormap')
-                t_array = raw.array;
-                raw.array = uint16(double(intmax('uint16')) * double(raw.array)/double(max(raw.array(:))));
-                raw.array = double(raw.array)/double(max(raw.array(:)));
-                threshold_value = Program.GUIHandling.proc_threshold_raw_value( ...
-                    app, double(max(raw.array, [], 'all')));
-            else
-                threshold_value = Program.GUIHandling.proc_threshold_raw_value( ...
-                    app, double(max(raw.array, [], 'all')));
-            end
-
-            % Threshold.
-            raw.array(raw.array < threshold_value) = 0;
-            
-            % For each channel...
-            for c=1:raw.dims(4)
-                % ...Adjust the gamma & histogram.
-                c_gamma = sprintf("%s_GammaEditField", Program.GUIHandling.pos_prefixes{c});
-                c_hist = sprintf("%s_hist_slider", Program.GUIHandling.pos_prefixes{c});
-                slider_vals = app.(c_hist).Value; hist_limit = app.(c_hist).Limits(2);
-                
-                raw.array(:, :, :, c, :) = imadjustn(raw.array(:, :, :, c, :), [slider_vals(1)/hist_limit slider_vals(2)/hist_limit], [], app.(c_gamma).Value);
-                
-                if ~ismember(c, rgb)
-                    raw.array(:, :, :, rgb) = raw.array(:, :, :, rgb) + repmat(raw.array(:, :, :, c, :), [1, 1, 1, 3]);
-                    raw.array(:, :, :, c, :) = [];
-                end
-            end
-
-            % Apply processing operations.
-            actions = fieldnames(app.flags);
-            for a=1:length(actions)
-                action = actions{a};
-                if app.flags.(action) == 1
-                    raw.array = Methods.ChunkyMethods.apply_vol(app, action, raw.array);
-                end
-            end
+            package = Program.Routines.Processing.compose_volume(app, raw);
+            render_volume = package.render_volume;
+            raw_dims = package.raw_dims;
 
             Program.GUI.preprocessing_gui().set_gui_limits( ...
-                'x', [1, raw.dims(2)], ...
-                'y', [1, raw.dims(1)]);
+                'x', [1, raw_dims(2)], ...
+                'y', [1, raw_dims(1)]);
 
-            Program.GUIHandling.histogram_handler(app, 'draw', raw.array);
+            Program.Handlers.histograms.draw();
             Program.GUIHandling.shorten_knob_labels(app);
 
             if app.ProcShowMIPCheckBox.Value
-                frame.xy = squeeze(max(raw.array,[],3));
+                frame.xy = squeeze(max(render_volume, [], 3));
             else
-                frame.xy = squeeze(raw.array);
+                z_idx = min(max(round(raw.coords(3)), 1), size(render_volume, 3));
+                frame.xy = squeeze(render_volume(:, :, z_idx, :));
             end
 
             if app.ProcPreviewZslowCheckBox.Value
-                frame.xz = squeeze(raw.array(:,y,:,:,:));
-                frame.yz = squeeze(raw.array(x,:,:,:,:));
+                x = min(max(round(raw.coords(1)), 1), size(render_volume, 2));
+                y = min(max(round(raw.coords(2)), 1), size(render_volume, 1));
+                frame.xz = squeeze(render_volume(:, y, :, :));
+                frame.yz = squeeze(render_volume(x, :, :, :));
             end
         end
     end
