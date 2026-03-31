@@ -47,8 +47,8 @@ function set_manipulation_panel(state)
         otherwise
     end
 
+    row_index = app.ImageManipulationPanel.Layout.Row;
     temp_height = app.ProcSideGrid.RowHeight;
-    temp_height{3} = new_panel_height;
+    temp_height{row_index} = new_panel_height;
     app.ProcSideGrid.RowHeight = temp_height;
 end
-

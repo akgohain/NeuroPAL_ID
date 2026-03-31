@@ -917,19 +917,18 @@ classdef GUIHandling
             app.ProcNoiseThresholdKnob.Visible = 'off';
             app.ProcThresholdManipulationLabel.Text = 'Background Threshold (%)';
             app.ProcThresholdManipulationLabel.Tooltip = ...
-                'Global threshold on the combined displayed channels, expressed as a percent of the current intensity range.';
-
-            grid.ColumnWidth = {'1x', 92, 24, '1x'};
-            grid.RowHeight = {22, 22};
+                'Threshold applied globally across the current processing preview.';
+            grid.ColumnWidth = {'1x', 92, 24, '1x', 0};
+            grid.RowHeight = {22, 22, 0, 0};
 
             app.ProcNoiseThresholdField.Layout.Row = [1 2];
             app.ProcNoiseThresholdField.Layout.Column = 2;
             app.ProcNoiseThresholdField.ValueChangedFcn = @(src, event) ...
                 Program.GUIHandling.handle_threshold_field_changed(app, src);
             app.ProcNoiseThresholdField.Tooltip = ...
-                'Global threshold on the combined processing preview (% of current intensity range).';
+                'Threshold applied globally (% of the current preview intensity range).';
 
-            app.ProcThresholdGrid.RowHeight{2} = 52;
+            app.ProcThresholdGrid.RowHeight{2} = 74;
 
             handles = Program.GUIHandling.threshold_stepper_handles(app);
             if isempty(handles)
@@ -938,7 +937,7 @@ classdef GUIHandling
                 up_button.Layout.Column = 3;
                 up_button.FontSize = 11;
                 up_button.Text = char(9650);
-                up_button.Tooltip = 'Increase background threshold by 1%.';
+                up_button.Tooltip = 'Increase the threshold by 1%.';
                 up_button.ButtonPushedFcn = @(src, event) ...
                     Program.GUIHandling.step_proc_threshold(app, 1);
 
@@ -947,7 +946,7 @@ classdef GUIHandling
                 down_button.Layout.Column = 3;
                 down_button.FontSize = 11;
                 down_button.Text = char(9660);
-                down_button.Tooltip = 'Decrease background threshold by 1%.';
+                down_button.Tooltip = 'Decrease the threshold by 1%.';
                 down_button.ButtonPushedFcn = @(src, event) ...
                     Program.GUIHandling.step_proc_threshold(app, -1);
 
@@ -960,17 +959,27 @@ classdef GUIHandling
                 handles.up.Layout.Column = 3;
                 handles.down.Layout.Row = 2;
                 handles.down.Layout.Column = 3;
+                handles.up.Visible = 'on';
+                handles.down.Visible = 'on';
             end
 
+            app.ProcMeasureROINoiseButton.ButtonPushedFcn = @(src, event) ...
+                Program.GUIHandling.measure_threshold_from_roi(app);
+            app.ProcMeasure90pthNoiseButton.ButtonPushedFcn = @(src, event) ...
+                Program.GUIHandling.measure_threshold_from_percentile(app);
+            app.ProcMeasureROINoiseButton.Tooltip = 'Measure ROI noise from the current preview.';
+            app.ProcMeasure90pthNoiseButton.Tooltip = 'Measure percentile noise from the current preview.';
             Program.GUIHandling.set_threshold_stepper_state(app, app.ProcNoiseThresholdField.Enable);
         end
 
         function set_threshold_stepper_state(app, state)
+            if isprop(app.ProcNoiseThresholdKnob, 'Enable')
+                app.ProcNoiseThresholdKnob.Enable = state;
+            end
             handles = Program.GUIHandling.threshold_stepper_handles(app);
             if isempty(handles)
                 return
             end
-
             handles.up.Enable = state;
             handles.down.Enable = state;
         end
@@ -993,6 +1002,20 @@ classdef GUIHandling
             end
         end
 
+        function set_threshold_field_display(app, value, target_label)
+            %#ok<INUSD>
+            value = min(max(round(double(value)), 0), 100);
+            app.ProcNoiseThresholdField.Value = value;
+            app.ProcNoiseThresholdKnob.Value = value;
+            app.ProcNoiseThresholdField.Tooltip = ...
+                'Threshold applied globally (% of the current preview intensity range).';
+            handles = Program.GUIHandling.threshold_stepper_handles(app);
+            if ~isempty(handles)
+                handles.up.Tooltip = 'Increase the threshold by 1%.';
+                handles.down.Tooltip = 'Decrease the threshold by 1%.';
+            end
+        end
+
         function handle_threshold_field_changed(app, src)
             Program.GUIHandling.set_proc_threshold_value(app, src.Value, true);
         end
@@ -1005,9 +1028,7 @@ classdef GUIHandling
         function set_proc_threshold_value(app, value, redraw)
             limits = app.ProcNoiseThresholdField.Limits;
             value = min(max(round(double(value)), limits(1)), limits(2));
-
-            app.ProcNoiseThresholdField.Value = value;
-            app.ProcNoiseThresholdKnob.Value = value;
+            Program.GUIHandling.set_threshold_field_display(app, value, '');
 
             if redraw
                 Program.Routines.Processing.render();
@@ -1031,6 +1052,61 @@ classdef GUIHandling
 
             raw_max = max(double(raw_max), 1);
             value = (double(app.ProcNoiseThresholdField.Value) / 100) * raw_max;
+        end
+
+        function measure_threshold_from_roi(app)
+            [preview_frame, raw_max] = Program.GUIHandling.threshold_preview_frame(app);
+            if isempty(preview_frame)
+                return
+            end
+
+            Program.GUIHandling.gui_lock(app, 'lock', 'processing_tab');
+            check = uiconfirm(app.CELL_ID, ...
+                'Draw a box on the current preview to estimate noise.', ...
+                'NeuroPAL_ID', 'Options', ["OK", "Cancel"]);
+            if ~strcmp(check, "OK")
+                Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
+                return
+            end
+
+            roi = drawrectangle(app.proc_xyAxes, 'Color', 'black', 'StripeColor', 'm');
+            Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
+            mask = createMask(roi);
+            delete(roi);
+
+            roi_values = double(preview_frame(mask));
+            if isempty(roi_values)
+                return
+            end
+
+            pct = 100 * mean(roi_values, 'all') / raw_max;
+            Program.GUIHandling.set_proc_threshold_value(app, pct, true);
+        end
+
+        function measure_threshold_from_percentile(app)
+            [preview_frame, raw_max] = Program.GUIHandling.threshold_preview_frame(app);
+            if isempty(preview_frame)
+                return
+            end
+
+            pct = 100 * prctile(double(preview_frame(:)), 90) / raw_max;
+            Program.GUIHandling.set_proc_threshold_value(app, pct, true);
+        end
+
+        function [preview_frame, raw_max] = threshold_preview_frame(app)
+            preview_frame = [];
+            raw_max = 1;
+
+            raw = Program.GUIHandling.get_active_volume(app, 'request', 'all');
+            package = Program.Routines.Processing.compose_volume(app, raw);
+            render_volume = double(package.render_volume);
+            raw_max = max(max(render_volume, [], 'all'), 1);
+            if app.ProcShowMIPCheckBox.Value
+                preview_frame = squeeze(max(render_volume, [], 3));
+            else
+                z_idx = min(max(round(app.proc_zSlider.Value), 1), size(render_volume, 3));
+                preview_frame = squeeze(render_volume(:, :, z_idx, :));
+            end
         end
 
         function shorten_knob_labels(app)
