@@ -28,7 +28,7 @@ classdef histograms
         
         function draw()
             app = Program.app;
-            raw = Program.GUIHandling.get_active_volume(app, 'request', 'array');
+            raw = Program.Handlers.histograms.get_source_array(app);
 
             Program.Handlers.histograms.reset();
             rheight = app.ProcHistogramGrid.RowHeight;
@@ -87,6 +87,22 @@ classdef histograms
     end
 
     methods(Static, Access=private)
+        function raw = get_source_array(app)
+            if strcmp(app.VolumeDropDown.Value, 'Colormap') && ...
+                    app.ProcShowMIPCheckBox.Value && ...
+                    ~app.ProcPreviewZslowCheckBox.Value && ...
+                    isappdata(app.CELL_ID, 'proc_mip_cache')
+                cache = getappdata(app.CELL_ID, 'proc_mip_cache');
+                signature = Program.Helpers.processing_render_signature(app);
+                if isstruct(cache) && isfield(cache, 'signature') && strcmp(cache.signature, signature)
+                    raw = cache.raw;
+                    return
+                end
+            end
+
+            raw = Program.GUIHandling.get_active_volume(app, 'request', 'array');
+        end
+
         function [h_panel, h_label, h_axes] = get_gui(c)
             app = Program.app;
 

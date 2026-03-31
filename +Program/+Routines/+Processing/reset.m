@@ -38,6 +38,9 @@ function reset()
 
     d.Message = "Redrawing clean volume...";
     app.flags = struct();
+    if isappdata(app.CELL_ID, 'proc_mip_cache')
+        rmappdata(app.CELL_ID, 'proc_mip_cache');
+    end
     app.spectral_cache = struct( ...
         'ch_db', {[]}, ...
         'ch_px', {{}}, ...

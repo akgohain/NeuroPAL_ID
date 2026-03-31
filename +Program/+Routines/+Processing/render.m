@@ -2,18 +2,33 @@ function render()
     app = Program.app;
 
     Program.Handlers.dialogue.step('Loading target chunk...');
-    raw = Program.GUIHandling.get_active_volume(app, 'request', 'all');
-    package = Program.Routines.Processing.compose_volume(app, raw);
-    raw_dims = package.raw_dims;
-    render_volume = package.render_volume;
+    use_cached_mip = strcmp(app.VolumeDropDown.Value, 'Colormap') && ...
+        app.ProcShowMIPCheckBox.Value && ...
+        ~app.ProcPreviewZslowCheckBox.Value;
+
+    if use_cached_mip
+        [raw, package, frame, cache_hit] = local_get_cached_mip_payload(app);
+        raw_dims = package.raw_dims;
+        render_volume = [];
+    else
+        local_clear_mip_cache(app);
+        raw = Program.GUIHandling.get_active_volume(app, 'request', 'all');
+        package = Program.Routines.Processing.compose_volume(app, raw);
+        raw_dims = package.raw_dims;
+        render_volume = package.render_volume;
+        frame = [];
+        cache_hit = false;
+    end
     Program.Helpers.debug_event('ProcRender', ...
-        'coords=%s state=%s raw_dims=%s padded_dims=%s threshold_pct=%g mip=%d flags=%s', ...
+        'coords=%s state=%s raw_dims=%s padded_dims=%s threshold_pct=%g threshold_raw=%g mip=%d cache_hit=%d flags=%s', ...
         mat2str(raw.coords), ...
         string(raw.state), ...
         mat2str(size(raw.array)), ...
         mat2str(raw_dims), ...
         app.ProcNoiseThresholdField.Value, ...
+        package.threshold_raw, ...
         app.ProcShowMIPCheckBox.Value, ...
+        cache_hit, ...
         format_flags(app.flags));
     Program.Helpers.debug_array_summary('ProcRender', 'raw_array', raw.array);
 
@@ -39,9 +54,12 @@ function render()
         mat2str(b.settings.low_high_in), ...
         x, y, z, t);
     Program.Helpers.debug_event('ProcRender', ...
-        'threshold_raw=%g applies globally to the combined displayed channels', package.threshold_raw);
-    Program.Helpers.debug_array_summary('ProcRender', 'post_threshold', render_volume);
-    Program.Helpers.debug_array_summary('ProcRender', 'post_normalize', render_volume);
+        'threshold_pct=%g threshold_raw=%g applies globally after channel mixing', ...
+        app.ProcNoiseThresholdField.Value, package.threshold_raw);
+    if ~isempty(render_volume)
+        Program.Helpers.debug_array_summary('ProcRender', 'post_threshold', render_volume);
+        Program.Helpers.debug_array_summary('ProcRender', 'post_normalize', render_volume);
+    end
 
     Program.GUIHandling.set_gui_limits(app, dims=raw_dims);
     Program.Handlers.dialogue.step('Drawing histograms...');
@@ -49,9 +67,7 @@ function render()
     Program.GUIHandling.shorten_knob_labels(app);
 
     Program.Handlers.dialogue.step('Rendering volume data...');
-    if app.ProcShowMIPCheckBox.Value
-        frame = squeeze(max(render_volume, [], 3));
-    else
+    if ~app.ProcShowMIPCheckBox.Value
         z_idx = min(max(round(z), 1), size(render_volume, 3));
         frame = squeeze(render_volume(:, :, z_idx, :));
     end
@@ -90,6 +106,38 @@ function render()
         image(flipud(rot90(squeeze(render_volume(x, :, :, :, :)))), 'Parent', app.proc_xzAxes);
         image(squeeze(render_volume(:, y, :, :, :)), 'Parent', app.proc_yzAxes);
     end
+end
+
+function [raw, package, frame, cache_hit] = local_get_cached_mip_payload(app)
+cache_hit = false;
+frame = [];
+cache_key = Program.Helpers.processing_render_signature(app);
+
+if isappdata(app.CELL_ID, 'proc_mip_cache')
+    cache = getappdata(app.CELL_ID, 'proc_mip_cache');
+    if isstruct(cache) && isfield(cache, 'signature') && strcmp(cache.signature, cache_key)
+        raw = cache.raw;
+        package = cache.package;
+        frame = cache.frame;
+        cache_hit = true;
+        return
+    end
+end
+
+raw = Program.GUIHandling.get_active_volume(app, 'request', 'all');
+package = Program.Routines.Processing.compose_volume(app, raw);
+frame = squeeze(max(package.render_volume, [], 3));
+setappdata(app.CELL_ID, 'proc_mip_cache', struct( ...
+    'signature', cache_key, ...
+    'raw', raw, ...
+    'package', package, ...
+    'frame', frame));
+end
+
+function local_clear_mip_cache(app)
+if isappdata(app.CELL_ID, 'proc_mip_cache')
+    rmappdata(app.CELL_ID, 'proc_mip_cache');
+end
 end
 
 function out = format_flags(flags)
