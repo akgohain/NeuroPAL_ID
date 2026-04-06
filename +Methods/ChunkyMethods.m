@@ -499,8 +499,7 @@ classdef ChunkyMethods
             if app.ProcShowMIPCheckBox.Value
                 frame.xy = squeeze(max(render_volume, [], 3));
             else
-                z_idx = min(max(round(raw.coords(3)), 1), size(render_volume, 3));
-                frame.xy = squeeze(render_volume(:, :, z_idx, :));
+                frame.xy = Program.Helpers.extract_z_slice(render_volume, raw.coords(3), false);
             end
 
             if app.ProcPreviewZslowCheckBox.Value

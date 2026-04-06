@@ -9,16 +9,9 @@ function set_bounds()
             frame = app.retrieve_frame(1);
     end
 
-    frame_class = class(frame);
-    if ismember(frame_class, {'double', 'single'})
-        new_max = max(frame, [], 'all');
-    else
-        new_max = intmax(frame_class);
-    end
-
-    setappdata(app.CELL_ID, 'proc_threshold_raw_max', double(max(new_max, 1)));
+    setappdata(app.CELL_ID, 'proc_threshold_raw_max', 255);
     for p=1:length(pfx)
         handle = sprintf('%s_hist_slider', pfx{p});
-        app.(handle).Limits(2) = new_max;
+        app.(handle).Limits(2) = 255;
     end
 end

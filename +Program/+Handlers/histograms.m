@@ -29,57 +29,47 @@ classdef histograms
         function draw()
             app = Program.app;
             raw = Program.Handlers.histograms.get_source_array(app);
+            state = Program.Handlers.channels.processing_state(app);
+            rows = state.rows([state.rows.source_idx] > 0);
 
             Program.Handlers.histograms.reset();
             rheight = app.ProcHistogramGrid.RowHeight;
             rheight{2} = 0;
             app.ProcHistogramGrid.RowHeight = rheight;
 
-            for c=1:length(app.proc_channel_grid.RowHeight)
-                checkbox = Program.Routines.GUI.get_component('pp_cb', c);
-                if checkbox.Value
-                    dropdown = Program.Routines.GUI.get_component('pp_dd', c);
-                    reference = Program.Helpers.get_reference(c);
-                    if isempty(reference)
-                        continue
-                    end
+            for n = 1:numel(rows)
+                row = rows(n);
+                chan_hist = Program.Helpers.to_user_uint8(raw.array(:, :, :, row.source_idx));
 
-                    chan_hist = raw.array(:, :, :, find(ismember(dropdown.Items, dropdown.Value)));
+                if app.HidezerointensitypixelsCheckBox.Value
+                    chan_hist = chan_hist(chan_hist > 0);
+                end
 
-                    if app.HidezerointensitypixelsCheckBox.Value
-                        chan_hist = chan_hist(chan_hist>0);
-                    end
-                    
-                    if max(chan_hist, [], 'all') <= 1
-                        chan_hist = chan_hist * Program.GUIHandling.proc_threshold_raw_max(app);
-                    end
+                if isempty(chan_hist)
+                    continue
+                end
 
-                    [h_panel, h_label, h_axes] = Program.Handlers.histograms.get_gui(c);
-                    h_panel.Visible = 'on';
+                [h_panel, h_label, h_axes] = Program.Handlers.histograms.get_gui(row.row);
+                h_panel.Visible = 'on';
 
-                    h_label.Text = sprintf("%s Channel", reference.name);
-                    histogram(h_axes, chan_hist, ...
-                        'FaceColor', reference.color, ...
-                        'EdgeColor', reference.color)
-                    lower_bound = app.HidezerointensitypixelsCheckBox.Value;
-                    if h_axes.XLim(2) <= 1.0 && lower_bound == 1
-                        lower_bound = 0.001;
-                    end
-                    h_axes.XLim = [lower_bound, h_axes.XLim(2)];
+                h_label.Text = sprintf("%s Channel", row.role_name);
+                histogram(h_axes, chan_hist, ...
+                    'FaceColor', row.color, ...
+                    'EdgeColor', row.color)
+                lower_bound = app.HidezerointensitypixelsCheckBox.Value;
+                if h_axes.XLim(2) <= 1.0 && lower_bound == 1
+                    lower_bound = 0.001;
+                end
+                h_axes.XLim = [lower_bound, h_axes.XLim(2)];
 
-                    n_max = Program.Handlers.channels.config{'max_channels'};
-                    if c >= 4
-                        rheight = app.ProcHistogramGrid.RowHeight;
-                        rheight{2} = '1x';
-                        app.ProcHistogramGrid.RowHeight = rheight;
+                if row.row >= 4
+                    rheight = app.ProcHistogramGrid.RowHeight;
+                    rheight{2} = '1x';
+                    app.ProcHistogramGrid.RowHeight = rheight;
 
-                        h_panel.Parent = app.ProcHistogramGrid;
-                        h_panel.Layout.Row = 2;
-
-                        if c <= n_max
-                            h_panel.Layout.Column = c - 3;
-                        end
-                    end
+                    h_panel.Parent = app.ProcHistogramGrid;
+                    h_panel.Layout.Row = 2;
+                    h_panel.Layout.Column = row.row - 3;
                 end
             end
             
@@ -90,9 +80,8 @@ classdef histograms
         function raw = get_source_array(app)
             if strcmp(app.VolumeDropDown.Value, 'Colormap') && ...
                     app.ProcShowMIPCheckBox.Value && ...
-                    ~app.ProcPreviewZslowCheckBox.Value && ...
-                    isappdata(app.CELL_ID, 'proc_mip_cache')
-                cache = getappdata(app.CELL_ID, 'proc_mip_cache');
+                    isappdata(app.CELL_ID, 'proc_render_cache')
+                cache = getappdata(app.CELL_ID, 'proc_render_cache');
                 signature = Program.Helpers.processing_render_signature(app);
                 if isstruct(cache) && isfield(cache, 'signature') && strcmp(cache.signature, signature)
                     raw = cache.raw;
