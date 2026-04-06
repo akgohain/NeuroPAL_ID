@@ -9,6 +9,9 @@ function load_file(mode, path)
             if isappdata(app.CELL_ID, 'proc_mip_cache')
                 rmappdata(app.CELL_ID, 'proc_mip_cache');
             end
+            if isappdata(app.CELL_ID, 'proc_render_cache')
+                rmappdata(app.CELL_ID, 'proc_render_cache');
+            end
             app.rotation_stack.cache = struct('Colormap', {{}}, 'Video', {{}});
             gammas = [];
             
@@ -86,6 +89,7 @@ function load_file(mode, path)
             end
             
             Program.Routines.GUI.set_limits(nx, ny, nz, nt);
+            Program.GUIHandling.install_processing_slider_callbacks(app);
 
             app.ProcXYFactorEditField.Enable = 'on';
             app.ProcZSlicesEditField.Enable = 'on';
@@ -110,6 +114,7 @@ function load_file(mode, path)
             d.Value = 5 / 5;
             d.Message = sprintf('Drawing image...');
             app.drawProcImage();
+            Program.GUIHandling.capture_processing_defaults(app, lower(string(app.VolumeDropDown.Value)), true);
 
             app.ImageProcessingTab.Tag = 'rendered';
             set(app.ProcessingButton, 'Visible', 'off');

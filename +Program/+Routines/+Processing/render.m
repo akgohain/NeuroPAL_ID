@@ -1,45 +1,32 @@
 function render()
     app = Program.app;
+    Program.GUIHandling.update_processing_zslider_visibility(app);
 
-    Program.Handlers.dialogue.step('Loading target chunk...');
-    use_cached_mip = strcmp(app.VolumeDropDown.Value, 'Colormap') && ...
-        app.ProcShowMIPCheckBox.Value && ...
-        ~app.ProcPreviewZslowCheckBox.Value;
+    [raw, package, cache_hit] = local_get_cached_payload(app);
+    raw_dims = package.raw_dims;
+    render_volume = package.render_volume;
 
-    if use_cached_mip
-        [raw, package, frame, cache_hit] = local_get_cached_mip_payload(app);
-        raw_dims = package.raw_dims;
-        render_volume = [];
-    else
-        local_clear_mip_cache(app);
-        raw = Program.GUIHandling.get_active_volume(app, 'request', 'all');
-        package = Program.Routines.Processing.compose_volume(app, raw);
-        raw_dims = package.raw_dims;
-        render_volume = package.render_volume;
-        frame = [];
-        cache_hit = false;
-    end
     Program.Helpers.debug_event('ProcRender', ...
-        'coords=%s state=%s raw_dims=%s padded_dims=%s threshold_pct=%g threshold_raw=%g mip=%d cache_hit=%d flags=%s', ...
+        'coords=%s state=%s raw_dims=%s padded_dims=%s threshold_raw=%g mip=%d cache_hit=%d flags=%s', ...
         mat2str(raw.coords), ...
         string(raw.state), ...
         mat2str(size(raw.array)), ...
         mat2str(raw_dims), ...
-        app.ProcNoiseThresholdField.Value, ...
         package.threshold_raw, ...
         app.ProcShowMIPCheckBox.Value, ...
         cache_hit, ...
         format_flags(app.flags));
-    Program.Helpers.debug_array_summary('ProcRender', 'raw_array', raw.array);
+    if ~cache_hit
+        Program.Helpers.debug_array_summary('ProcRender', 'raw_array', raw.array);
+    end
 
-    Program.Handlers.dialogue.step('Parsing channel data...');
     r = package.channels.r;
     g = package.channels.g;
     b = package.channels.b;
     white = package.channels.white;
     dic = package.channels.dic;
     gfp = package.channels.gfp;
-    [x, y, z, t] = Program.Routines.Processing.parse_gui(); 
+    [x, y, z, t] = Program.Routines.Processing.parse_gui();
     Program.Helpers.debug_event('ProcRender', ...
         ['channels rgb=[%d %d %d] w=%d dic=%d gfp=%d checks=%s ' ...
          'rgb_gamma=%s white_gamma=%g dic_gamma=%g gfp_gamma=%g'], ...
@@ -53,28 +40,23 @@ function render()
         mat2str(g.settings.low_high_in), ...
         mat2str(b.settings.low_high_in), ...
         x, y, z, t);
-    Program.Helpers.debug_event('ProcRender', ...
-        'threshold_pct=%g threshold_raw=%g applies globally after channel mixing', ...
-        app.ProcNoiseThresholdField.Value, package.threshold_raw);
-    if ~isempty(render_volume)
-        Program.Helpers.debug_array_summary('ProcRender', 'post_threshold', render_volume);
-        Program.Helpers.debug_array_summary('ProcRender', 'post_normalize', render_volume);
+
+    if ~cache_hit
+        Program.GUIHandling.set_gui_limits(app, dims=raw_dims);
+        Program.Handlers.dialogue.step('Drawing histograms...');
+        Program.Handlers.histograms.draw();
+        Program.GUIHandling.shorten_knob_labels(app);
     end
 
-    Program.GUIHandling.set_gui_limits(app, dims=raw_dims);
-    Program.Handlers.dialogue.step('Drawing histograms...');
-    Program.Handlers.histograms.draw();
-    Program.GUIHandling.shorten_knob_labels(app);
-
     Program.Handlers.dialogue.step('Rendering volume data...');
-    if ~app.ProcShowMIPCheckBox.Value
-        z_idx = min(max(round(z), 1), size(render_volume, 3));
-        frame = squeeze(render_volume(:, :, z_idx, :));
+    if app.ProcShowMIPCheckBox.Value
+        frame = squeeze(max(render_volume, [], 3));
+    else
+        [frame, z, ~] = Program.Helpers.get_current_display_slice(app, 'processing', render_volume);
     end
     Program.Helpers.debug_array_summary('ProcRender', 'frame', frame);
     log_main_parity(app, frame);
 
-    % Ensure frame is displayable.
     if ndims(frame) == 2
         image(frame, 'Parent', app.proc_xyAxes);
     elseif ndims(frame) == 3
@@ -108,36 +90,52 @@ function render()
     end
 end
 
-function [raw, package, frame, cache_hit] = local_get_cached_mip_payload(app)
+function [raw, package, cache_hit] = local_get_cached_payload(app)
 cache_hit = false;
-frame = [];
 cache_key = Program.Helpers.processing_render_signature(app);
+use_cache = strcmp(app.VolumeDropDown.Value, 'Colormap');
 
-if isappdata(app.CELL_ID, 'proc_mip_cache')
-    cache = getappdata(app.CELL_ID, 'proc_mip_cache');
+if use_cache && isappdata(app.CELL_ID, 'proc_render_cache')
+    cache = getappdata(app.CELL_ID, 'proc_render_cache');
     if isstruct(cache) && isfield(cache, 'signature') && strcmp(cache.signature, cache_key)
         raw = cache.raw;
         package = cache.package;
-        frame = cache.frame;
         cache_hit = true;
         return
     end
 end
 
-raw = Program.GUIHandling.get_active_volume(app, 'request', 'all');
+if use_cache
+    raw = local_get_full_colormap_payload(app);
+else
+    raw = Program.GUIHandling.get_active_volume(app, 'request', 'all');
+end
 package = Program.Routines.Processing.compose_volume(app, raw);
-frame = squeeze(max(package.render_volume, [], 3));
-setappdata(app.CELL_ID, 'proc_mip_cache', struct( ...
-    'signature', cache_key, ...
-    'raw', raw, ...
-    'package', package, ...
-    'frame', frame));
+if use_cache
+    setappdata(app.CELL_ID, 'proc_render_cache', struct( ...
+        'signature', cache_key, ...
+        'raw', raw, ...
+        'package', package));
+end
 end
 
-function local_clear_mip_cache(app)
-if isappdata(app.CELL_ID, 'proc_mip_cache')
-    rmappdata(app.CELL_ID, 'proc_mip_cache');
+function raw = local_get_full_colormap_payload(app)
+state = Program.Handlers.channels.processing_state(app);
+max_idx = state.max_source_idx;
+if max_idx < 1
+    dims = size(app.proc_image, 'data');
+    array = zeros(dims(1), dims(2), dims(3), 1, class(app.proc_image.data(1,1,1,1)));
+else
+    array = app.proc_image.data(:, :, :, 1:max_idx);
 end
+if ndims(array) == 3
+    array = reshape(array, size(array,1), size(array,2), size(array,3), 1);
+end
+raw = struct( ...
+    'state', 'colormap', ...
+    'dims', size(array), ...
+    'array', array, ...
+    'coords', [app.proc_xSlider.Value, app.proc_ySlider.Value, app.proc_zSlider.Value, app.proc_tSlider.Value]);
 end
 
 function out = format_flags(flags)
@@ -170,13 +168,11 @@ if isempty(app.image_view)
     return
 end
 
-z_gui = round(app.ZSlider.Value);
-z_data = z_gui;
-if isfield(app.image_prefs, 'is_Z_flip') && app.image_prefs.is_Z_flip
-    z_data = size(app.image_view, 3) - z_data + 1;
-end
+z_gui = Program.Helpers.gui_z_to_data_index(app.ZSlider.Value, size(app.image_view, 3), false);
+z_data = Program.Helpers.gui_z_to_data_index(z_gui, size(app.image_view, 3), ...
+    isfield(app.image_prefs, 'is_Z_flip') && app.image_prefs.is_Z_flip);
 
-main_frame = squeeze(app.image_view(:, :, z_data, :));
+[main_frame, ~, ~] = Program.Helpers.get_current_display_slice(app, 'main', app.image_view);
 if ~isequal(size(main_frame), size(frame))
     Program.Helpers.debug_event('ProcParity', ...
         'Skipped: main frame size %s ~= processing frame size %s', ...

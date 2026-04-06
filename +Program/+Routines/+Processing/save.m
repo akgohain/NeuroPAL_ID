@@ -19,6 +19,9 @@ function save()
     if isappdata(app.CELL_ID, 'proc_mip_cache')
         rmappdata(app.CELL_ID, 'proc_mip_cache');
     end
+    if isappdata(app.CELL_ID, 'proc_render_cache')
+        rmappdata(app.CELL_ID, 'proc_render_cache');
+    end
     if had_file_actions
         Program.Handlers.dialogue.resolve();
         prompt = "Successfully updated file. Load into main tab?";

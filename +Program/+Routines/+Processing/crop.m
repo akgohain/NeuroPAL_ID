@@ -12,6 +12,7 @@ function crop()
     Program.GUIHandling.gui_lock(app, 'lock', 'processing_tab', event);
     check = uiconfirm(app.CELL_ID, "Draw a bounding box on the volume to crop the image.", "NeuroPAL_ID", "Options", ["OK", "Cancel"]);
     if ~strcmp(check, "OK")
+        Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
         return
     end
 
@@ -30,4 +31,3 @@ function crop()
         drawnow;
     end
 end
-
