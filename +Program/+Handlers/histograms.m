@@ -46,13 +46,11 @@ classdef histograms
                     chan_hist = chan_hist(chan_hist > 0);
                 end
 
+                cla(h_axes);
                 if isempty(chan_hist)
-                    cla(h_axes);
                     Program.Handlers.histograms.set_histogram_xlim(app, h_axes);
                 else
-                    histogram(h_axes, chan_hist, ...
-                        'FaceColor', row.color, ...
-                        'EdgeColor', row.color)
+                    Program.Handlers.histograms.draw_histogram_series(h_axes, chan_hist, row.color);
                     Program.Handlers.histograms.set_histogram_xlim(app, h_axes);
                 end
             end
@@ -138,6 +136,14 @@ classdef histograms
                 lower_bound = 1;
             end
             h_axes.XLim = [lower_bound, 255];
+        end
+
+        function draw_histogram_series(h_axes, chan_hist, color)
+            counts = histcounts(double(chan_hist(:)), -0.5:255.5);
+            centers = 0:255;
+            bar(h_axes, centers, counts, 1, ...
+                'FaceColor', color, ...
+                'EdgeColor', 'none');
         end
     end
 end
