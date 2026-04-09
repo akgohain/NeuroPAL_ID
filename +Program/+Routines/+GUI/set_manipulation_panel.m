@@ -28,6 +28,7 @@ function set_manipulation_panel(state)
             end
 
             app.proc_ds_panel.Visible = "on";
+            Program.GUIHandling.install_processing_downsample_callbacks(app);
 
             for h=1:length(panel_gui.default)
                 app.(panel_gui.default{h}).Enable = 'off';

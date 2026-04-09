@@ -31,9 +31,10 @@ classdef ChunkyMethods
                     new_dims(1:2) = [bottom_edge-top_edge+1, right_edge-left_edge+1];
 
                 case 'ds'
+                    [target_xy, target_slices] = Methods.ChunkyMethods.proc_downsample_targets(app, og_dims(1:3));
                     new_dims = og_dims;
-                    new_dims(1:2) = new_dims(1:2)*app.ProcXYFactorEditField.Value;
-                    new_dims(3) = app.ProcZSlicesEditField.Value;
+                    new_dims(1:2) = target_xy;
+                    new_dims(3) = numel(target_slices);
 
                 case {'hori', 'vert', 'cc', 'acc', 'rotate'}
                     temp_arr = zeros(og_dims);
@@ -104,9 +105,13 @@ classdef ChunkyMethods
                     output_slice = temp_slice(end:-1:1,:,:,:,:);
 
                 case 'ds'
-                    temp_slice = imresize(slice,[size(slice, 1)*app.ProcXYFactorEditField.Value size(slice, 2)*app.ProcXYFactorEditField.Value]);
-                    target_slices = Methods.ChunkyMethods.proc_target_slices(size(temp_slice, 3), app.ProcZSlicesEditField.Value);
+                    [target_xy, target_slices] = Methods.ChunkyMethods.proc_downsample_targets(app, ...
+                        [size(slice, 1), size(slice, 2), size(slice, 3)]);
+                    temp_slice = imresize(slice, target_xy);
                     output_slice = temp_slice(:, :, target_slices, :);
+
+                case 'window'
+                    output_slice = Methods.ChunkyMethods.apply_channel_windows(app, slice);
 
                 case 'debleed'
                     % TBD
@@ -123,6 +128,11 @@ classdef ChunkyMethods
                 otherwise
                     [new_dims, old_dims] = Methods.ChunkyMethods.calc_pp_size(app, action, vol);
                     nz = old_dims(3);
+
+                    if strcmp(action, 'ds')
+                        processed_vol = Methods.ChunkyMethods.apply_slice(app, action, vol);
+                        return
+                    end
 
                     % Initialize cache array.
                     processed_vol = zeros(new_dims, class(vol));
@@ -161,19 +171,17 @@ classdef ChunkyMethods
                 return
             end
 
+            current_vol = app.proc_image.data;
             for a=1:length(actions)
-                if exist('progress', 'var')
-                    Program.Handlers.dialogue.add_task(sprintf("Applying %s", actions{a}));
-                    Program.Handlers.dialogue.set_value(a/length(actions));
-                    processed_vol = Methods.ChunkyMethods.apply_vol(app, actions{a}, app.proc_image.data);
-                else
-                    processed_vol = Methods.ChunkyMethods.apply_vol(app, actions{a}, app.proc_image.data);
-                end
+                Program.Handlers.dialogue.add_task(sprintf("Applying %s", actions{a}));
+                Program.Handlers.dialogue.set_value(a/length(actions));
+                processed_vol = Methods.ChunkyMethods.apply_vol(app, actions{a}, current_vol);
+                current_vol = processed_vol;
             end
     
             % Save to file.
             app.proc_image.Properties.Writable = true;
-            app.proc_image.data = processed_vol;
+            app.proc_image.data = current_vol;
             app.proc_image.Properties.Writable = false;
         end
 
@@ -212,7 +220,7 @@ classdef ChunkyMethods
                 time_string = Program.GUIHandling.get_time_string(start_time, t, nt);
                 Program.Handlers.dialogue.add_task(sprintf("Frame %.f/%.f %s", t, nt, time_string));
 
-                processed_frame = app.retrieve_frame(app.proc_tSlider.Value);
+                processed_frame = app.retrieve_frame(t);
 
                 for a=1:length(actions)
                     Program.Handlers.dialogue.set_value(min(frame_progress + (frame_progress/t)*(a/length(actions)), 1));
@@ -408,33 +416,38 @@ classdef ChunkyMethods
 
         function sliceIndices = proc_target_slices(nz, nnz)
             % Calculate the indices of slices to retain for a new volume with nnz slices while preserving isotropy.
-        
-            % Validate inputs
+
+            nz = max(1, round(double(nz)));
+            nnz = min(max(round(double(nnz)), 1), nz);
+
+            if nnz <= 1
+                sliceIndices = ceil(nz / 2);
+                return
+            end
+
             if nnz >= nz
-                error('nnz must be less than nz');
+                sliceIndices = 1:nz;
+                return
             end
-        
-            % Calculate the indices to retain
-            mid = ceil(nz / 2); % Middle slice index of the original volume
-            half_nnz = floor(nnz / 2); % Half the number of slices to retain
-        
-            if mod(nnz, 2) == 0
-                % If nnz is even, we take slices symmetrically around the middle slice
-                startIndex = mid - half_nnz;
-                endIndex = mid + half_nnz - 1;
-                
-                % If nz is odd, exclude the middle slice
-                if mod(nz, 2) ~= 0
-                    sliceIndices = [startIndex:mid-1, mid+1:endIndex];
-                else
-                    sliceIndices = startIndex:endIndex;
+
+            target_positions = linspace(1, nz, nnz);
+            available = 1:nz;
+            sliceIndices = zeros(1, nnz);
+            used = false(1, nz);
+
+            for k = 1:nnz
+                [~, order] = sort(abs(available - target_positions(k)), 'ascend');
+                for candidate_idx = order
+                    candidate = available(candidate_idx);
+                    if ~used(candidate)
+                        sliceIndices(k) = candidate;
+                        used(candidate) = true;
+                        break
+                    end
                 end
-            else
-                % If nnz is odd, we take an odd number of slices symmetrically
-                startIndex = mid - half_nnz;
-                endIndex = mid + half_nnz;
-                sliceIndices = startIndex:endIndex;
             end
+
+            sliceIndices = sort(sliceIndices);
         end
 
         function neurons = stream_neurons(mode)
@@ -508,6 +521,157 @@ classdef ChunkyMethods
                 frame.xz = squeeze(render_volume(:, y, :, :));
                 frame.yz = squeeze(render_volume(x, :, :, :));
             end
+        end
+
+        function output = apply_channel_windows(app, volume)
+            output = volume;
+            if ndims(output) < 4
+                return
+            end
+
+            window_settings = Methods.ChunkyMethods.proc_window_settings(app, size(output, 4));
+            if isempty(window_settings)
+                return
+            end
+
+            for n = 1:numel(window_settings)
+                source_idx = window_settings(n).source_idx;
+                output(:, :, :, source_idx) = Methods.ChunkyMethods.apply_channel_window( ...
+                    output(:, :, :, source_idx), ...
+                    window_settings(n).low_high_in);
+            end
+        end
+
+        function window_settings = proc_window_settings(app, n_channels)
+            state = Program.Handlers.channels.processing_state(app);
+            template = struct('source_idx', 0, 'low_high_in', [0 1]);
+            assigned = false(1, n_channels);
+            window_settings = repmat(template, 1, n_channels);
+
+            for n = 1:numel(state.rows)
+                row = state.rows(n);
+                source_idx = row.source_idx;
+                if source_idx < 1 || source_idx > n_channels || assigned(source_idx)
+                    continue
+                end
+
+                low_high = double(row.settings.low_high_in);
+                if isempty(low_high) || numel(low_high) ~= 2
+                    continue
+                end
+
+                low_high = Methods.ChunkyMethods.normalize_window_range(low_high);
+                if all(abs(low_high - [0 1]) <= (0.5 / 255))
+                    continue
+                end
+
+                window_settings(source_idx).source_idx = source_idx;
+                window_settings(source_idx).low_high_in = low_high;
+                assigned(source_idx) = true;
+            end
+
+            window_settings = window_settings(assigned);
+        end
+
+        function output = apply_channel_window(channel, low_high_in)
+            low_high_in = Methods.ChunkyMethods.normalize_window_range(low_high_in);
+            if all(abs(low_high_in - [0 1]) <= (0.5 / 255))
+                output = channel;
+                return
+            end
+
+            if isfloat(channel)
+                finite_mask = isfinite(channel);
+                if ~any(finite_mask, 'all')
+                    output = channel;
+                    return
+                end
+
+                finite_vals = channel(finite_mask);
+                min_val = min(finite_vals, [], 'all');
+                max_val = max(finite_vals, [], 'all');
+                if min_val >= 0 && max_val <= 1
+                    min_val = 0;
+                    max_val = 1;
+                end
+                if max_val <= min_val
+                    output = zeros(size(channel), 'like', channel);
+                    return
+                end
+
+                normalized = zeros(size(channel), 'double');
+                normalized(finite_mask) = (double(channel(finite_mask)) - double(min_val)) ./ ...
+                    (double(max_val) - double(min_val));
+                normalized = min(max(normalized, 0), 1);
+                adjusted = imadjustn(normalized, low_high_in, [0 1], 1);
+
+                output = channel;
+                adjusted = double(adjusted) .* (double(max_val) - double(min_val)) + double(min_val);
+                output(finite_mask) = cast(adjusted(finite_mask), class(channel));
+                return
+            end
+
+            output = imadjustn(channel, low_high_in, [0 1], 1);
+        end
+
+        function low_high = normalize_window_range(low_high)
+            if isempty(low_high) || numel(low_high) < 2
+                low_high = [0 1];
+                return
+            end
+
+            low_high = double(low_high(:)');
+            low_high = min(max(low_high(1:2), 0), 1);
+            if low_high(1) > low_high(2)
+                low_high = fliplr(low_high);
+            end
+        end
+
+        function request = proc_downsample_request(app, dims3)
+            ny = max(1, round(double(dims3(1))));
+            nx = max(1, round(double(dims3(2))));
+            nz = max(1, round(double(dims3(3))));
+
+            min_xy_factor = 1 / max([ny, nx]);
+            xy_factor = double(app.ProcXYFactorEditField.Value);
+            if ~isfinite(xy_factor)
+                xy_factor = 1;
+            end
+            xy_factor = min(max(xy_factor, min_xy_factor), 1);
+
+            z_target = double(app.ProcZSlicesEditField.Value);
+            if ~isfinite(z_target)
+                z_target = nz;
+            end
+            z_target = min(max(round(z_target), 1), nz);
+
+            target_xy = max(1, round([ny, nx] * xy_factor));
+            target_xy = min(target_xy, [ny, nx]);
+            target_slices = Methods.ChunkyMethods.proc_target_slices(nz, z_target);
+
+            if isequal(target_xy, [ny, nx])
+                xy_factor = 1;
+            end
+            if numel(target_slices) == nz
+                z_target = nz;
+            else
+                z_target = numel(target_slices);
+            end
+
+            request = struct( ...
+                'dims3', [ny, nx, nz], ...
+                'min_xy_factor', min_xy_factor, ...
+                'xy_factor', xy_factor, ...
+                'target_xy', target_xy, ...
+                'z_target', z_target, ...
+                'target_slices', target_slices, ...
+                'is_identity', isequal(target_xy, [ny, nx]) && numel(target_slices) == nz);
+        end
+
+        function [target_xy, target_slices] = proc_downsample_targets(app, dims3)
+            request = Methods.ChunkyMethods.proc_downsample_request(app, dims3);
+            target_xy = request.target_xy;
+            target_slices = request.target_slices;
         end
     end
 end

@@ -49,7 +49,7 @@ switch target
             'gfp', Program.Handlers.channels.render_struct_from_row(state.gfp), ...
             'other', {cellfun(@Program.Handlers.channels.other_struct_from_row, ...
                 num2cell(state.other), 'UniformOutput', false)});
-        threshold_raw = Program.GUIHandling.proc_threshold_raw_value(app, max(raw_volume, [], 'all'));
+        threshold_raw = 0;
         is_z_flip = false;
 
     otherwise

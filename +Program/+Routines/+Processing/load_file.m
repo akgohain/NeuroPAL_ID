@@ -12,6 +12,15 @@ function load_file(mode, path)
             if isappdata(app.CELL_ID, 'proc_render_cache')
                 rmappdata(app.CELL_ID, 'proc_render_cache');
             end
+            if isappdata(app.CELL_ID, 'proc_raw_cache')
+                rmappdata(app.CELL_ID, 'proc_raw_cache');
+            end
+            if isappdata(app.CELL_ID, 'proc_histogram_signature')
+                rmappdata(app.CELL_ID, 'proc_histogram_signature');
+            end
+            if isappdata(app.CELL_ID, 'proc_render_view_dims')
+                rmappdata(app.CELL_ID, 'proc_render_view_dims');
+            end
             app.rotation_stack.cache = struct('Colormap', {{}}, 'Video', {{}});
             gammas = [];
             
@@ -90,9 +99,18 @@ function load_file(mode, path)
             
             Program.Routines.GUI.set_limits(nx, ny, nz, nt);
             Program.GUIHandling.install_processing_slider_callbacks(app);
+            Program.GUIHandling.install_processing_histogram_callbacks(app);
+            Program.GUIHandling.configure_processing_color_panel(app);
 
             app.ProcXYFactorEditField.Enable = 'on';
             app.ProcZSlicesEditField.Enable = 'on';
+            app.ProcZSlicesEditField.Limits = [1, max(1, nz)];
+            app.ProcZSlicesEditField.RoundFractionalValues = 'on';
+            app.ProcZSlicesEditField.ValueDisplayFormat = '%.0f';
+            app.ProcTStartEditField.Limits = [1, max(1, nt)];
+            app.ProcTStopEditField.Limits = [1, max(1, nt)];
+            app.ProcTStartEditField.RoundFractionalValues = 'on';
+            app.ProcTStopEditField.RoundFractionalValues = 'on';
 
             set(app.proc_xEditField, 'Enable', 'off');
             set(app.proc_yEditField, 'Enable', 'off');
@@ -121,6 +139,8 @@ function load_file(mode, path)
             set(app.ProcessingGridLayout, 'Visible', 'on');
 
             app.TabGroup.SelectedTab = app.ImageProcessingTab;
+            drawnow limitrate nocallbacks;
+            Program.GUIHandling.apply_processing_responsive_layout(app);
             close(d)
 
             check = uiconfirm(app.CELL_ID, "We recommend starting by cropping your image to ensure that there is no superfluous space taking up memory. Do you want to do so now?", "NeuroPAL_ID", "Options", ["Yes", "No, skip cropping."]);

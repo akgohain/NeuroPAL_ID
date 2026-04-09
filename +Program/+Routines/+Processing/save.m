@@ -1,6 +1,6 @@
 function save()
     app = Program.app;
-    actions = fieldnames(app.flags);
+    actions = Program.GUIHandling.processing_file_actions(app);
     had_file_actions = ~isempty(actions);
 
     if had_file_actions
@@ -21,6 +21,15 @@ function save()
     end
     if isappdata(app.CELL_ID, 'proc_render_cache')
         rmappdata(app.CELL_ID, 'proc_render_cache');
+    end
+    if isappdata(app.CELL_ID, 'proc_raw_cache')
+        rmappdata(app.CELL_ID, 'proc_raw_cache');
+    end
+    if isappdata(app.CELL_ID, 'proc_histogram_signature')
+        rmappdata(app.CELL_ID, 'proc_histogram_signature');
+    end
+    if isappdata(app.CELL_ID, 'proc_render_view_dims')
+        rmappdata(app.CELL_ID, 'proc_render_view_dims');
     end
     if had_file_actions
         Program.Handlers.dialogue.resolve();

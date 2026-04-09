@@ -8,5 +8,7 @@ function save_prompt(action)
         end
     else
         app.flags.(action) = 1;
+        Program.Routines.Processing.render();
+        drawnow limitrate nocallbacks;
     end
 end

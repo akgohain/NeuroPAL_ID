@@ -12,7 +12,7 @@ function set_limits(nx, ny, nz, nt)
     app.proc_ySlider.Value = middle_y;
 
     Program.Helpers.configure_processing_zsliders(app, nz, middle_z);
-    app.ProcZSlicesEditField.Value = middle_z;
+    app.ProcZSlicesEditField.Value = nz;
 
     app.proc_tEditField.Value = 1;
 end
