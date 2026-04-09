@@ -17,8 +17,7 @@ for a = 1:length(actions)
     action = actions{a};
     if app.flags.(action) == 1
         msg = sprintf('Applying %s...', action);
-        Program.Handlers.dialogue.step(msg)
-        Program.Handlers.loading.start(msg);
+        Program.Handlers.dialogue.step(msg);
         render_volume = Methods.ChunkyMethods.apply_vol(app, action, render_volume);
     end
 end

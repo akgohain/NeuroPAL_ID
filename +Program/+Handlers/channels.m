@@ -447,10 +447,10 @@ classdef channels
             app = Program.app;
             handles = Program.Handlers.channels.get_handles();
 
-            app.ProcessingGridLayout.ColumnWidth = {'1x', 282};
+            app.ProcessingGridLayout.ColumnWidth = {'1x', 292};
             % The web ViewModel is fragile around hidden grid columns; keep
             % the columns narrow rather than collapsing them to zero width.
-            app.proc_channel_grid.ColumnWidth = {15, 105, '1x', 12, 12, 14};
+            app.proc_channel_grid.ColumnWidth = {15, 88, '1x', 8, 8, 8};
 
             for c=1:length(app.proc_channel_grid.RowHeight)
                 dd_handle = sprintf(Program.Handlers.channels.handles{'pp_dd'}, c);

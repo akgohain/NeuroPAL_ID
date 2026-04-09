@@ -131,6 +131,7 @@ classdef GUIHandling
             figure_size(1:2) = screen_margin / 2;
             figure_size(3) = screen_size(1) - screen_margin(1);
             figure_size(4) = screen_size(2) - 2*screen_margin(2);
+            figure_size = Program.GUIHandling.constrain_app_window_position(figure_size);
             app.CELL_ID.Position = figure_size;
 
             % Set up placeholder buttons
@@ -153,6 +154,9 @@ classdef GUIHandling
             app.TrackingButton.Parent = app.VideoGridLayout.Parent;
             app.TrackingButton.Position = button_locations;
             set(app.TrackingButton, 'Visible', 'on');
+
+            Program.GUIHandling.install_processing_resize_callback(app);
+            Program.GUIHandling.apply_processing_responsive_layout(app);
         end
 
         function gui_lock(app, action, group, event)
@@ -189,6 +193,10 @@ classdef GUIHandling
 
             for comp=1:length(gui_components)
                 app.(gui_components{comp}).Enable = state;
+            end
+
+            if strcmp(group, 'processing_tab')
+                Program.GUIHandling.update_processing_histogram_interactivity(app);
             end
 
             if exist('event', 'var')
@@ -584,6 +592,8 @@ classdef GUIHandling
                 end
             else
                 app.flags.(action) = 1;
+                Program.Routines.Processing.render();
+                drawnow limitrate nocallbacks;
             end
         end
 
@@ -703,9 +713,6 @@ classdef GUIHandling
                             case 'Colormap'
                                 safe_c = Program.Validation.noskip_index(c_max);
                                 slice = app.proc_image.data(:, :, :, c_load);
-                                Program.Helpers.debug_event('ProcVolume', ...
-                                    'request=array mode=colormap mip=1 coords=%s c_load=%s', ...
-                                    mat2str(package.coords), mat2str(c_load));
                             case 'Video'
                                 slice = app.retrieve_frame(package.coords(4));
                         end
@@ -719,11 +726,6 @@ classdef GUIHandling
                                 z_idx = Program.Helpers.gui_z_to_data_index( ...
                                     z_gui, nz_data, ...
                                     isfield(prefs, 'is_Z_flip') && prefs.is_Z_flip);
-                                Program.Helpers.debug_event('ProcVolume', ...
-                                    'request=array mode=colormap mip=0 coords=%s z_gui=%d z_data=%d is_Z_flip=%d c_load=%s', ...
-                                    mat2str(package.coords), z_gui, z_idx, ...
-                                    isfield(prefs, 'is_Z_flip') && prefs.is_Z_flip, ...
-                                    mat2str(c_load));
                                 slice = app.proc_image.data(:, :, z_idx, c_load);
                                 if ndims(slice) == 3
                                     slice = reshape(slice, size(slice,1), size(slice,2), 1, size(slice,3));
@@ -745,7 +747,6 @@ classdef GUIHandling
                     slice(:, :, :, missing_rgb) = 0;
                     slice(:, :, :, [find(~ismember(c_load, c_bools))]) = 0;
                     package.array = slice;
-                    Program.Helpers.debug_array_summary('ProcVolume', 'slice', package.array);
 
                 case 'coords'
                     package.coords(1) = min(max(round(package.dims(1)-app.proc_ySlider.Value), 1), app.proc_ySlider.Limits(2));
@@ -757,7 +758,761 @@ classdef GUIHandling
 
 
         function install_processing_slider_callbacks(app)
+            Program.GUIHandling.install_processing_downsample_callbacks(app);
             Program.GUIHandling.update_processing_zslider_visibility(app);
+        end
+
+        function install_processing_downsample_callbacks(app)
+            Program.GUIHandling.update_processing_downsample_field_limits(app);
+            Program.GUIHandling.sanitize_processing_downsample_fields(app);
+
+            app.ProcXYFactorUpdateButton.ButtonPushedFcn = @(src, event) ...
+                Program.GUIHandling.handle_processing_downsample_update(app);
+            app.ProcXYFactorEditField.ValueChangedFcn = @(src, event) ...
+                Program.GUIHandling.handle_processing_downsample_field_changed(app);
+            app.ProcZSlicesEditField.ValueChangedFcn = @(src, event) ...
+                Program.GUIHandling.handle_processing_downsample_field_changed(app);
+        end
+
+        function handle_processing_downsample_update(app)
+            drawnow;
+            request = Program.GUIHandling.sanitize_processing_downsample_fields(app);
+            if request.is_identity
+                Program.GUIHandling.restore_identity_downsample_preview(app, request);
+            else
+                Program.Routines.Processing.save_prompt('ds');
+            end
+
+            Program.Routines.GUI.set_manipulation_panel('closed');
+        end
+
+        function handle_processing_downsample_field_changed(app)
+            request = Program.GUIHandling.sanitize_processing_downsample_fields(app);
+            Program.GUIHandling.restore_identity_downsample_preview(app, request);
+        end
+
+        function request = sanitize_processing_downsample_fields(app)
+            dims3 = Program.GUIHandling.processing_source_dims(app);
+            Program.GUIHandling.update_processing_downsample_field_limits(app, dims3);
+            request = Methods.ChunkyMethods.proc_downsample_request(app, dims3);
+
+            app.ProcXYFactorEditField.Value = request.xy_factor;
+            app.ProcZSlicesEditField.Value = request.z_target;
+        end
+
+        function update_processing_downsample_field_limits(app, dims3)
+            if nargin < 2 || isempty(dims3)
+                dims3 = Program.GUIHandling.processing_source_dims(app);
+            end
+
+            min_xy_factor = 1 / max(dims3(1:2));
+            app.ProcXYFactorEditField.Limits = [min_xy_factor, 1];
+            app.ProcXYFactorEditField.ValueDisplayFormat = '%.4g';
+
+            app.ProcZSlicesEditField.Limits = [1, max(1, dims3(3))];
+            app.ProcZSlicesEditField.RoundFractionalValues = 'on';
+            app.ProcZSlicesEditField.ValueDisplayFormat = '%.0f';
+        end
+
+        function clear_processing_preview_cache(app)
+            cache_keys = { ...
+                'proc_mip_cache', ...
+                'proc_render_cache', ...
+                'proc_histogram_signature', ...
+                'proc_render_view_dims'};
+
+            for n = 1:numel(cache_keys)
+                key = cache_keys{n};
+                if isappdata(app.CELL_ID, key)
+                    rmappdata(app.CELL_ID, key);
+                end
+            end
+        end
+
+        function restored = restore_identity_downsample_preview(app, request)
+            if nargin < 2 || isempty(request)
+                request = Program.GUIHandling.sanitize_processing_downsample_fields(app);
+            end
+
+            restored = false;
+            if ~isfield(request, 'is_identity') || ~request.is_identity
+                return
+            end
+
+            needs_restore = isfield(app.flags, 'ds');
+            render_dims = [];
+            if ~needs_restore && isappdata(app.CELL_ID, 'proc_render_view_dims')
+                render_dims = getappdata(app.CELL_ID, 'proc_render_view_dims');
+                source_dims = Program.GUIHandling.processing_source_dims(app);
+                needs_restore = numel(render_dims) >= 3 && ...
+                    any(double(render_dims(1:3)) ~= double(source_dims(1:3)));
+            end
+
+            if ~needs_restore
+                return
+            end
+
+            if isfield(app.flags, 'ds')
+                app.flags = rmfield(app.flags, 'ds');
+            end
+
+            Program.GUIHandling.clear_processing_preview_cache(app);
+            Program.Routines.Processing.render();
+            drawnow limitrate nocallbacks;
+            restored = true;
+        end
+
+        function dims3 = processing_source_dims(app)
+            switch char(string(app.VolumeDropDown.Value))
+                case 'Colormap'
+                    dims = size(app.proc_image, 'data');
+                case 'Video'
+                    dims = [app.video_info.ny, app.video_info.nx, app.video_info.nz];
+                otherwise
+                    dims = [1, 1, 1];
+            end
+
+            dims3 = max(1, round(double(dims(1:3))));
+        end
+
+        function install_processing_histogram_callbacks(app)
+            app.HidezerointensitypixelsCheckBox.ValueChangedFcn = @(src, event) ...
+                Program.GUIHandling.handle_processing_histogram_toggle(app);
+            for n = 1:length(app.proc_channel_grid.RowHeight)
+                cb_handle = sprintf(Program.Handlers.channels.handles{'pp_cb'}, n);
+                if isprop(app, cb_handle) && isvalid(app.(cb_handle))
+                    app.(cb_handle).ValueChangedFcn = @(src, event) ...
+                        Program.GUIHandling.handle_processing_channel_toggle(app);
+                end
+            end
+            Program.GUIHandling.install_processing_window_controls(app);
+            for n = 1:length(Program.GUIHandling.pos_prefixes)
+                prefix = Program.GUIHandling.pos_prefixes{n};
+                slider = app.(sprintf('%s_hist_slider', prefix));
+                Program.GUIHandling.configure_processing_histogram_slider(slider);
+                slider.ValueChangedFcn = @(src, event) ...
+                    Program.GUIHandling.handle_processing_histogram_slider(app, prefix, src.Value, true);
+                if isprop(slider, 'ValueChangingFcn')
+                    slider.ValueChangingFcn = @(src, event) ...
+                        Program.GUIHandling.handle_processing_histogram_slider(app, prefix, event.Value, true);
+                end
+                Program.GUIHandling.sync_processing_window_fields(app, prefix);
+            end
+
+            Program.GUIHandling.apply_processing_responsive_layout(app);
+        end
+
+        function ensure_processing_color_ui(app)
+            if nargin < 1
+                app = Program.app;
+            end
+
+            Program.GUIHandling.install_processing_resize_callback(app);
+            Program.GUIHandling.install_processing_histogram_callbacks(app);
+            Program.GUIHandling.configure_processing_color_panel(app);
+            Program.GUIHandling.apply_processing_responsive_layout(app);
+        end
+
+        function handle_processing_histogram_toggle(app)
+            setappdata(app.CELL_ID, 'proc_histogram_signature', ...
+                Program.Helpers.processing_histogram_signature(app));
+            Program.Handlers.histograms.draw();
+            drawnow limitrate nocallbacks;
+        end
+
+        function handle_processing_channel_toggle(app)
+            Program.GUIHandling.update_processing_histogram_interactivity(app);
+            Program.Routines.Processing.render();
+        end
+
+        function configure_processing_histogram_slider(slider)
+            if isempty(slider) || ~isvalid(slider)
+                return
+            end
+
+            slider.MinorTicks = [];
+            slider.MajorTicks = [];
+            if isprop(slider, 'MajorTickLabels')
+                slider.MajorTickLabels = {''};
+            end
+        end
+
+        function install_processing_window_controls(app)
+            prefixes = Program.GUIHandling.pos_prefixes;
+            controls_by_prefix = struct();
+
+            for n = 1:numel(prefixes)
+                prefix = prefixes{n};
+                gamma_field = app.(sprintf('%s_GammaEditField', prefix));
+                header_grid = gamma_field.Parent;
+
+                controls = Program.GUIHandling.processing_window_controls(app, prefix);
+                if isempty(controls)
+                    controls = struct();
+                    controls.min_label = uilabel(header_grid, ...
+                        'Text', 'Min', ...
+                        'Tag', sprintf('proc_%s_min_label', prefix), ...
+                        'HorizontalAlignment', 'right', ...
+                        'Tooltip', 'Lower display/save bound for this channel (0-255).');
+                    controls.min_field = uieditfield(header_grid, 'numeric', ...
+                        'Tag', sprintf('proc_%s_min_field', prefix), ...
+                        'Limits', [0 255], ...
+                        'RoundFractionalValues', 'on', ...
+                        'ValueDisplayFormat', '%.0f', ...
+                        'Tooltip', 'Lower display/save bound for this channel (0-255).', ...
+                        'ValueChangedFcn', @(src, event) ...
+                            Program.GUIHandling.handle_processing_window_field_changed(app, prefix, 'min', src));
+                    controls.max_label = uilabel(header_grid, ...
+                        'Text', 'Max', ...
+                        'Tag', sprintf('proc_%s_max_label', prefix), ...
+                        'HorizontalAlignment', 'right', ...
+                        'Tooltip', 'Upper display/save bound for this channel (0-255).');
+                    controls.max_field = uieditfield(header_grid, 'numeric', ...
+                        'Tag', sprintf('proc_%s_max_field', prefix), ...
+                        'Limits', [0 255], ...
+                        'RoundFractionalValues', 'on', ...
+                        'ValueDisplayFormat', '%.0f', ...
+                        'Tooltip', 'Upper display/save bound for this channel (0-255).', ...
+                        'ValueChangedFcn', @(src, event) ...
+                            Program.GUIHandling.handle_processing_window_field_changed(app, prefix, 'max', src));
+                end
+
+                controls_by_prefix.(matlab.lang.makeValidName(prefix)) = controls;
+            end
+
+            setappdata(app.CELL_ID, 'proc_window_controls', controls_by_prefix);
+            Program.GUIHandling.apply_processing_responsive_layout(app);
+        end
+
+        function handle_processing_histogram_slider(app, prefix, value, redraw)
+            slider = app.(sprintf('%s_hist_slider', prefix));
+            value = Program.GUIHandling.clamp_processing_window_range(value);
+            slider.Value = value;
+            Program.GUIHandling.sync_processing_window_fields(app, prefix);
+            if redraw
+                Program.Routines.Processing.render();
+                drawnow limitrate nocallbacks;
+            end
+        end
+
+        function handle_processing_window_field_changed(app, prefix, bound, src)
+            slider = app.(sprintf('%s_hist_slider', prefix));
+            range = Program.GUIHandling.clamp_processing_window_range(slider.Value);
+            value = min(max(round(double(src.Value)), 0), 255);
+
+            switch lower(string(bound))
+                case "min"
+                    range(1) = value;
+                    if range(2) < value
+                        range(2) = value;
+                    end
+                case "max"
+                    range(2) = value;
+                    if range(1) > value
+                        range(1) = value;
+                    end
+            end
+
+            slider.Value = range;
+            Program.GUIHandling.sync_processing_window_fields(app, prefix);
+            Program.Routines.Processing.render();
+        end
+
+        function sync_processing_window_fields(app, prefix)
+            controls = Program.GUIHandling.processing_window_controls(app, prefix);
+            if isempty(controls)
+                return
+            end
+
+            slider = app.(sprintf('%s_hist_slider', prefix));
+            range = Program.GUIHandling.clamp_processing_window_range(slider.Value);
+            controls.min_field.Value = range(1);
+            controls.max_field.Value = range(2);
+
+            enabled_state = 'on';
+            if isprop(slider, 'Enable')
+                enabled_state = slider.Enable;
+            end
+            controls.min_field.Enable = enabled_state;
+            controls.max_field.Enable = enabled_state;
+            if isprop(controls.min_label, 'Enable')
+                controls.min_label.Enable = enabled_state;
+            end
+            if isprop(controls.max_label, 'Enable')
+                controls.max_label.Enable = enabled_state;
+            end
+        end
+
+        function update_processing_histogram_interactivity(app)
+            if nargin < 1
+                app = Program.app;
+            end
+
+            state = Program.Handlers.channels.processing_state(app);
+            prefixes = Program.GUIHandling.pos_prefixes;
+            base_state = Program.GUIHandling.processing_control_enable_state(app);
+
+            for n = 1:numel(prefixes)
+                row_enabled = false;
+                if n <= numel(state.rows)
+                    row = state.rows(n);
+                    row_enabled = logical(row.enabled) && row.source_idx > 0;
+                end
+
+                desired_state = 'off';
+                if strcmp(base_state, 'on') && row_enabled
+                    desired_state = 'on';
+                end
+
+                Program.GUIHandling.set_processing_histogram_controls_enabled( ...
+                    app, prefixes{n}, desired_state);
+            end
+        end
+
+        function state = processing_control_enable_state(app)
+            state = 'on';
+            candidates = {'ProcXYFactorEditField', 'proc_xSlider', 'ProcNormalizeColorsButton'};
+            for n = 1:numel(candidates)
+                name = candidates{n};
+                if isprop(app, name) && isvalid(app.(name)) && isprop(app.(name), 'Enable')
+                    state = char(string(app.(name).Enable));
+                    return
+                end
+            end
+        end
+
+        function set_processing_histogram_controls_enabled(app, prefix, state)
+            slider = app.(sprintf('%s_hist_slider', prefix));
+            gamma_field = app.(sprintf('%s_GammaEditField', prefix));
+            title_label = Program.Routines.GUI.get_component('labels', prefix);
+            gamma_label = Program.GUIHandling.find_processing_gamma_label(gamma_field.Parent, title_label);
+
+            if isprop(slider, 'Enable')
+                slider.Enable = state;
+            end
+            if isprop(gamma_field, 'Enable')
+                gamma_field.Enable = state;
+            end
+
+            Program.GUIHandling.set_processing_label_state(title_label, state);
+            Program.GUIHandling.set_processing_label_state(gamma_label, state);
+            Program.GUIHandling.sync_processing_window_fields(app, prefix);
+        end
+
+        function set_processing_label_state(label, state)
+            if isempty(label) || ~isvalid(label)
+                return
+            end
+
+            if isprop(label, 'Enable')
+                label.Enable = state;
+            end
+
+            if isprop(label, 'FontColor')
+                if strcmp(state, 'on')
+                    label.FontColor = [0 0 0];
+                else
+                    label.FontColor = [0.6 0.6 0.6];
+                end
+            end
+        end
+
+        function controls = processing_window_controls(app, prefix)
+            controls = [];
+            if ~isappdata(app.CELL_ID, 'proc_window_controls')
+                return
+            end
+
+            controls_by_prefix = getappdata(app.CELL_ID, 'proc_window_controls');
+            key = matlab.lang.makeValidName(prefix);
+            if ~isstruct(controls_by_prefix) || ~isfield(controls_by_prefix, key)
+                return
+            end
+
+            controls = controls_by_prefix.(key);
+            required = {'min_label', 'min_field', 'max_label', 'max_field'};
+            for n = 1:numel(required)
+                name = required{n};
+                if ~isfield(controls, name) || isempty(controls.(name)) || ~isvalid(controls.(name))
+                    controls = [];
+                    return
+                end
+            end
+        end
+
+        function gamma_label = find_processing_gamma_label(header_grid, title_label)
+            gamma_label = [];
+            children = header_grid.Children;
+            for n = 1:numel(children)
+                child = children(n);
+                if isa(child, 'matlab.ui.control.Label') && child ~= title_label
+                    child_tag = "";
+                    if isprop(child, 'Tag')
+                        child_tag = string(child.Tag);
+                    end
+                    if startsWith(child_tag, "proc_")
+                        continue
+                    end
+                    gamma_label = child;
+                    return
+                end
+            end
+        end
+
+        function install_processing_resize_callback(app)
+            if isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
+                return
+            end
+
+            if isappdata(app.CELL_ID, 'proc_resize_callback_installed')
+                return
+            end
+
+            setappdata(app.CELL_ID, 'proc_resize_callback_installed', true);
+            setappdata(app.CELL_ID, 'proc_resize_legacy_callback', app.CELL_ID.SizeChangedFcn);
+            app.CELL_ID.SizeChangedFcn = @(src, event) ...
+                Program.GUIHandling.handle_window_resized(app, src, event);
+        end
+
+        function handle_window_resized(app, src, event)
+            if nargin >= 2 && ~isempty(src) && isvalid(src) && ...
+                    isappdata(src, 'proc_resize_guard') && getappdata(src, 'proc_resize_guard')
+                return
+            end
+
+            if nargin >= 1 && ~isempty(app) && isvalid(app)
+                Program.GUIHandling.enforce_app_window_bounds(app);
+                Program.GUIHandling.apply_processing_responsive_layout(app);
+            end
+
+            if nargin < 2 || isempty(src) || ~isvalid(src) || ...
+                    ~isappdata(src, 'proc_resize_legacy_callback')
+                return
+            end
+
+            legacy_callback = getappdata(src, 'proc_resize_legacy_callback');
+            if isempty(legacy_callback)
+                return
+            end
+
+            try
+                if isa(legacy_callback, 'function_handle')
+                    legacy_callback(src, event);
+                else
+                    feval(legacy_callback, src, event);
+                end
+            catch
+            end
+        end
+
+        function enforce_app_window_bounds(app)
+            if isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
+                return
+            end
+
+            fig = app.CELL_ID;
+            current_position = fig.Position;
+            target_position = Program.GUIHandling.constrain_app_window_position(current_position);
+            if isequal(round(target_position), round(current_position))
+                return
+            end
+
+            setappdata(fig, 'proc_resize_guard', true);
+            cleanup = onCleanup(@() setappdata(fig, 'proc_resize_guard', false));
+            fig.Position = target_position;
+        end
+
+        function position = constrain_app_window_position(position)
+            screen_rect = get(groot, 'ScreenSize');
+            screen_origin = screen_rect(1:2);
+            screen_extent = screen_rect(3:4);
+
+            usable_extent = max(screen_extent - [40 110], [900 650]);
+            minimum_extent = min([1500 900], usable_extent);
+
+            position(3) = min(max(position(3), minimum_extent(1)), usable_extent(1));
+            position(4) = min(max(position(4), minimum_extent(2)), usable_extent(2));
+
+            x_max = screen_origin(1) + screen_extent(1) - position(3);
+            y_max = screen_origin(2) + screen_extent(2) - position(4);
+            position(1) = min(max(position(1), screen_origin(1)), x_max);
+            position(2) = min(max(position(2), screen_origin(2)), y_max);
+        end
+
+        function apply_processing_responsive_layout(app)
+            if isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'ProcessingGridLayout') || isempty(app.ProcessingGridLayout) || ...
+                    ~isvalid(app.ProcessingGridLayout)
+                return
+            end
+
+            total_width = Program.GUIHandling.processing_container_width(app);
+            side_width = Program.GUIHandling.processing_sidebar_width(total_width);
+            main_width = Program.GUIHandling.processing_main_width(app, total_width, side_width);
+            control_width = Program.GUIHandling.processing_control_panel_width(main_width);
+            stack_threshold_panel = main_width < 880;
+
+            histogram_width = main_width;
+            if ~stack_threshold_panel
+                histogram_width = max(main_width - control_width, 320);
+            end
+            histogram_columns = Program.GUIHandling.processing_histogram_columns(histogram_width);
+
+            app.ProcessingGridLayout.ColumnWidth = {'1x', side_width};
+            app.ProcessingGridLayout.RowHeight = ...
+                Program.GUIHandling.processing_grid_row_heights(stack_threshold_panel, histogram_columns);
+
+            if stack_threshold_panel
+                app.GridLayout64.ColumnWidth = {'1x'};
+                app.GridLayout64.RowHeight = {'1x', 'fit'};
+                app.ProcHistogramPanel.Layout.Row = 1;
+                app.ProcHistogramPanel.Layout.Column = 1;
+                app.ProcThresholdPanel.Layout.Row = 2;
+                app.ProcThresholdPanel.Layout.Column = 1;
+            else
+                app.GridLayout64.ColumnWidth = {'1x', control_width};
+                app.GridLayout64.RowHeight = {'1x'};
+                app.ProcHistogramPanel.Layout.Row = 1;
+                app.ProcHistogramPanel.Layout.Column = 1;
+                app.ProcThresholdPanel.Layout.Row = 1;
+                app.ProcThresholdPanel.Layout.Column = 2;
+            end
+
+            Program.GUIHandling.layout_processing_threshold_controls(app, stack_threshold_panel);
+            Program.GUIHandling.layout_processing_histogram_panels(app, histogram_columns, histogram_width);
+        end
+
+        function width = processing_container_width(app)
+            candidates = nan(1, 4);
+
+            try
+                candidates(1) = app.ProcessingGridLayout.Position(3);
+            catch
+            end
+
+            try
+                candidates(2) = app.ImageProcessingTab.Position(3) - 16;
+            catch
+            end
+
+            try
+                candidates(3) = app.TabGroup.Position(3) - 16;
+            catch
+            end
+
+            try
+                candidates(4) = app.CELL_ID.Position(3) - 40;
+            catch
+            end
+
+            candidates = candidates(isfinite(candidates) & candidates > 1);
+            if isempty(candidates)
+                width = app.CELL_ID.Position(3);
+            else
+                width = min(candidates);
+            end
+        end
+
+        function width = processing_sidebar_width(total_width)
+            width = min(304, max(292, round(total_width * 0.19)));
+        end
+
+        function width = processing_main_width(app, total_width, side_width)
+            width = max(total_width - side_width - 8, 320);
+        end
+
+        function width = processing_control_panel_width(main_width)
+            width = min(190, max(156, round(main_width * 0.2)));
+        end
+
+        function columns = processing_histogram_columns(histogram_width)
+            if histogram_width >= 860
+                columns = 3;
+            elseif histogram_width >= 1
+                columns = 2;
+            end
+        end
+
+        function row_heights = processing_grid_row_heights(stack_threshold_panel, histogram_columns)
+            if histogram_columns >= 3 && ~stack_threshold_panel
+                row_heights = {'0.62x', '0.38x'};
+            elseif stack_threshold_panel
+                row_heights = {'0.42x', '0.58x'};
+            else
+                row_heights = {'0.48x', '0.52x'};
+            end
+        end
+
+        function layout_processing_threshold_controls(app, compact)
+            row_heights = app.ProcThresholdGrid.RowHeight;
+            if numel(row_heights) >= 9
+                row_heights{3} = 30;
+                row_heights{4} = 30;
+                row_heights{5} = 20;
+                row_heights{6} = 0;
+                row_heights{7} = 30;
+                row_heights{8} = 30;
+                row_heights{9} = 20;
+            end
+
+            if compact
+                app.ProcThresholdGrid.ColumnWidth = {'1x', '1x'};
+                if numel(row_heights) >= 9
+                    row_heights{4} = 0;
+                    row_heights{8} = 0;
+                end
+
+                app.ProcMeasureROINoiseButton.Layout.Row = 3;
+                app.ProcMeasureROINoiseButton.Layout.Column = 1;
+                app.ProcMeasure90pthNoiseButton.Layout.Row = 3;
+                app.ProcMeasure90pthNoiseButton.Layout.Column = 2;
+                app.ProcNormalizeColorsButton.Layout.Row = 7;
+                app.ProcNormalizeColorsButton.Layout.Column = 1;
+                app.ProcHistogramMatchingButton.Layout.Row = 7;
+                app.ProcHistogramMatchingButton.Layout.Column = 2;
+                app.Panel_87.Layout.Row = 9;
+                app.Panel_87.Layout.Column = [1 2];
+            else
+                app.ProcThresholdGrid.ColumnWidth = {'1x'};
+                app.ProcMeasureROINoiseButton.Layout.Row = 3;
+                app.ProcMeasureROINoiseButton.Layout.Column = 1;
+                app.ProcMeasure90pthNoiseButton.Layout.Row = 4;
+                app.ProcMeasure90pthNoiseButton.Layout.Column = 1;
+                app.ProcNormalizeColorsButton.Layout.Row = 7;
+                app.ProcNormalizeColorsButton.Layout.Column = 1;
+                app.ProcHistogramMatchingButton.Layout.Row = 8;
+                app.ProcHistogramMatchingButton.Layout.Column = 1;
+                app.Panel_87.Layout.Row = 9;
+                app.Panel_87.Layout.Column = 1;
+            end
+
+            app.ProcThresholdGrid.RowHeight = row_heights;
+        end
+
+        function layout_processing_histogram_panels(app, desired_columns, histogram_width)
+            state = Program.Handlers.channels.processing_state(app);
+            active_rows = [state.rows([state.rows.source_idx] > 0).row];
+            panel_count = max(1, numel(active_rows));
+            columns = min(max(1, desired_columns), panel_count);
+            row_count = max(1, ceil(panel_count / columns));
+
+            app.ProcHistogramGrid.ColumnWidth = repmat({'1x'}, 1, columns);
+            app.ProcHistogramGrid.RowHeight = repmat({'1x'}, 1, row_count);
+
+            occupied_rows = false(1, numel(Program.GUIHandling.pos_prefixes));
+            for order = 1:numel(active_rows)
+                row_idx = active_rows(order);
+                prefix = Program.GUIHandling.pos_prefixes{row_idx};
+                panel = app.(sprintf('%s_hist_panel', prefix));
+                panel.Parent = app.ProcHistogramGrid;
+                panel.Layout.Row = ceil(order / columns);
+                panel.Layout.Column = mod(order - 1, columns) + 1;
+                occupied_rows(row_idx) = true;
+            end
+
+            for row_idx = find(~occupied_rows)
+                prefix = Program.GUIHandling.pos_prefixes{row_idx};
+                panel = app.(sprintf('%s_hist_panel', prefix));
+                panel.Parent = app.ProcHistogramGrid;
+                panel.Layout.Row = 1;
+                panel.Layout.Column = 1;
+            end
+
+            card_width = max(histogram_width / columns, 240);
+            compact_header = columns < 3 || card_width < 360;
+            for n = 1:numel(Program.GUIHandling.pos_prefixes)
+                Program.GUIHandling.layout_processing_histogram_header(app, ...
+                    Program.GUIHandling.pos_prefixes{n}, compact_header);
+            end
+        end
+
+        function layout_processing_histogram_header(app, prefix, compact)
+            gamma_field = app.(sprintf('%s_GammaEditField', prefix));
+            title_label = Program.Routines.GUI.get_component('labels', prefix);
+            header_grid = gamma_field.Parent;
+            gamma_label = Program.GUIHandling.find_processing_gamma_label(header_grid, title_label);
+            controls = Program.GUIHandling.processing_window_controls(app, prefix);
+            if isempty(controls)
+                return
+            end
+
+            if isprop(header_grid, 'ColumnSpacing')
+                header_grid.ColumnSpacing = 2;
+            end
+            if isprop(header_grid, 'RowSpacing')
+                header_grid.RowSpacing = 0;
+            end
+
+            if compact
+                header_grid.RowHeight = {'fit', 'fit'};
+                header_grid.ColumnWidth = {2, 'fit', 44, 'fit', 44, '1x', 'fit', 46, 2};
+
+                title_label.Layout.Row = 1;
+                title_label.Layout.Column = [2 6];
+                title_label.HorizontalAlignment = 'left';
+                title_label.VerticalAlignment = 'center';
+
+                if ~isempty(gamma_label)
+                    gamma_label.Layout.Row = 1;
+                    gamma_label.Layout.Column = 7;
+                    gamma_label.HorizontalAlignment = 'right';
+                    gamma_label.VerticalAlignment = 'center';
+                end
+
+                gamma_field.Layout.Row = 1;
+                gamma_field.Layout.Column = 8;
+
+                controls.min_label.Layout.Row = 2;
+                controls.min_label.Layout.Column = 2;
+                controls.min_field.Layout.Row = 2;
+                controls.min_field.Layout.Column = 3;
+                controls.max_label.Layout.Row = 2;
+                controls.max_label.Layout.Column = 4;
+                controls.max_field.Layout.Row = 2;
+                controls.max_field.Layout.Column = 5;
+            else
+                header_grid.RowHeight = {'fit'};
+                header_grid.ColumnWidth = {2, 'fit', '1x', 24, 44, 24, 44, 'fit', 46, 2};
+
+                title_label.Layout.Row = 1;
+                title_label.Layout.Column = 2;
+                title_label.HorizontalAlignment = 'left';
+                title_label.VerticalAlignment = 'center';
+
+                if ~isempty(gamma_label)
+                    gamma_label.Layout.Row = 1;
+                    gamma_label.Layout.Column = 8;
+                    gamma_label.HorizontalAlignment = 'right';
+                    gamma_label.VerticalAlignment = 'center';
+                end
+
+                gamma_field.Layout.Row = 1;
+                gamma_field.Layout.Column = 9;
+
+                controls.min_label.Layout.Row = 1;
+                controls.min_label.Layout.Column = 4;
+                controls.min_field.Layout.Row = 1;
+                controls.min_field.Layout.Column = 5;
+                controls.max_label.Layout.Row = 1;
+                controls.max_label.Layout.Column = 6;
+                controls.max_field.Layout.Row = 1;
+                controls.max_field.Layout.Column = 7;
+            end
+        end
+
+        function range = clamp_processing_window_range(range)
+            if isempty(range) || numel(range) < 2
+                range = [0 255];
+                return
+            end
+
+            range = round(double(range(:)'));
+            range = min(max(range(1:2), 0), 255);
+            if range(1) > range(2)
+                range = fliplr(range);
+            end
         end
 
         function update_processing_zslider_visibility(app)
@@ -781,7 +1536,62 @@ classdef GUIHandling
             end
         end
 
+        function configure_processing_color_panel(app)
+            app.Panel_57.Title = 'Adjust Colors';
+            app.Panel_57.BorderType = 'line';
+            app.Panel_57.FontWeight = 'bold';
+            if isprop(app.Panel_57, 'TitlePosition')
+                app.Panel_57.TitlePosition = 'centertop';
+            end
+
+            app.ProcHistogramManipulationLabel.Visible = 'off';
+            row_heights = app.ProcThresholdGrid.RowHeight;
+            if numel(row_heights) >= 9
+                row_heights{3} = 30;
+                row_heights{4} = 30;
+                row_heights{5} = 20;
+                row_heights{6} = 0;
+                row_heights{7} = 30;
+                row_heights{8} = 30;
+                row_heights{9} = 20;
+            end
+
+            Program.GUIHandling.set_proc_threshold_value(app, 0, false);
+            if numel(row_heights) >= 2
+                row_heights{1} = 0;
+                row_heights{2} = 0;
+                app.ProcThresholdGrid.RowHeight = row_heights;
+            end
+
+            if isprop(app, 'ProcThresholdManipulationLabel') && isvalid(app.ProcThresholdManipulationLabel)
+                app.ProcThresholdManipulationLabel.Visible = 'off';
+            end
+            if isprop(app, 'ProcThresholdKnobPanel') && isvalid(app.ProcThresholdKnobPanel)
+                app.ProcThresholdKnobPanel.Visible = 'off';
+            end
+            if isprop(app, 'ProcMeasureROINoiseButton') && isvalid(app.ProcMeasureROINoiseButton)
+                app.ProcMeasureROINoiseButton.Visible = 'on';
+                app.ProcMeasureROINoiseButton.ButtonPushedFcn = @(src, event) ...
+                    Program.GUIHandling.measure_threshold_from_roi(app);
+                app.ProcMeasureROINoiseButton.Tooltip = ...
+                    'Measure an ROI on the current preview and set each mapped channel''s Min field from that ROI.';
+            end
+            if isprop(app, 'ProcMeasure90pthNoiseButton') && isvalid(app.ProcMeasure90pthNoiseButton)
+                app.ProcMeasure90pthNoiseButton.Visible = 'on';
+                app.ProcMeasure90pthNoiseButton.ButtonPushedFcn = @(src, event) ...
+                    Program.GUIHandling.measure_threshold_from_percentile(app);
+                app.ProcMeasure90pthNoiseButton.Tooltip = ...
+                    'Measure a percentile on the current preview and set each mapped channel''s Min field.';
+            end
+
+            Program.GUIHandling.apply_processing_responsive_layout(app);
+        end
+
         function set_gui_limits(app, mode, dims)
+            if nargin < 2 || isempty(mode)
+                mode = 'soft';
+            end
+
             if ~exist('dims', 'var')
                 active_volume = Program.GUIHandling.get_active_volume(app, 'request', 'state');
                 switch active_volume.state
@@ -812,6 +1622,8 @@ classdef GUIHandling
                 app.proc_tSlider.MinorTicks = [];
             end
 
+            app.proc_xSlider.Limits = [1, nx];
+            app.proc_ySlider.Limits = [1, ny];
             app.proc_xyAxes.XLim = [1, nx];
             app.proc_xyAxes.YLim = [1, ny];
             if app.ProcPreviewZslowCheckBox.Value
@@ -822,21 +1634,30 @@ classdef GUIHandling
             end
 
             if strcmp(mode, 'hard')
-                app.proc_xSlider.Limits = [1, nx];
-                app.proc_ySlider.Limits = [1, ny];
-
-                app.proc_xSlider.Value = round(app.proc_xSlider.Limits(2)/2);
-                app.proc_ySlider.Value = round(app.proc_ySlider.Limits(2)/2);
+                x_value = round(app.proc_xSlider.Limits(2)/2);
+                y_value = round(app.proc_ySlider.Limits(2)/2);
                 z_value = round(nz/2);
-                app.proc_tSlider.Value = 1;
+                t_value = 1;
     
-                app.proc_xEditField.Value = app.proc_xSlider.Value;
-                app.proc_yEditField.Value = app.proc_ySlider.Value;
-                app.proc_tEditField.Value = app.proc_tSlider.Value;
-
-                Program.Helpers.configure_processing_zsliders(app, nz, z_value);
             else
-                app.proc_zEditField.Value = min(max(round(app.proc_zSlider.Value), 1), app.proc_zSlider.Limits(2));
+                x_value = min(max(round(app.proc_xSlider.Value), 1), nx);
+                y_value = min(max(round(app.proc_ySlider.Value), 1), ny);
+                z_value = min(max(round(app.proc_zSlider.Value), 1), nz);
+                if exist("nt", 'var')
+                    t_value = min(max(round(app.proc_tSlider.Value), 1), nt);
+                end
+            end
+
+            app.proc_xSlider.Value = x_value;
+            app.proc_ySlider.Value = y_value;
+            app.proc_xEditField.Value = x_value;
+            app.proc_yEditField.Value = y_value;
+
+            Program.Helpers.configure_processing_zsliders(app, nz, z_value);
+
+            if exist("nt", 'var')
+                app.proc_tSlider.Value = t_value;
+                app.proc_tEditField.Value = t_value;
             end
         end
 
@@ -932,13 +1753,15 @@ classdef GUIHandling
             app.ProcNoiseThresholdKnob.MajorTicks = 0:51:255;
             app.ProcNoiseThresholdKnob.MajorTickLabels = string(app.ProcNoiseThresholdKnob.MajorTicks);
             Program.GUIHandling.shorten_knob_labels(app);
-            Program.GUIHandling.install_threshold_stepper(app);
             Program.GUIHandling.set_proc_threshold_value(app, threshold_limits(1), false);
 
             for pos=1:length(Program.GUIHandling.pos_prefixes)
-                app.(sprintf('%s_hist_slider', Program.GUIHandling.pos_prefixes{pos})).Limits = hist_limits;
-                app.(sprintf('%s_hist_slider', Program.GUIHandling.pos_prefixes{pos})).Value = hist_limits;
+                slider = app.(sprintf('%s_hist_slider', Program.GUIHandling.pos_prefixes{pos}));
+                slider.Limits = hist_limits;
+                slider.Value = hist_limits;
+                Program.GUIHandling.configure_processing_histogram_slider(slider);
                 app.(sprintf('%s_hist_ax', Program.GUIHandling.pos_prefixes{pos})).XLim = hist_limits;
+                Program.GUIHandling.sync_processing_window_fields(app, Program.GUIHandling.pos_prefixes{pos});
             end
         end
 
@@ -1077,12 +1900,12 @@ classdef GUIHandling
 
         function value = proc_threshold_raw_value(app, raw_max)
             %#ok<INUSD>
-            value = min(max(round(double(app.ProcNoiseThresholdField.Value)), 0), 255);
+            value = 0;
         end
 
         function measure_threshold_from_roi(app)
-            [preview_frame, raw_max] = Program.GUIHandling.threshold_preview_frame(app);
-            if isempty(preview_frame)
+            channels = Program.GUIHandling.processing_measurement_frames(app);
+            if isempty(channels)
                 return
             end
 
@@ -1100,23 +1923,61 @@ classdef GUIHandling
             mask = createMask(roi);
             delete(roi);
 
-            roi_values = double(preview_frame(mask));
-            if isempty(roi_values)
-                return
+            updated = false;
+            for n = 1:numel(channels)
+                roi_values = double(channels(n).frame(mask));
+                roi_values = roi_values(isfinite(roi_values));
+                if isempty(roi_values)
+                    continue
+                end
+
+                min_value = mean(roi_values, 'all');
+                Program.GUIHandling.set_processing_channel_min(app, channels(n).prefix, min_value);
+                updated = true;
             end
 
-            threshold_value = mean(double(Program.Helpers.to_user_uint8(roi_values)), 'all');
-            Program.GUIHandling.set_proc_threshold_value(app, threshold_value, true);
+            if updated
+                Program.Routines.Processing.render();
+                drawnow limitrate nocallbacks;
+            end
         end
 
         function measure_threshold_from_percentile(app)
-            [preview_frame, raw_max] = Program.GUIHandling.threshold_preview_frame(app);
-            if isempty(preview_frame)
+            channels = Program.GUIHandling.processing_measurement_frames(app);
+            if isempty(channels)
                 return
             end
 
-            threshold_value = prctile(double(Program.Helpers.to_user_uint8(preview_frame(:))), 90);
-            Program.GUIHandling.set_proc_threshold_value(app, threshold_value, true);
+            check = inputdlg( ...
+                "Which percentile should be used for each mapped channel's minimum?", ...
+                "NeuroPAL_ID", [1 125], {'90'});
+            if isempty(check)
+                return
+            end
+
+            percentile_value = str2double(check{1});
+            if ~isfinite(percentile_value)
+                return
+            end
+            percentile_value = min(max(percentile_value, 0), 100);
+
+            updated = false;
+            for n = 1:numel(channels)
+                values = double(channels(n).frame(:));
+                values = values(isfinite(values));
+                if isempty(values)
+                    continue
+                end
+
+                min_value = prctile(values, percentile_value);
+                Program.GUIHandling.set_processing_channel_min(app, channels(n).prefix, min_value);
+                updated = true;
+            end
+
+            if updated
+                Program.Routines.Processing.render();
+                drawnow limitrate nocallbacks;
+            end
         end
 
         function [preview_frame, raw_max] = threshold_preview_frame(app)
@@ -1133,6 +1994,42 @@ classdef GUIHandling
                 z_idx = min(max(round(app.proc_zSlider.Value), 1), size(render_volume, 3));
                 preview_frame = squeeze(render_volume(:, :, z_idx, :));
             end
+        end
+
+        function channels = processing_measurement_frames(app)
+            channels = struct('prefix', {}, 'frame', {});
+            raw = Program.GUIHandling.get_active_volume(app, 'request', 'array');
+            state = Program.Handlers.channels.processing_state(app);
+            rows = state.rows([state.rows.source_idx] > 0);
+
+            for n = 1:numel(rows)
+                row = rows(n);
+                if row.row < 1 || row.row > numel(Program.GUIHandling.pos_prefixes)
+                    continue
+                end
+
+                channel_volume = Program.Helpers.to_user_uint8(raw.array(:, :, :, row.source_idx));
+                if app.ProcShowMIPCheckBox.Value
+                    frame = squeeze(max(channel_volume, [], 3));
+                else
+                    z_idx = min(max(round(app.proc_zSlider.Value), 1), size(channel_volume, 3));
+                    frame = squeeze(channel_volume(:, :, z_idx));
+                end
+
+                channels(end + 1) = struct( ... %#ok<AGROW>
+                    'prefix', Program.GUIHandling.pos_prefixes{row.row}, ...
+                    'frame', double(frame));
+            end
+        end
+
+        function set_processing_channel_min(app, prefix, value)
+            slider = app.(sprintf('%s_hist_slider', prefix));
+            range = Program.GUIHandling.clamp_processing_window_range(slider.Value);
+            range(1) = min(max(round(double(value)), 0), 255);
+            if range(2) < range(1)
+                range(2) = range(1);
+            end
+            Program.GUIHandling.handle_processing_histogram_slider(app, prefix, range, false);
         end
 
 
@@ -1186,7 +2083,7 @@ classdef GUIHandling
 
             snapshot = struct( ...
                 'mode', string(app.VolumeDropDown.Value), ...
-                'threshold', double(app.ProcNoiseThresholdField.Value), ...
+                'threshold', 0, ...
                 'show_mip', logical(app.ProcShowMIPCheckBox.Value), ...
                 'preview_zslow', logical(app.ProcPreviewZslowCheckBox.Value), ...
                 'hide_zero', logical(app.HidezerointensitypixelsCheckBox.Value), ...
@@ -1250,6 +2147,7 @@ classdef GUIHandling
                 app.(sprintf('%s_GammaEditField', prefixes{n})).Value = snapshot.gamma_values(n);
                 app.(sprintf('%s_hist_slider', prefixes{n})).Value = snapshot.hist_values{n};
                 app.(sprintf('%s_hist_ax', prefixes{n})).XLim = snapshot.hist_values{n};
+                Program.GUIHandling.sync_processing_window_fields(app, prefixes{n});
             end
 
             app.HidezerointensitypixelsCheckBox.Value = logical(snapshot.hide_zero);
@@ -1257,7 +2155,44 @@ classdef GUIHandling
             app.ProcPreviewZslowCheckBox.Value = logical(snapshot.preview_zslow);
             app.ProcXYFactorEditField.Value = snapshot.xy_factor;
             app.ProcZSlicesEditField.Value = snapshot.z_slices;
-            Program.GUIHandling.set_proc_threshold_value(app, snapshot.threshold, false);
+            Program.GUIHandling.sanitize_processing_downsample_fields(app);
+            Program.GUIHandling.set_proc_threshold_value(app, 0, false);
+        end
+
+        function tf = processing_channel_windows_active(app)
+            if nargin < 1
+                app = Program.app;
+            end
+
+            state = Program.Handlers.channels.processing_state(app);
+            tf = false;
+            for n = 1:numel(state.rows)
+                row = state.rows(n);
+                if row.source_idx <= 0
+                    continue
+                end
+
+                low_high = double(row.settings.low_high_in);
+                if isempty(low_high)
+                    continue
+                end
+
+                if numel(low_high) == 2 && any(abs(low_high(:)' - [0 1]) > (0.5 / 255))
+                    tf = true;
+                    return
+                end
+            end
+        end
+
+        function actions = processing_file_actions(app)
+            if nargin < 1
+                app = Program.app;
+            end
+
+            actions = fieldnames(app.flags)';
+            if Program.GUIHandling.processing_channel_windows_active(app)
+                actions = [{'window'}, actions];
+            end
         end
 
         function reset_processing_runtime_state(app)
@@ -1267,6 +2202,12 @@ classdef GUIHandling
             end
             if isappdata(app.CELL_ID, 'proc_render_cache')
                 rmappdata(app.CELL_ID, 'proc_render_cache');
+            end
+            if isappdata(app.CELL_ID, 'proc_raw_cache')
+                rmappdata(app.CELL_ID, 'proc_raw_cache');
+            end
+            if isappdata(app.CELL_ID, 'proc_histogram_signature')
+                rmappdata(app.CELL_ID, 'proc_histogram_signature');
             end
             Program.GUIHandling.clear_rotation_preview_cache(app);
             Program.GUIHandling.reset_rotation_controls(app);
