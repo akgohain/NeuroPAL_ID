@@ -598,64 +598,12 @@ classdef GUIHandling
         end
 
         function histogram_handler(app, mode, image)
-            raw = Program.GUIHandling.get_active_volume(app, 'request', 'array');
-            nc = size(raw.array, 4);
-            state = Program.Handlers.channels.processing_state(app);
-            mapped_rows = state.rows([state.rows.source_idx] > 0);
-
-            if nc < 4
-                app.bl_hist_panel.Parent = app.CELL_ID;
-                app.bm_hist_panel.Parent = app.CELL_ID;
-                app.br_hist_panel.Parent = app.CELL_ID;
-
-                app.bl_hist_panel.Visible = 'off';
-                app.bm_hist_panel.Visible = 'off';
-                app.br_hist_panel.Visible = 'off';
-
-                app.ProcHistogramGrid.RowHeight = {'1x'};
-            else
-                app.ProcHistogramGrid.RowHeight = {'1x', '1x'};
-            end
-
-            for c=1:nc
-                prefix = Program.GUIHandling.pos_prefixes{c};
-
-                switch mode
-                    case 'reset'
-                        app.(sprintf("%s_hist_panel", prefix)).Visible = 'off';
-                        cla(app.(sprintf("%s_hist_ax", prefix)))
-
-                    case 'draw'
-
-                        chan_hist = raw.array(:, :, :, c);
-
-                        if app.HidezerointensitypixelsCheckBox.Value
-                            chan_hist = chan_hist(chan_hist>0);
-                        end
-
-                        if max(chan_hist, [], 'all') <= 1
-                            chan_hist = chan_hist * Program.GUIHandling.proc_threshold_raw_max(app);
-                        end
-
-                        source_match = find([mapped_rows.source_idx] == c, 1);
-                        if ~isempty(source_match)
-                            row = mapped_rows(source_match);
-                            h_panel = sprintf("%s_hist_panel", Program.GUIHandling.pos_prefixes{c});
-                            h_label = sprintf("%s_Label", Program.GUIHandling.pos_prefixes{c});
-                            h_axes = sprintf("%s_hist_ax", Program.GUIHandling.pos_prefixes{c});
-
-                            app.(h_panel).Visible = 'on';
-                            app.(h_label).Text = sprintf("%s Channel", row.role_name);
-                            histogram(app.(h_axes), chan_hist, 'FaceColor', row.color, 'EdgeColor', row.color);
-                            app.(h_axes).XLim = [app.HidezerointensitypixelsCheckBox.Value, app.(h_axes).XLim(2)];
-       
-                            if c >= 4
-                                app.(h_panel).Parent = app.ProcHistogramGrid;
-                                app.(h_panel).Layout.Row = 2;
-                                app.(h_panel).Layout.Column = c-3;
-                            end
-                        end
-                end
+            %#ok<INUSD>
+            switch lower(string(mode))
+                case "reset"
+                    Program.Handlers.histograms.reset();
+                case "draw"
+                    Program.Handlers.histograms.draw();
             end
         end
 
