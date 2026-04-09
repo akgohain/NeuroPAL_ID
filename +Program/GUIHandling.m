@@ -1029,6 +1029,76 @@ classdef GUIHandling
             end
         end
 
+        function configure_processing_sidebar_layout(app)
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            if isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'ProcSideGrid') || isempty(app.ProcSideGrid) || ~isvalid(app.ProcSideGrid)
+                return
+            end
+
+            app.ProcSavePanel.Layout.Row = 4;
+            app.ProcAdvancedOptionsButton.Layout.Row = 5;
+            app.SpectralUnmixingPanel.Layout.Row = 6;
+
+            is_image_mode = strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap');
+            row3_height = 72;
+            try
+                current_heights = app.ProcSideGrid.RowHeight;
+                if numel(current_heights) >= 3
+                    row3_height = current_heights{3};
+                end
+            catch
+            end
+
+            row5_height = 28 * is_image_mode;
+            if is_image_mode && strcmpi(app.SpectralUnmixingPanel.Visible, 'on')
+                row6_height = 212;
+            else
+                row6_height = 0;
+            end
+
+            app.ProcAdvancedOptionsButton.Visible = matlab.lang.OnOffSwitchState(is_image_mode);
+            if ~is_image_mode
+                app.SpectralUnmixingPanel.Visible = 'off';
+                app.ProcAdvancedOptionsButton.Text = 'Advanced';
+            end
+
+            app.ProcSideGrid.RowHeight = {95, 'fit', row3_height, 93, row5_height, row6_height};
+        end
+
+        function install_processing_advanced_callback(app)
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            app.ProcAdvancedOptionsButton.ButtonPushedFcn = @(src, event) ...
+                Program.GUIHandling.handle_processing_advanced_toggle(app);
+        end
+
+        function handle_processing_advanced_toggle(app)
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            if ~strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap')
+                return
+            end
+
+            show_panel = ~strcmpi(app.SpectralUnmixingPanel.Visible, 'on');
+            if show_panel
+                app.SpectralUnmixingPanel.Visible = 'on';
+                app.ProcAdvancedOptionsButton.Text = 'Hide Advanced';
+            else
+                app.SpectralUnmixingPanel.Visible = 'off';
+                app.ProcAdvancedOptionsButton.Text = 'Advanced';
+            end
+
+            Program.GUIHandling.configure_processing_sidebar_layout(app);
+        end
+
         function set_processing_histogram_controls_enabled(app, prefix, state)
             slider = app.(sprintf('%s_hist_slider', prefix));
             gamma_field = app.(sprintf('%s_GammaEditField', prefix));
@@ -2209,12 +2279,7 @@ classdef GUIHandling
             try
                 app.SpectralUnmixingPanel.Visible = 'off';
                 app.ProcAdvancedOptionsButton.Text = 'Advanced';
-                row_index = app.SpectralUnmixingPanel.Layout.Row;
-                row_heights = app.ProcSideGrid.RowHeight;
-                if row_index <= numel(row_heights)
-                    row_heights{row_index} = 0;
-                    app.ProcSideGrid.RowHeight = row_heights;
-                end
+                Program.GUIHandling.configure_processing_sidebar_layout(app);
             catch
             end
         end

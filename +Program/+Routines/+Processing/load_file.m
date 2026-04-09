@@ -101,7 +101,9 @@ function load_file(mode, path)
             Program.Routines.GUI.set_limits(nx, ny, nz, nt);
             Program.GUIHandling.install_processing_slider_callbacks(app);
             Program.GUIHandling.install_processing_histogram_callbacks(app);
+            Program.GUIHandling.install_processing_advanced_callback(app);
             Program.GUIHandling.configure_processing_color_panel(app);
+            Program.GUIHandling.configure_processing_sidebar_layout(app);
 
             app.ProcXYFactorEditField.Enable = 'on';
             app.ProcZSlicesEditField.Enable = 'on';
