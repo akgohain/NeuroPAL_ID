@@ -16,6 +16,7 @@ function save()
     end
 
     app.flags = struct();
+    Methods.ChunkyMethods.clear_spectral_filtered_cache(app);
     if isappdata(app.CELL_ID, 'proc_mip_cache')
         rmappdata(app.CELL_ID, 'proc_mip_cache');
     end

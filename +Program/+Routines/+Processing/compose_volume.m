@@ -7,24 +7,16 @@ if nargin < 2 || isempty(raw)
 end
 
 [raw_volume, raw_dims] = Program.Validation.pad_rgb(raw.array);
-display_package = Program.Helpers.get_display_volume(app, 'processing', raw_volume);
+preview_raw_volume = Methods.ChunkyMethods.apply_preview_actions(app, raw_volume);
+display_package = Program.Helpers.get_display_volume(app, 'processing', preview_raw_volume);
 channels = display_package.channels;
 threshold_raw = display_package.threshold_raw;
 render_volume = display_package.display_volume;
 
-actions = fieldnames(app.flags);
-for a = 1:length(actions)
-    action = actions{a};
-    if app.flags.(action) == 1
-        msg = sprintf('Applying %s...', action);
-        Program.Handlers.dialogue.step(msg);
-        render_volume = Methods.ChunkyMethods.apply_vol(app, action, render_volume);
-    end
-end
-
 package = struct( ...
     'raw', raw, ...
     'raw_volume', raw_volume, ...
+    'preview_raw_volume', preview_raw_volume, ...
     'raw_dims', raw_dims, ...
     'channels', channels, ...
     'render_volume', render_volume, ...

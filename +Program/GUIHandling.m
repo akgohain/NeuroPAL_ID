@@ -2160,13 +2160,17 @@ classdef GUIHandling
             Program.GUIHandling.clear_rotation_preview_cache(app);
             Program.GUIHandling.reset_rotation_controls(app);
 
-            app.spectral_cache = struct( ...
-                'ch_db', {[]}, ...
-                'ch_px', {{}}, ...
-                'ch_val', {[]}, ...
-                'bg_px', {[]}, ...
-                'bg_val', {[]}, ...
-                'blurred_img', {[]});
+            app.spectral_cache = Methods.ChunkyMethods.spectral_cache_template();
+            spectral_prefixes = {'red', 'green', 'blue', 'background'};
+            spectral_channels = {'r', 'g', 'b'};
+            for i = 1:numel(spectral_prefixes)
+                for j = 1:numel(spectral_channels)
+                    field_name = sprintf('%s_%s', spectral_prefixes{i}, spectral_channels{j});
+                    if isprop(app, field_name) && isvalid(app.(field_name))
+                        app.(field_name).Value = 0;
+                    end
+                end
+            end
 
             if isprop(app, 'rotation_stack')
                 if isfield(app.rotation_stack, 'cache')

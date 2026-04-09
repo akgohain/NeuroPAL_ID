@@ -6,6 +6,7 @@ function load_file(mode, path)
 
             d = uiprogressdlg(window,"Title","NeuroPAL ID","Message","Initializing Processing Tab...",'Indeterminate','off');    
             app.flags = struct();
+            Methods.ChunkyMethods.clear_spectral_filtered_cache(app);
             if isappdata(app.CELL_ID, 'proc_mip_cache')
                 rmappdata(app.CELL_ID, 'proc_mip_cache');
             end
