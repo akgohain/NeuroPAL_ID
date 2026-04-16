@@ -82,7 +82,7 @@ classdef ChunkyMethods
 
                 case 'histmatch'
                     slice(:, :, :, RGBW(1:3)) = Methods.run_histmatch(slice, RGBW);
-                    output_slice = Methods.Preprocess.zscore_frame(slice);     
+                    output_slice = slice;
 
                 case 'crop'
                     output_slice = Program.rotation_gui.apply_mask(app, slice);
