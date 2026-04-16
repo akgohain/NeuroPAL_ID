@@ -1,24 +1,35 @@
 function save()
     app = Program.app;
     actions = Program.GUIHandling.processing_file_actions(app);
-    had_file_actions = ~isempty(actions);
-
-    if had_file_actions
-        Program.Handlers.dialogue.add_task('Updating file...');
-    end
 
     switch app.VolumeDropDown.Value
         case 'Colormap'
-            Methods.ChunkyMethods.apply_colormap(app, actions);
+            if ~isempty(actions)
+                Program.Helpers.apply_processing_preview_action(app, actions);
+            end
+
+            Program.Helpers.sync_main_display_from_processing(app, false);
+            Program.Helpers.write_processing_colormap_to_file(app);
+            Program.Routines.Processing.render();
+            Program.Routines.ID.render();
 
         case 'Video'
+            if ~isempty(actions)
+                Program.Handlers.dialogue.add_task('Updating file...');
+            end
             Methods.ChunkyMethods.apply_video(app, actions);
+            if ~isempty(actions)
+                Program.Handlers.dialogue.resolve();
+            end
     end
 
     app.flags = struct();
     Methods.ChunkyMethods.clear_spectral_filtered_cache(app);
     if isappdata(app.CELL_ID, 'proc_mip_cache')
         rmappdata(app.CELL_ID, 'proc_mip_cache');
+    end
+    if isappdata(app.CELL_ID, 'proc_view_cache')
+        rmappdata(app.CELL_ID, 'proc_view_cache');
     end
     if isappdata(app.CELL_ID, 'proc_render_cache')
         rmappdata(app.CELL_ID, 'proc_render_cache');
@@ -31,18 +42,5 @@ function save()
     end
     if isappdata(app.CELL_ID, 'proc_render_view_dims')
         rmappdata(app.CELL_ID, 'proc_render_view_dims');
-    end
-    if had_file_actions
-        Program.Handlers.dialogue.resolve();
-        prompt = "Successfully updated file. Load into main tab?";
-    else
-        prompt = "No file-backed processing operations were pending. Load the current preview state into the main tab?";
-    end
-
-    check = uiconfirm(Program.window, ...
-        prompt, "NeuroPAL_ID", ...
-        "Options",["Yes", "No"]);
-    if strcmp(check, "Yes")
-        Program.Routines.Processing.pass_to_main();
     end
 end

@@ -587,17 +587,12 @@ classdef GUIHandling
         end
 
         function proc_save_prompt(app, action)
-            check = uiconfirm(app.CELL_ID, "Do you want to save this operation to the file?", "NeuroPAL_ID", "Options", ["Yes", "No, stick with preview"]);
-            if strcmp(check, "Yes")
-                app.proc_apply_processing(action);
-                if isfield(app.flags, action)
-                    app.flags = rmfield(app.flags, action);
-                end
-            else
-                app.flags.(action) = 1;
-                Program.Routines.Processing.render();
-                drawnow limitrate nocallbacks;
+            applied = Program.Helpers.apply_processing_preview_action(app, action);
+            if ~applied
+                return
             end
+
+            Program.Routines.GUI.set_manipulation_panel('closed');
         end
 
         function histogram_handler(app, mode, image)

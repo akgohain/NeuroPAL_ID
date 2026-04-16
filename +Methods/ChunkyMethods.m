@@ -162,29 +162,40 @@ classdef ChunkyMethods
         function apply_colormap(app, actions)
             % Apply set of operations to a colormap.
 
+            if nargin < 2 || isempty(actions)
+                return
+            end
+
+            actions = cellstr(lower(string(actions)));
+            actions = actions(~cellfun('isempty', actions));
+            if isempty(actions)
+                return
+            end
+
             % Calculate new colormap dimensions
             Program.Handlers.dialogue.step('Calculating new dimensions...');
-            new_dims = size(app.proc_image, 'data');
+            context = Program.Helpers.processing_colormap_context(app);
+            if isempty(context.volume)
+                return
+            end
+
+            new_dims = size(context.volume);
             for a=1:length(actions)
                 new_dims = Methods.ChunkyMethods.calc_pp_size(app, actions{a}, zeros(new_dims));
             end
 
-            if length(actions) < 1
-                return
-            end
-
-            current_vol = app.proc_image.data;
+            current_vol = context.volume;
             for a=1:length(actions)
                 Program.Handlers.dialogue.add_task(sprintf("Applying %s", actions{a}));
                 Program.Handlers.dialogue.set_value(a/length(actions));
                 processed_vol = Methods.ChunkyMethods.apply_vol(app, actions{a}, current_vol);
                 current_vol = processed_vol;
             end
-    
-            % Save to file.
-            app.proc_image.Properties.Writable = true;
-            app.proc_image.data = current_vol;
-            app.proc_image.Properties.Writable = false;
+
+            app.image_data = current_vol;
+            app.image_data_zscored = Methods.Preprocess.zscore_frame(app.image_data);
+            setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
+            Program.Helpers.write_processing_colormap_to_file(app);
         end
 
         function apply_video(app, actions, progress)
