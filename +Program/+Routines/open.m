@@ -1,5 +1,6 @@
 function open(path)
     app = Program.app;
+    Program.GUIHandling.install_main_processing_sync_callbacks(app);
 
     % Are we already opening a file?
     if app.is_opening_file
@@ -99,6 +100,9 @@ function open(path)
     % Setup the image.
     app.image_name = name; %strrep(name, '_', '\_');
     app.image_data = data;
+    if isappdata(app.CELL_ID, 'proc_runtime_dirty')
+        rmappdata(app.CELL_ID, 'proc_runtime_dirty');
+    end
 
     % Z-score the image.
     app.image_data_zscored = Methods.Preprocess.zscore_frame(app.image_data);

@@ -136,8 +136,15 @@ classdef ChunkyMethods
                         return
                     end
 
+                    if isa(vol, 'matlab.io.MatFile')
+                        sample = vol.data(1, 1, 1, 1);
+                        output_class = class(sample);
+                    else
+                        output_class = class(vol);
+                    end
+
                     % Initialize cache array.
-                    processed_vol = zeros(new_dims, class(vol));
+                    processed_vol = zeros(new_dims, output_class);
     
                     % Iterate over slices.
                     for z=1:nz
@@ -145,7 +152,7 @@ classdef ChunkyMethods
     
                         % Grab slice.
                         if isa(vol, 'matlab.io.MatFile')
-                            slice = app.proc_image.data(:, :, z, :);
+                            slice = vol.data(:, :, z, :);
                         else
                             slice = vol(:, :, z, :);
                         end
@@ -786,30 +793,13 @@ classdef ChunkyMethods
 
         function frame = load_proc_image(app)
             frame = struct('xy', {[]}, 'yz', {[]}, 'xz', {[]});
-            raw = Program.GUIHandling.get_active_volume(app, 'request', 'all');
-            package = Program.Routines.Processing.compose_volume(app, raw);
-            render_volume = package.render_volume;
-            raw_dims = package.raw_dims;
-
-            Program.GUI.preprocessing_gui().set_gui_limits( ...
-                'x', [1, raw_dims(2)], ...
-                'y', [1, raw_dims(1)]);
-
+            [package, package_info] = Program.Routines.Processing.get_cached_package(app);
             Program.Handlers.histograms.draw();
             Program.GUIHandling.shorten_knob_labels(app);
-
-            if app.ProcShowMIPCheckBox.Value
-                frame.xy = squeeze(max(render_volume, [], 3));
-            else
-                frame.xy = Program.Helpers.extract_z_slice(render_volume, raw.coords(3), false);
-            end
-
-            if app.ProcPreviewZslowCheckBox.Value
-                x = min(max(round(raw.coords(1)), 1), size(render_volume, 2));
-                y = min(max(round(raw.coords(2)), 1), size(render_volume, 1));
-                frame.xz = squeeze(render_volume(:, y, :, :));
-                frame.yz = squeeze(render_volume(x, :, :, :));
-            end
+            frames = Program.Routines.Processing.get_view_frames(app, package, package_info.package_signature);
+            frame.xy = frames.xy;
+            frame.xz = frames.xz;
+            frame.yz = frames.yz;
         end
 
         function output = apply_channel_windows(app, volume)

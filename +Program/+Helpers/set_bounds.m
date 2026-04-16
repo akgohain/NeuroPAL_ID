@@ -4,7 +4,7 @@ function set_bounds()
 
     switch lower(app.VolumeDropDown.Value)
         case 'colormap'
-            frame = app.proc_image.data(:, :, 1, :);
+            frame = Program.Helpers.processing_colormap_context(app).volume(:, :, 1, :);
         case 'video'
             frame = app.retrieve_frame(1);
     end

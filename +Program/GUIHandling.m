@@ -390,6 +390,30 @@ classdef GUIHandling
             end
         end
 
+        function set_descendant_enable_state(root, state)
+            if nargin < 2 || isempty(root) || ~isvalid(root)
+                return
+            end
+
+            try
+                descendants = [root; findall(root)];
+            catch
+                descendants = root;
+            end
+
+            for n = 1:numel(descendants)
+                component = descendants(n);
+                if isempty(component) || ~isvalid(component) || ~isprop(component, 'Enable')
+                    continue
+                end
+
+                try
+                    component.Enable = state;
+                catch
+                end
+            end
+        end
+
         function handle = window_fig()
             persistent window_handle
 
@@ -837,25 +861,37 @@ classdef GUIHandling
                     package.dims = size(package.array);
 
                 case 'array'
+                    source_array = [];
+                    prefs = struct();
+                    if strcmp(app.VolumeDropDown.Value, 'Colormap')
+                        context = Program.Helpers.processing_colormap_context(app);
+                        source_array = context.volume;
+                        prefs = context.prefs;
+                    end
+
                     if app.ProcShowMIPCheckBox.Value
                         switch app.VolumeDropDown.Value
                             case 'Colormap'
                                 safe_c = Program.Validation.noskip_index(c_max);
-                                slice = app.proc_image.data(:, :, :, c_load);
+                                if isempty(source_array)
+                                    slice = zeros(0, 0, 0, safe_c);
+                                else
+                                    c_load = c_load(c_load <= size(source_array, 4));
+                                    slice = source_array(:, :, :, c_load);
+                                end
                             case 'Video'
                                 slice = app.retrieve_frame(package.coords(4));
                         end
                     else
                         switch app.VolumeDropDown.Value
                             case 'Colormap'
-                                safe_c = Program.Validation.noskip_index(c_max);
-                                [~, ~, nz_data, ~] = size(app.proc_image, 'data');
-                                prefs = app.proc_image.prefs;
+                                [~, ~, nz_data, ~] = size(source_array);
                                 z_gui = Program.Helpers.gui_z_to_data_index(package.coords(3), nz_data, false);
                                 z_idx = Program.Helpers.gui_z_to_data_index( ...
                                     z_gui, nz_data, ...
                                     isfield(prefs, 'is_Z_flip') && prefs.is_Z_flip);
-                                slice = app.proc_image.data(:, :, z_idx, c_load);
+                                c_load = c_load(c_load <= size(source_array, 4));
+                                slice = source_array(:, :, z_idx, c_load);
                                 if ndims(slice) == 3
                                     slice = reshape(slice, size(slice,1), size(slice,2), 1, size(slice,3));
                                 end
@@ -1050,8 +1086,158 @@ classdef GUIHandling
 
 
         function install_processing_slider_callbacks(app)
+            Program.GUIHandling.install_processing_zslider_callbacks(app);
             Program.GUIHandling.install_processing_downsample_callbacks(app);
             Program.GUIHandling.update_processing_zslider_visibility(app);
+        end
+
+        function install_processing_zslider_callbacks(app)
+            Program.GUIHandling.clear_processing_zslider_event_listeners(app);
+
+            app.proc_zSlider.ValueChangedFcn = @(src, event) ...
+                Program.GUIHandling.handle_processing_primary_zslider_change(app, event.Value, false);
+            app.proc_hor_zSlider.ValueChangedFcn = @(src, event) ...
+                Program.GUIHandling.handle_processing_horizontal_zslider_change(app, event.Value, false);
+            app.proc_vert_zSlider.ValueChangedFcn = @(src, event) ...
+                Program.GUIHandling.handle_processing_vertical_zslider_change(app, event.Value, false);
+
+            if isprop(app.proc_zSlider, 'ValueChangingFcn')
+                app.proc_zSlider.ValueChangingFcn = @(src, event) [];
+            end
+            if isprop(app.proc_hor_zSlider, 'ValueChangingFcn')
+                app.proc_hor_zSlider.ValueChangingFcn = @(src, event) [];
+            end
+            if isprop(app.proc_vert_zSlider, 'ValueChangingFcn')
+                app.proc_vert_zSlider.ValueChangingFcn = @(src, event) [];
+            end
+
+            listeners = struct( ...
+                'primary', addlistener(app.proc_zSlider, 'ValueChanging', @(src, event) ...
+                    Program.GUIHandling.handle_processing_primary_zslider_change(app, event.Value, true)), ...
+                'horizontal', addlistener(app.proc_hor_zSlider, 'ValueChanging', @(src, event) ...
+                    Program.GUIHandling.handle_processing_horizontal_zslider_change(app, event.Value, true)), ...
+                'vertical', addlistener(app.proc_vert_zSlider, 'ValueChanging', @(src, event) ...
+                    Program.GUIHandling.handle_processing_vertical_zslider_change(app, event.Value, true)));
+            setappdata(app.CELL_ID, 'proc_zslider_event_listeners', listeners);
+        end
+
+        function clear_processing_zslider_event_listeners(app)
+            if ~isappdata(app.CELL_ID, 'proc_zslider_event_listeners')
+                return
+            end
+
+            listeners = getappdata(app.CELL_ID, 'proc_zslider_event_listeners');
+            if isstruct(listeners)
+                names = fieldnames(listeners);
+                for n = 1:numel(names)
+                    listener = listeners.(names{n});
+                    if isempty(listener)
+                        continue
+                    end
+                    try
+                        delete(listener);
+                    catch
+                    end
+                end
+            end
+            rmappdata(app.CELL_ID, 'proc_zslider_event_listeners');
+        end
+
+        function suspend_processing_zslider_callbacks(app, tf)
+            if nargin < 2 || tf
+                setappdata(app.CELL_ID, 'proc_suspend_zslider_callbacks', true);
+            elseif isappdata(app.CELL_ID, 'proc_suspend_zslider_callbacks')
+                rmappdata(app.CELL_ID, 'proc_suspend_zslider_callbacks');
+            end
+        end
+
+        function tf = processing_zslider_callbacks_suspended(app)
+            tf = isappdata(app.CELL_ID, 'proc_suspend_zslider_callbacks') && ...
+                logical(getappdata(app.CELL_ID, 'proc_suspend_zslider_callbacks'));
+        end
+
+        function handle_processing_primary_zslider_change(app, value, is_live)
+            z_value = Program.GUIHandling.clamp_processing_zslider_value(app, value);
+            Program.GUIHandling.handle_processing_zslider_change(app, z_value, is_live);
+        end
+
+        function handle_processing_horizontal_zslider_change(app, value, is_live)
+            z_value = Program.GUIHandling.clamp_processing_zslider_value(app, value);
+            Program.GUIHandling.handle_processing_zslider_change(app, z_value, is_live);
+        end
+
+        function handle_processing_vertical_zslider_change(app, value, is_live)
+            value = Program.GUIHandling.clamp_processing_zslider_value(app, value);
+            z_limits = double(app.proc_vert_zSlider.Limits);
+            z_value = min(max(round(z_limits(2) - value), z_limits(1)), z_limits(2));
+            Program.GUIHandling.handle_processing_zslider_change(app, z_value, is_live);
+        end
+
+        function z_value = clamp_processing_zslider_value(app, value)
+            z_limits = double(app.proc_zSlider.Limits);
+            z_value = min(max(round(double(value)), z_limits(1)), z_limits(2));
+        end
+
+        function handle_processing_zslider_change(app, z_value, is_live)
+            if nargin < 3
+                is_live = false;
+            end
+
+            if Program.GUIHandling.processing_zslider_callbacks_suspended(app)
+                return
+            end
+
+            if is_live && isappdata(app.CELL_ID, 'proc_live_z_value')
+                previous_live_z = getappdata(app.CELL_ID, 'proc_live_z_value');
+                if isequal(previous_live_z, z_value)
+                    return
+                end
+            end
+
+            Program.GUIHandling.sync_processing_zcontrols(app, z_value);
+            if ~isempty(app.image_data)
+                current_z = min(max(round(z_value), 1), size(app.image_data, 3));
+                Program.Helpers.configure_main_zslider(app, size(app.image_data, 3), current_z);
+                app.ZSlider.Value = current_z;
+                if isprop(app, 'ZSliderS') && isvalid(app.ZSliderS)
+                    app.ZSliderS.Limits = [1, size(app.image_data, 3)];
+                    app.ZSliderS.Value = current_z;
+                end
+                if ~is_live && ~isempty(app.image_view)
+                    Program.Routines.ID.get_slice(app.ZSlider, app.image_view, app.XY);
+                end
+            end
+
+            if is_live
+                setappdata(app.CELL_ID, 'proc_live_z_value', z_value);
+                Program.Routines.Processing.render_live_slice();
+                drawnow limitrate nocallbacks;
+            else
+                if isappdata(app.CELL_ID, 'proc_live_z_value')
+                    rmappdata(app.CELL_ID, 'proc_live_z_value');
+                end
+                Program.Routines.Processing.render();
+            end
+        end
+
+        function sync_processing_zcontrols(app, z_value)
+            z_limits = double(app.proc_zSlider.Limits);
+            z_value = min(max(round(double(z_value)), z_limits(1)), z_limits(2));
+            vert_limits = double(app.proc_vert_zSlider.Limits);
+            vert_value = min(max(round(vert_limits(2) - z_value), vert_limits(1)), vert_limits(2));
+
+            if app.proc_zSlider.Value ~= z_value
+                app.proc_zSlider.Value = z_value;
+            end
+            if app.proc_hor_zSlider.Value ~= z_value
+                app.proc_hor_zSlider.Value = z_value;
+            end
+            if app.proc_vert_zSlider.Value ~= vert_value
+                app.proc_vert_zSlider.Value = vert_value;
+            end
+            if app.proc_zEditField.Value ~= z_value
+                app.proc_zEditField.Value = z_value;
+            end
         end
 
         function install_processing_downsample_callbacks(app)
@@ -1109,9 +1295,12 @@ classdef GUIHandling
         function clear_processing_preview_cache(app)
             cache_keys = { ...
                 'proc_mip_cache', ...
+                'proc_live_mip_cache', ...
+                'proc_view_cache', ...
                 'proc_render_cache', ...
                 'proc_histogram_signature', ...
-                'proc_render_view_dims'};
+                'proc_render_view_dims', ...
+                'proc_live_z_value'};
 
             for n = 1:numel(cache_keys)
                 key = cache_keys{n};
@@ -1132,7 +1321,6 @@ classdef GUIHandling
             end
 
             needs_restore = isfield(app.flags, 'ds');
-            render_dims = [];
             if ~needs_restore && isappdata(app.CELL_ID, 'proc_render_view_dims')
                 render_dims = getappdata(app.CELL_ID, 'proc_render_view_dims');
                 source_dims = Program.GUIHandling.processing_source_dims(app);
@@ -1157,7 +1345,7 @@ classdef GUIHandling
         function dims3 = processing_source_dims(app)
             switch char(string(app.VolumeDropDown.Value))
                 case 'Colormap'
-                    dims = size(app.proc_image, 'data');
+                    dims = Program.Helpers.processing_colormap_context(app).dims;
                 case 'Video'
                     dims = [app.video_info.ny, app.video_info.nx, app.video_info.nz];
                 otherwise
@@ -1172,26 +1360,99 @@ classdef GUIHandling
                 Program.GUIHandling.handle_processing_histogram_toggle(app);
             for n = 1:length(app.proc_channel_grid.RowHeight)
                 cb_handle = sprintf(Program.Handlers.channels.handles{'pp_cb'}, n);
+                dd_handle = sprintf(Program.Handlers.channels.handles{'pp_dd'}, n);
                 if isprop(app, cb_handle) && isvalid(app.(cb_handle))
                     app.(cb_handle).ValueChangedFcn = @(src, event) ...
                         Program.GUIHandling.handle_processing_channel_toggle(app);
                 end
+                if isprop(app, dd_handle) && isvalid(app.(dd_handle))
+                    app.(dd_handle).ValueChangedFcn = @(src, event) ...
+                        Program.GUIHandling.handle_processing_channel_assignment_changed(app, src, event, 'pp_dd');
+                end
+                if n >= 4
+                    ref_handle = sprintf(Program.Handlers.channels.handles{'pp_ref'}, n);
+                    if isprop(app, ref_handle) && isvalid(app.(ref_handle))
+                        app.(ref_handle).ValueChangedFcn = @(src, event) ...
+                            Program.GUIHandling.handle_processing_channel_assignment_changed(app, src, event, 'pp_ref');
+                    end
+                end
             end
             Program.GUIHandling.install_processing_window_controls(app);
+            Program.GUIHandling.install_processing_commit_callbacks(app);
             for n = 1:length(Program.GUIHandling.pos_prefixes)
                 prefix = Program.GUIHandling.pos_prefixes{n};
                 slider = app.(sprintf('%s_hist_slider', prefix));
                 Program.GUIHandling.configure_processing_histogram_slider(slider);
                 slider.ValueChangedFcn = @(src, event) ...
-                    Program.GUIHandling.handle_processing_histogram_slider(app, prefix, src.Value, true);
+                    Program.GUIHandling.handle_processing_histogram_slider(app, prefix, src.Value, true, true);
                 if isprop(slider, 'ValueChangingFcn')
                     slider.ValueChangingFcn = @(src, event) ...
-                        Program.GUIHandling.handle_processing_histogram_slider(app, prefix, event.Value, true);
+                        Program.GUIHandling.handle_processing_histogram_slider(app, prefix, event.Value, true, false);
                 end
                 Program.GUIHandling.sync_processing_window_fields(app, prefix);
             end
 
+            Program.GUIHandling.update_processing_threshold_target_options(app);
             Program.GUIHandling.apply_processing_responsive_layout(app);
+        end
+
+        function install_processing_action_callbacks(app)
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            if isprop(app, 'ProcNormalizeColorsButton') && isvalid(app.ProcNormalizeColorsButton)
+                app.ProcNormalizeColorsButton.ButtonPushedFcn = @(src, event) ...
+                    Program.GUIHandling.apply_processing_runtime_action(app, 'zscore');
+            end
+            if isprop(app, 'ProcHistogramMatchingButton') && isvalid(app.ProcHistogramMatchingButton)
+                app.ProcHistogramMatchingButton.ButtonPushedFcn = @(src, event) ...
+                    Program.GUIHandling.apply_processing_runtime_action(app, 'histmatch');
+            end
+            if isprop(app, 'ProcCropImageButton') && isvalid(app.ProcCropImageButton)
+                app.ProcCropImageButton.ButtonPushedFcn = @(src, event) ...
+                    Program.Routines.Processing.crop();
+            end
+            if isprop(app, 'ProcSaveButton') && isvalid(app.ProcSaveButton)
+                app.ProcSaveButton.ButtonPushedFcn = @(src, event) ...
+                    Program.Routines.Processing.save();
+            end
+            if isprop(app, 'ProcResetButton') && isvalid(app.ProcResetButton)
+                app.ProcResetButton.ButtonPushedFcn = @(src, event) ...
+                    Program.Routines.Processing.reset();
+            end
+            if isprop(app, 'ProcShowMIPCheckBox') && isvalid(app.ProcShowMIPCheckBox)
+                app.ProcShowMIPCheckBox.ValueChangedFcn = @(src, event) ...
+                    Program.GUIHandling.handle_processing_mip_toggled(app);
+            end
+            if isprop(app, 'VolumeDropDown') && isvalid(app.VolumeDropDown)
+                app.VolumeDropDown.ValueChangedFcn = @(src, event) ...
+                    Program.GUIHandling.handle_processing_volume_changed(app, event);
+            end
+        end
+
+        function apply_processing_runtime_action(app, action)
+            if nargin < 2 || strlength(string(action)) == 0
+                return
+            end
+
+            Program.Routines.Processing.save_prompt(action);
+        end
+
+        function handle_processing_mip_toggled(app)
+            Program.GUIHandling.hide_percentile_noise_editor(app);
+            Program.GUIHandling.update_processing_zslider_visibility(app);
+            Program.GUIHandling.clear_processing_preview_cache(app);
+            Program.Routines.Processing.render();
+        end
+
+        function handle_processing_volume_changed(app, event)
+            Program.Handlers.loading.start('Swapping volumes...');
+            cleanup = onCleanup(@() Program.Handlers.loading.done());
+            Program.GUIHandling.hide_percentile_noise_editor(app);
+            Program.GUIHandling.swap_volumes(app, event);
+            Program.GUIHandling.update_processing_threshold_target_options(app);
+            Program.Routines.Processing.render();
         end
 
         function ensure_processing_color_ui(app)
@@ -1201,6 +1462,7 @@ classdef GUIHandling
 
             Program.GUIHandling.install_processing_resize_callback(app);
             Program.GUIHandling.install_processing_histogram_callbacks(app);
+            Program.GUIHandling.install_processing_action_callbacks(app);
             Program.GUIHandling.configure_processing_color_panel(app);
             Program.GUIHandling.configure_spectral_unmixing_controls(app);
             Program.GUIHandling.apply_processing_responsive_layout(app);
@@ -1270,7 +1532,72 @@ classdef GUIHandling
 
         function handle_processing_channel_toggle(app)
             Program.GUIHandling.update_processing_histogram_interactivity(app);
+            Program.GUIHandling.update_processing_threshold_target_options(app);
+            Program.Helpers.sync_main_display_from_processing(app, false);
             Program.Routines.Processing.render();
+            Program.Routines.ID.render();
+        end
+
+        function handle_processing_channel_assignment_changed(app, source, event, group_key)
+            rendered_processing = false;
+            if nargin >= 4 && ~isempty(group_key)
+                Program.Helpers.dd_sync( ...
+                    source, ...
+                    event.PreviousValue, ...
+                    event.Value, ...
+                    Program.Handlers.channels.handles{group_key});
+                rendered_processing = true;
+            end
+            Program.GUIHandling.update_processing_histogram_interactivity(app);
+            Program.GUIHandling.update_processing_threshold_target_options(app);
+            setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
+            Program.Helpers.sync_main_display_from_processing(app, false);
+            if ~rendered_processing
+                Program.Routines.Processing.render();
+            end
+            Program.Routines.ID.render();
+        end
+
+        function handle_processing_gamma_changed(app)
+            setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
+            Program.Helpers.sync_main_display_from_processing(app, false);
+            Program.Routines.Processing.render();
+            Program.Routines.ID.render();
+        end
+
+        function install_processing_commit_callbacks(app)
+            if isprop(app, 'confirm_rotation') && isvalid(app.confirm_rotation)
+                app.confirm_rotation.ButtonPushedFcn = @(src, event) ...
+                    Program.GUIHandling.confirm_processing_rotation(app);
+            end
+        end
+
+        function confirm_processing_rotation(app)
+            rotate_actions = {};
+
+            if app.flip_lr.Value
+                rotate_actions{end+1} = 'hori'; %#ok<AGROW>
+            end
+            if app.flip_ud.Value
+                rotate_actions{end+1} = 'vert'; %#ok<AGROW>
+            end
+            if app.proc_rot_spinner.Value ~= 0
+                rotate_actions{end+1} = 'rotate'; %#ok<AGROW>
+            end
+
+            if isempty(rotate_actions)
+                app.proc_xyAxes.XLim(2) = app.proc_xSlider.Limits(2);
+                app.proc_xyAxes.YLim(2) = app.proc_ySlider.Limits(2);
+                Program.Routines.GUI.set_manipulation_panel('closed');
+                return
+            end
+
+            applied = Program.Helpers.apply_processing_preview_action(app, rotate_actions);
+            if ~applied
+                return
+            end
+
+            Program.Routines.GUI.set_manipulation_panel('closed');
         end
 
         function configure_processing_histogram_slider(slider)
@@ -1292,6 +1619,8 @@ classdef GUIHandling
             for n = 1:numel(prefixes)
                 prefix = prefixes{n};
                 gamma_field = app.(sprintf('%s_GammaEditField', prefix));
+                gamma_field.ValueChangedFcn = @(src, event) ...
+                    Program.GUIHandling.handle_processing_gamma_changed(app);
                 header_grid = gamma_field.Parent;
 
                 controls = Program.GUIHandling.processing_window_controls(app, prefix);
@@ -1332,13 +1661,25 @@ classdef GUIHandling
             Program.GUIHandling.apply_processing_responsive_layout(app);
         end
 
-        function handle_processing_histogram_slider(app, prefix, value, redraw)
+        function handle_processing_histogram_slider(app, prefix, value, redraw, sync_main)
+            if nargin < 5
+                sync_main = redraw;
+            end
+
             slider = app.(sprintf('%s_hist_slider', prefix));
             value = Program.GUIHandling.clamp_processing_window_range(value);
             slider.Value = value;
             Program.GUIHandling.sync_processing_window_fields(app, prefix);
+            Program.GUIHandling.sync_processing_threshold_field(app);
+            if sync_main
+                setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
+                Program.Helpers.sync_main_display_from_processing(app, false);
+            end
             if redraw
                 Program.Routines.Processing.render();
+                if sync_main
+                    Program.Routines.ID.render();
+                end
                 drawnow limitrate nocallbacks;
             end
         end
@@ -1363,7 +1704,11 @@ classdef GUIHandling
 
             slider.Value = range;
             Program.GUIHandling.sync_processing_window_fields(app, prefix);
+            Program.GUIHandling.sync_processing_threshold_field(app);
+            setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
+            Program.Helpers.sync_main_display_from_processing(app, false);
             Program.Routines.Processing.render();
+            Program.Routines.ID.render();
         end
 
         function sync_processing_window_fields(app, prefix)
@@ -1453,17 +1798,18 @@ classdef GUIHandling
             catch
             end
 
-            row5_height = 28 * is_image_mode;
-            if is_image_mode && strcmpi(app.SpectralUnmixingPanel.Visible, 'on')
+            row5_height = 0;
+            if is_image_mode
                 row6_height = 212;
+                app.SpectralUnmixingPanel.Visible = 'on';
             else
                 row6_height = 0;
+                app.SpectralUnmixingPanel.Visible = 'off';
             end
 
-            app.ProcAdvancedOptionsButton.Visible = matlab.lang.OnOffSwitchState(is_image_mode);
-            if ~is_image_mode
-                app.SpectralUnmixingPanel.Visible = 'off';
-                app.ProcAdvancedOptionsButton.Text = 'Advanced';
+            app.ProcAdvancedOptionsButton.Visible = 'off';
+            if isprop(app.ProcAdvancedOptionsButton, 'Enable')
+                app.ProcAdvancedOptionsButton.Enable = 'off';
             end
 
             app.ProcSideGrid.RowHeight = {95, 'fit', row3_height, 93, row5_height, row6_height};
@@ -1474,6 +1820,10 @@ classdef GUIHandling
                 app = Program.app;
             end
 
+            app.ProcAdvancedOptionsButton.Visible = 'off';
+            if isprop(app.ProcAdvancedOptionsButton, 'Enable')
+                app.ProcAdvancedOptionsButton.Enable = 'off';
+            end
             app.ProcAdvancedOptionsButton.ButtonPushedFcn = @(src, event) ...
                 Program.GUIHandling.handle_processing_advanced_toggle(app);
         end
@@ -1481,19 +1831,6 @@ classdef GUIHandling
         function handle_processing_advanced_toggle(app)
             if nargin < 1 || isempty(app)
                 app = Program.app;
-            end
-
-            if ~strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap')
-                return
-            end
-
-            show_panel = ~strcmpi(app.SpectralUnmixingPanel.Visible, 'on');
-            if show_panel
-                app.SpectralUnmixingPanel.Visible = 'on';
-                app.ProcAdvancedOptionsButton.Text = 'Hide Advanced';
-            else
-                app.SpectralUnmixingPanel.Visible = 'off';
-                app.ProcAdvancedOptionsButton.Text = 'Advanced';
             end
 
             Program.GUIHandling.configure_processing_sidebar_layout(app);
@@ -1585,6 +1922,13 @@ classdef GUIHandling
 
             if isappdata(app.CELL_ID, 'proc_resize_callback_installed')
                 return
+            end
+
+            if isprop(app.CELL_ID, 'AutoResizeChildren')
+                try
+                    app.CELL_ID.AutoResizeChildren = 'off';
+                catch
+                end
             end
 
             setappdata(app.CELL_ID, 'proc_resize_callback_installed', true);
@@ -1700,6 +2044,7 @@ classdef GUIHandling
 
             Program.GUIHandling.layout_processing_threshold_controls(app, stack_threshold_panel);
             Program.GUIHandling.layout_processing_histogram_panels(app, histogram_columns, histogram_width);
+            Program.GUIHandling.position_percentile_noise_editor(app);
         end
 
         function width = processing_container_width(app)
@@ -1934,22 +2279,31 @@ classdef GUIHandling
         end
 
         function update_processing_zslider_visibility(app)
-            desired_visible = ~logical(app.ProcShowMIPCheckBox.Value);
-            if desired_visible
-                target_visibility = 'on';
-                target_height = 30;
-            else
-                target_visibility = 'off';
-                target_height = 0;
+            mip_enabled = logical(app.ProcShowMIPCheckBox.Value);
+            target_enable = 'on';
+            if mip_enabled
+                target_enable = 'off';
             end
 
-            if ~strcmp(app.proc_zSlider.Visible, target_visibility)
-                app.proc_zSlider.Visible = target_visibility;
+            if ~strcmp(app.proc_zSlider.Visible, 'on')
+                app.proc_zSlider.Visible = 'on';
+            end
+            if isprop(app.proc_zSlider, 'Enable') && ~strcmp(app.proc_zSlider.Enable, target_enable)
+                app.proc_zSlider.Enable = target_enable;
+            end
+            if isprop(app.proc_hor_zSlider, 'Enable') && ~strcmp(app.proc_hor_zSlider.Enable, target_enable)
+                app.proc_hor_zSlider.Enable = target_enable;
+            end
+            if isprop(app.proc_vert_zSlider, 'Enable') && ~strcmp(app.proc_vert_zSlider.Enable, target_enable)
+                app.proc_vert_zSlider.Enable = target_enable;
+            end
+            if isprop(app.proc_zEditField, 'Enable') && ~strcmp(app.proc_zEditField.Enable, target_enable)
+                app.proc_zEditField.Enable = target_enable;
             end
 
             row_heights = app.ProcAxGrid.RowHeight;
-            if numel(row_heights) >= 4 && ~isequal(row_heights{4}, target_height)
-                row_heights{4} = target_height;
+            if numel(row_heights) >= 4 && ~isequal(row_heights{4}, 30)
+                row_heights{4} = 30;
                 app.ProcAxGrid.RowHeight = row_heights;
             end
         end
@@ -1965,6 +2319,8 @@ classdef GUIHandling
             app.ProcHistogramManipulationLabel.Visible = 'off';
             row_heights = app.ProcThresholdGrid.RowHeight;
             if numel(row_heights) >= 9
+                row_heights{1} = 20;
+                row_heights{2} = 0;
                 row_heights{3} = 30;
                 row_heights{4} = 30;
                 row_heights{5} = 20;
@@ -1974,15 +2330,13 @@ classdef GUIHandling
                 row_heights{9} = 20;
             end
 
-            Program.GUIHandling.set_proc_threshold_value(app, 0, false);
-            if numel(row_heights) >= 2
-                row_heights{1} = 0;
-                row_heights{2} = 0;
-                app.ProcThresholdGrid.RowHeight = row_heights;
-            end
+            app.ProcThresholdGrid.RowHeight = row_heights;
 
             if isprop(app, 'ProcThresholdManipulationLabel') && isvalid(app.ProcThresholdManipulationLabel)
-                app.ProcThresholdManipulationLabel.Visible = 'off';
+                app.ProcThresholdManipulationLabel.Visible = 'on';
+                app.ProcThresholdManipulationLabel.Text = 'Threshold BG';
+                app.ProcThresholdManipulationLabel.Tooltip = ...
+                    'Threshold/background helpers for setting per-channel lower bounds.';
             end
             if isprop(app, 'ProcThresholdKnobPanel') && isvalid(app.ProcThresholdKnobPanel)
                 app.ProcThresholdKnobPanel.Visible = 'off';
@@ -1991,17 +2345,14 @@ classdef GUIHandling
                 app.ProcMeasureROINoiseButton.Visible = 'on';
                 app.ProcMeasureROINoiseButton.ButtonPushedFcn = @(src, event) ...
                     Program.GUIHandling.measure_threshold_from_roi(app);
-                app.ProcMeasureROINoiseButton.Tooltip = ...
-                    'Measure an ROI on the current preview and set each mapped channel''s Min field from that ROI.';
             end
             if isprop(app, 'ProcMeasure90pthNoiseButton') && isvalid(app.ProcMeasure90pthNoiseButton)
                 app.ProcMeasure90pthNoiseButton.Visible = 'on';
                 app.ProcMeasure90pthNoiseButton.ButtonPushedFcn = @(src, event) ...
                     Program.GUIHandling.measure_threshold_from_percentile(app);
-                app.ProcMeasure90pthNoiseButton.Tooltip = ...
-                    'Measure a percentile on the current preview and set each mapped channel''s Min field.';
             end
 
+            Program.GUIHandling.update_processing_threshold_target_options(app);
             Program.GUIHandling.apply_processing_responsive_layout(app);
         end
 
@@ -2014,7 +2365,11 @@ classdef GUIHandling
                 active_volume = Program.GUIHandling.get_active_volume(app, 'request', 'state');
                 switch active_volume.state
                     case 'colormap'
-                        [ny, nx, nz, nc] = size(app.proc_image, 'data');
+                        current_dims = Program.Helpers.processing_colormap_context(app).dims;
+                        ny = current_dims(1);
+                        nx = current_dims(2);
+                        nz = current_dims(3);
+                        nc = current_dims(4);
     
                     case 'video'
                         nx = app.video_info.nx;
@@ -2066,6 +2421,9 @@ classdef GUIHandling
                 end
             end
 
+            Program.GUIHandling.suspend_processing_zslider_callbacks(app, true);
+            cleanup = onCleanup(@() Program.GUIHandling.suspend_processing_zslider_callbacks(app, false));
+
             app.proc_xSlider.Value = x_value;
             app.proc_ySlider.Value = y_value;
             app.proc_xEditField.Value = x_value;
@@ -2111,18 +2469,36 @@ classdef GUIHandling
 
         function swap_volumes(app, event)
             if ~exist('event', 'var')
-                mode = Program.GUIHandling.get_active_volume(app, 'request', 'state');
+                requested_mode = Program.GUIHandling.get_active_volume(app, 'request', 'state');
             else
-                mode = lower(event.Value);
+                requested_mode = lower(char(string(event.Value)));
+            end
+
+            Program.GUIHandling.refresh_processing_volume_dropdown(app, requested_mode);
+            [mode, is_available, unavailable_message] = ...
+                Program.GUIHandling.resolve_processing_volume_request(app, requested_mode);
+            Program.GUIHandling.refresh_processing_volume_dropdown(app, mode);
+
+            if ~is_available
+                uialert(app.CELL_ID, unavailable_message, 'Volume Unavailable');
+                return
             end
 
             Program.GUIHandling.set_gui_limits(app, mode);
 
             switch mode
                 case 'colormap'
-                    max_val = max(app.proc_image.data, [], "all");
+                    context = Program.Helpers.processing_colormap_context(app);
+                    if isempty(context.volume)
+                        max_val = 255;
+                    else
+                        max_val = max(context.volume, [], "all");
+                    end
 
-                    chunk_prefs = app.proc_image.prefs;
+                    chunk_prefs = context.prefs;
+                    if ~isfield(chunk_prefs, 'gamma')
+                        chunk_prefs.gamma = ones(length(Program.GUIHandling.pos_prefixes), 1);
+                    end
                     chunk_gammas = Program.Helpers.expand_gamma( ...
                         chunk_prefs.gamma, ...
                         length(Program.GUIHandling.pos_prefixes));
@@ -2169,7 +2545,6 @@ classdef GUIHandling
             app.ProcNoiseThresholdKnob.MajorTicks = 0:51:255;
             app.ProcNoiseThresholdKnob.MajorTickLabels = string(app.ProcNoiseThresholdKnob.MajorTicks);
             Program.GUIHandling.shorten_knob_labels(app);
-            Program.GUIHandling.set_proc_threshold_value(app, threshold_limits(1), false);
 
             for pos=1:length(Program.GUIHandling.pos_prefixes)
                 slider = app.(sprintf('%s_hist_slider', Program.GUIHandling.pos_prefixes{pos}));
@@ -2179,43 +2554,52 @@ classdef GUIHandling
                 app.(sprintf('%s_hist_ax', Program.GUIHandling.pos_prefixes{pos})).XLim = hist_limits;
                 Program.GUIHandling.sync_processing_window_fields(app, Program.GUIHandling.pos_prefixes{pos});
             end
+
+            Program.GUIHandling.update_processing_threshold_target_options(app);
         end
 
         function install_threshold_stepper(app)
             grid = app.ProcThresholdKnobGrid;
             app.ProcNoiseThresholdKnob.Visible = 'off';
-            app.ProcThresholdManipulationLabel.Text = 'Background Threshold';
+            app.ProcThresholdKnobPanel.Visible = 'on';
+            app.ProcThresholdManipulationLabel.Text = 'Threshold BG';
             app.ProcThresholdManipulationLabel.Tooltip = ...
-                'Threshold applied globally on the user-facing uint8 display scale (0-255).';
-            grid.ColumnWidth = {'1x', 92, 24, '1x', 0};
+                'Targeted helpers for setting per-channel lower bounds on the user-facing uint8 scale (0-255).';
+            grid.ColumnWidth = {46, '1x', 0, 24, 24};
             grid.RowHeight = {22, 22, 0, 0};
 
-            app.ProcNoiseThresholdField.Layout.Row = [1 2];
+            controls = Program.GUIHandling.ensure_processing_threshold_target_controls(app);
+            controls.target_label.Parent = grid;
+            controls.target_dropdown.Parent = grid;
+            controls.min_label.Parent = grid;
+            controls.target_label.Layout.Row = 1;
+            controls.target_label.Layout.Column = 1;
+            controls.target_dropdown.Layout.Row = 1;
+            controls.target_dropdown.Layout.Column = [2 5];
+            controls.min_label.Layout.Row = 2;
+            controls.min_label.Layout.Column = 1;
+
+            app.ProcNoiseThresholdField.Visible = 'on';
+            app.ProcNoiseThresholdField.Layout.Row = 2;
             app.ProcNoiseThresholdField.Layout.Column = 2;
             app.ProcNoiseThresholdField.ValueChangedFcn = @(src, event) ...
                 Program.GUIHandling.handle_threshold_field_changed(app, src);
-            app.ProcNoiseThresholdField.Tooltip = ...
-                'Threshold applied globally on the user-facing uint8 display scale (0-255).';
-
-            app.ProcThresholdGrid.RowHeight{2} = 74;
 
             handles = Program.GUIHandling.threshold_stepper_handles(app);
             if isempty(handles)
                 up_button = uibutton(grid, 'push');
-                up_button.Layout.Row = 1;
-                up_button.Layout.Column = 3;
+                up_button.Layout.Row = 2;
+                up_button.Layout.Column = 4;
                 up_button.FontSize = 11;
                 up_button.Text = char(9650);
-                up_button.Tooltip = 'Increase the threshold by 1 intensity unit.';
                 up_button.ButtonPushedFcn = @(src, event) ...
                     Program.GUIHandling.step_proc_threshold(app, 1);
 
                 down_button = uibutton(grid, 'push');
                 down_button.Layout.Row = 2;
-                down_button.Layout.Column = 3;
+                down_button.Layout.Column = 5;
                 down_button.FontSize = 11;
                 down_button.Text = char(9660);
-                down_button.Tooltip = 'Decrease the threshold by 1 intensity unit.';
                 down_button.ButtonPushedFcn = @(src, event) ...
                     Program.GUIHandling.step_proc_threshold(app, -1);
 
@@ -2224,10 +2608,10 @@ classdef GUIHandling
             else
                 handles.up.Parent = grid;
                 handles.down.Parent = grid;
-                handles.up.Layout.Row = 1;
-                handles.up.Layout.Column = 3;
+                handles.up.Layout.Row = 2;
+                handles.up.Layout.Column = 4;
                 handles.down.Layout.Row = 2;
-                handles.down.Layout.Column = 3;
+                handles.down.Layout.Column = 5;
                 handles.up.Visible = 'on';
                 handles.down.Visible = 'on';
             end
@@ -2236,8 +2620,8 @@ classdef GUIHandling
                 Program.GUIHandling.measure_threshold_from_roi(app);
             app.ProcMeasure90pthNoiseButton.ButtonPushedFcn = @(src, event) ...
                 Program.GUIHandling.measure_threshold_from_percentile(app);
-            app.ProcMeasureROINoiseButton.Tooltip = 'Measure ROI noise from the current preview.';
-            app.ProcMeasure90pthNoiseButton.Tooltip = 'Measure percentile noise from the current preview.';
+            Program.GUIHandling.update_processing_threshold_button_tooltips(app);
+            Program.GUIHandling.sync_processing_threshold_field(app);
             Program.GUIHandling.set_threshold_stepper_state(app, app.ProcNoiseThresholdField.Enable);
         end
 
@@ -2245,6 +2629,22 @@ classdef GUIHandling
             if isprop(app.ProcNoiseThresholdKnob, 'Enable')
                 app.ProcNoiseThresholdKnob.Enable = state;
             end
+
+            if isprop(app.ProcNoiseThresholdField, 'Enable')
+                app.ProcNoiseThresholdField.Enable = state;
+            end
+
+            controls = Program.GUIHandling.processing_threshold_target_controls(app);
+            if ~isempty(controls)
+                controls.target_dropdown.Enable = state;
+                if isprop(controls.target_label, 'Enable')
+                    controls.target_label.Enable = state;
+                end
+                if isprop(controls.min_label, 'Enable')
+                    controls.min_label.Enable = state;
+                end
+            end
+
             handles = Program.GUIHandling.threshold_stepper_handles(app);
             if isempty(handles)
                 return
@@ -2271,21 +2671,180 @@ classdef GUIHandling
             end
         end
 
-        function set_threshold_field_display(app, value, target_label)
-            %#ok<INUSD>
-            value = min(max(round(double(value)), 0), 255);
-            app.ProcNoiseThresholdField.Value = value;
-            app.ProcNoiseThresholdKnob.Value = value;
-            app.ProcNoiseThresholdField.Tooltip = ...
-                'Threshold applied globally on the user-facing uint8 display scale (0-255).';
-            handles = Program.GUIHandling.threshold_stepper_handles(app);
-            if ~isempty(handles)
-                handles.up.Tooltip = 'Increase the threshold by 1 intensity unit.';
-                handles.down.Tooltip = 'Decrease the threshold by 1 intensity unit.';
+        function controls = ensure_processing_threshold_target_controls(app)
+            controls = Program.GUIHandling.processing_threshold_target_controls(app);
+            if ~isempty(controls)
+                return
+            end
+
+            grid = app.ProcThresholdKnobGrid;
+            target_label = uilabel(grid, ...
+                'Text', 'Apply', ...
+                'HorizontalAlignment', 'right', ...
+                'Tooltip', 'Choose which mapped channel this threshold helper edits.');
+            target_dropdown = uidropdown(grid, ...
+                'Items', {'All mapped channels'}, ...
+                'ItemsData', {'all'}, ...
+                'Value', 'all', ...
+                'Tooltip', 'Choose which mapped channel this threshold helper edits.', ...
+                'ValueChangedFcn', @(src, event) ...
+                    Program.GUIHandling.handle_processing_threshold_target_changed(app));
+            min_label = uilabel(grid, ...
+                'Text', 'Min', ...
+                'HorizontalAlignment', 'right', ...
+                'Tooltip', 'Lower display/save bound for the selected target channel(s).');
+
+            controls = struct( ...
+                'target_label', target_label, ...
+                'target_dropdown', target_dropdown, ...
+                'min_label', min_label);
+            setappdata(app.CELL_ID, 'proc_threshold_target_controls', controls);
+        end
+
+        function controls = processing_threshold_target_controls(app)
+            controls = [];
+            if ~isappdata(app.CELL_ID, 'proc_threshold_target_controls')
+                return
+            end
+
+            controls = getappdata(app.CELL_ID, 'proc_threshold_target_controls');
+            required = {'target_label', 'target_dropdown', 'min_label'};
+            for n = 1:numel(required)
+                name = required{n};
+                if ~isfield(controls, name) || isempty(controls.(name)) || ~isvalid(controls.(name))
+                    controls = [];
+                    if isappdata(app.CELL_ID, 'proc_threshold_target_controls')
+                        rmappdata(app.CELL_ID, 'proc_threshold_target_controls');
+                    end
+                    return
+                end
             end
         end
 
+        function handle_processing_threshold_target_changed(app)
+            Program.GUIHandling.sync_processing_threshold_field(app);
+            Program.GUIHandling.update_processing_threshold_button_tooltips(app);
+        end
+
+        function update_processing_threshold_target_options(app)
+            controls = Program.GUIHandling.processing_threshold_target_controls(app);
+            if ~isempty(controls)
+                if isprop(controls.target_label, 'Visible')
+                    controls.target_label.Visible = 'off';
+                end
+                if isprop(controls.target_dropdown, 'Visible')
+                    controls.target_dropdown.Visible = 'off';
+                end
+                if isprop(controls.min_label, 'Visible')
+                    controls.min_label.Visible = 'off';
+                end
+            end
+            Program.GUIHandling.update_processing_threshold_button_tooltips(app);
+        end
+
+        function rows = processing_threshold_target_rows(app)
+            rows = Program.Handlers.channels.empty_processing_row();
+            rows = rows([]);
+
+            state = Program.Handlers.channels.processing_state(app);
+            mapped_rows = state.rows([state.rows.source_idx] > 0 & [state.rows.row] <= numel(Program.GUIHandling.pos_prefixes));
+            if isempty(mapped_rows)
+                return
+            end
+
+            rows = mapped_rows;
+        end
+
+        function prefixes = processing_threshold_target_prefixes(app)
+            rows = Program.GUIHandling.processing_threshold_target_rows(app);
+            prefixes = {};
+            for n = 1:numel(rows)
+                row = rows(n);
+                if row.row < 1 || row.row > numel(Program.GUIHandling.pos_prefixes)
+                    continue
+                end
+                prefixes{end + 1} = Program.GUIHandling.pos_prefixes{row.row}; %#ok<AGROW>
+            end
+        end
+
+        function description = processing_threshold_target_description(app)
+            %#ok<INUSD>
+            description = 'all mapped channels';
+        end
+
+        function set_threshold_field_display(app, value, target_label)
+            value = min(max(round(double(value)), 0), 255);
+            Program.GUIHandling.suspend_processing_threshold_field_callbacks(app, true);
+            cleanup = onCleanup(@() Program.GUIHandling.suspend_processing_threshold_field_callbacks(app, false));
+            app.ProcNoiseThresholdField.Value = value;
+            app.ProcNoiseThresholdKnob.Value = value;
+            if nargin < 3 || strlength(string(target_label)) == 0
+                target_label = Program.GUIHandling.processing_threshold_target_description(app);
+            end
+            app.ProcNoiseThresholdField.Tooltip = ...
+                sprintf('Lower display/save bound for %s on the user-facing uint8 scale (0-255).', target_label);
+            handles = Program.GUIHandling.threshold_stepper_handles(app);
+            if ~isempty(handles)
+                handles.up.Tooltip = sprintf('Increase the lower bound for %s by 1 intensity unit.', target_label);
+                handles.down.Tooltip = sprintf('Decrease the lower bound for %s by 1 intensity unit.', target_label);
+            end
+        end
+
+        function suspend_processing_threshold_field_callbacks(app, tf)
+            if nargin < 2 || tf
+                setappdata(app.CELL_ID, 'proc_threshold_field_sync_guard', true);
+            elseif isappdata(app.CELL_ID, 'proc_threshold_field_sync_guard')
+                rmappdata(app.CELL_ID, 'proc_threshold_field_sync_guard');
+            end
+        end
+
+        function tf = processing_threshold_field_callbacks_suspended(app)
+            tf = isappdata(app.CELL_ID, 'proc_threshold_field_sync_guard') && ...
+                logical(getappdata(app.CELL_ID, 'proc_threshold_field_sync_guard'));
+        end
+
+        function update_processing_threshold_button_tooltips(app)
+            target_desc = Program.GUIHandling.processing_threshold_target_description(app);
+            if isprop(app, 'ProcMeasureROINoiseButton') && isvalid(app.ProcMeasureROINoiseButton)
+                app.ProcMeasureROINoiseButton.Tooltip = ...
+                    sprintf('Measure an ROI on the current preview and set the Min bound for %s.', target_desc);
+            end
+            if isprop(app, 'ProcMeasure90pthNoiseButton') && isvalid(app.ProcMeasure90pthNoiseButton)
+                app.ProcMeasure90pthNoiseButton.Tooltip = ...
+                    sprintf('Measure a percentile on the current preview and set the Min bound for %s.', target_desc);
+            end
+        end
+
+        function sync_processing_threshold_field(app)
+            controls = Program.GUIHandling.processing_threshold_target_controls(app);
+            if isempty(controls)
+                return
+            end
+
+            prefixes = Program.GUIHandling.processing_threshold_target_prefixes(app);
+            if isempty(prefixes)
+                Program.GUIHandling.set_threshold_field_display(app, 0, 'the mapped channels');
+                return
+            end
+
+            mins = zeros(1, numel(prefixes));
+            for n = 1:numel(prefixes)
+                slider = app.(sprintf('%s_hist_slider', prefixes{n}));
+                mins(n) = double(slider.Value(1));
+            end
+
+            target_desc = Program.GUIHandling.processing_threshold_target_description(app);
+            if numel(mins) > 1 && any(abs(mins - mins(1)) > 0.5)
+                target_desc = sprintf('%s (currently mixed)', target_desc);
+            end
+
+            Program.GUIHandling.set_threshold_field_display(app, mins(1), target_desc);
+        end
+
         function handle_threshold_field_changed(app, src)
+            if Program.GUIHandling.processing_threshold_field_callbacks_suspended(app)
+                return
+            end
             Program.GUIHandling.set_proc_threshold_value(app, src.Value, true);
         end
 
@@ -2297,10 +2856,19 @@ classdef GUIHandling
         function set_proc_threshold_value(app, value, redraw)
             limits = app.ProcNoiseThresholdField.Limits;
             value = min(max(round(double(value)), limits(1)), limits(2));
-            Program.GUIHandling.set_threshold_field_display(app, value, '');
+            prefixes = Program.GUIHandling.processing_threshold_target_prefixes(app);
+            Program.GUIHandling.set_threshold_field_display(app, value, ...
+                Program.GUIHandling.processing_threshold_target_description(app));
 
-            if redraw
+            for n = 1:numel(prefixes)
+                Program.GUIHandling.set_processing_channel_min(app, prefixes{n}, value);
+            end
+
+            if redraw && ~isempty(prefixes)
+                setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
+                Program.Helpers.sync_main_display_from_processing(app, false);
                 Program.Routines.Processing.render();
+                Program.Routines.ID.render();
             end
         end
 
@@ -2324,6 +2892,8 @@ classdef GUIHandling
             if isempty(channels)
                 return
             end
+
+            Program.GUIHandling.hide_percentile_noise_editor(app);
 
             Program.GUIHandling.gui_lock(app, 'lock', 'processing_tab');
             check = uiconfirm(app.CELL_ID, ...
@@ -2353,29 +2923,178 @@ classdef GUIHandling
             end
 
             if updated
+                setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
+                Program.Helpers.sync_main_display_from_processing(app, false);
                 Program.Routines.Processing.render();
+                Program.Routines.ID.render();
                 drawnow limitrate nocallbacks;
             end
         end
 
         function measure_threshold_from_percentile(app)
+            controls = Program.GUIHandling.ensure_percentile_noise_editor(app);
+            if isempty(controls)
+                return
+            end
+
+            if strcmp(controls.panel.Visible, 'on')
+                Program.GUIHandling.hide_percentile_noise_editor(app);
+                return
+            end
+
+            Program.GUIHandling.show_percentile_noise_editor(app);
+        end
+
+        function controls = ensure_percentile_noise_editor(app)
+            controls = Program.GUIHandling.percentile_noise_editor(app);
+            if ~isempty(controls)
+                return
+            end
+
+            panel = uipanel(app.CELL_ID, ...
+                'Title', 'Percentile Noise', ...
+                'Visible', 'off', ...
+                'Units', 'pixels', ...
+                'AutoResizeChildren', 'off');
+            panel.Position(3:4) = [220, 104];
+
+            grid = uigridlayout(panel, ...
+                'RowHeight', {'fit', 'fit', 'fit'}, ...
+                'ColumnWidth', {'1x', 64}, ...
+                'ColumnSpacing', 6, ...
+                'RowSpacing', 6, ...
+                'Padding', [10 8 10 8]);
+
+            prompt = uilabel(grid, ...
+                'Text', 'Percentile (0-100)', ...
+                'HorizontalAlignment', 'left');
+            prompt.Layout.Row = 1;
+            prompt.Layout.Column = [1 2];
+
+            field = uieditfield(grid, 'numeric', ...
+                'Limits', [0 100], ...
+                'ValueDisplayFormat', '%.4g', ...
+                'ValueChangedFcn', @(src, event) ...
+                    Program.GUIHandling.apply_percentile_noise_editor(app));
+            field.Layout.Row = 2;
+            field.Layout.Column = [1 2];
+
+            apply_button = uibutton(grid, 'push', ...
+                'Text', 'Apply', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.apply_percentile_noise_editor(app));
+            apply_button.Layout.Row = 3;
+            apply_button.Layout.Column = 1;
+
+            cancel_button = uibutton(grid, 'push', ...
+                'Text', 'Cancel', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.hide_percentile_noise_editor(app));
+            cancel_button.Layout.Row = 3;
+            cancel_button.Layout.Column = 2;
+
+            controls = struct( ...
+                'panel', panel, ...
+                'grid', grid, ...
+                'prompt', prompt, ...
+                'field', field, ...
+                'apply_button', apply_button, ...
+                'cancel_button', cancel_button);
+            setappdata(app.CELL_ID, 'proc_percentile_noise_editor', controls);
+        end
+
+        function controls = percentile_noise_editor(app)
+            controls = [];
+            if ~isappdata(app.CELL_ID, 'proc_percentile_noise_editor')
+                return
+            end
+
+            controls = getappdata(app.CELL_ID, 'proc_percentile_noise_editor');
+            required = {'panel', 'grid', 'prompt', 'field', 'apply_button', 'cancel_button'};
+            for n = 1:numel(required)
+                name = required{n};
+                if ~isfield(controls, name) || isempty(controls.(name)) || ~isvalid(controls.(name))
+                    controls = [];
+                    if isappdata(app.CELL_ID, 'proc_percentile_noise_editor')
+                        rmappdata(app.CELL_ID, 'proc_percentile_noise_editor');
+                    end
+                    return
+                end
+            end
+        end
+
+        function show_percentile_noise_editor(app)
+            controls = Program.GUIHandling.ensure_percentile_noise_editor(app);
+            if isempty(controls)
+                return
+            end
+
+            default_value = 90;
+            if isappdata(app.CELL_ID, 'proc_percentile_noise_value')
+                default_value = double(getappdata(app.CELL_ID, 'proc_percentile_noise_value'));
+            end
+            controls.field.Value = min(max(default_value, 0), 100);
+            controls.panel.Visible = 'on';
+            Program.GUIHandling.position_percentile_noise_editor(app);
+        end
+
+        function hide_percentile_noise_editor(app)
+            controls = Program.GUIHandling.percentile_noise_editor(app);
+            if isempty(controls)
+                return
+            end
+
+            controls.panel.Visible = 'off';
+        end
+
+        function position_percentile_noise_editor(app)
+            controls = Program.GUIHandling.percentile_noise_editor(app);
+            if isempty(controls) || ~strcmp(controls.panel.Visible, 'on') || ...
+                    ~isprop(app, 'ProcMeasure90pthNoiseButton') || isempty(app.ProcMeasure90pthNoiseButton) || ...
+                    ~isvalid(app.ProcMeasure90pthNoiseButton)
+                return
+            end
+
+            drawnow limitrate nocallbacks;
+            button_pos = getpixelposition(app.ProcMeasure90pthNoiseButton, true);
+            figure_pos = app.CELL_ID.Position;
+            panel_size = [220, 104];
+
+            x = button_pos(1) - panel_size(1) - 8;
+            if x < 10
+                x = button_pos(1) + button_pos(3) + 8;
+            end
+            x = min(max(x, 10), max(10, figure_pos(3) - panel_size(1) - 10));
+
+            y = button_pos(2) + button_pos(4) - panel_size(2);
+            y = min(max(y, 10), max(10, figure_pos(4) - panel_size(2) - 10));
+
+            controls.panel.Position = [x, y, panel_size];
+        end
+
+        function apply_percentile_noise_editor(app)
+            controls = Program.GUIHandling.percentile_noise_editor(app);
+            if isempty(controls)
+                return
+            end
+
+            percentile_value = double(controls.field.Value);
+            if ~isfinite(percentile_value)
+                return
+            end
+
+            percentile_value = min(max(percentile_value, 0), 100);
+            controls.field.Value = percentile_value;
+            setappdata(app.CELL_ID, 'proc_percentile_noise_value', percentile_value);
+            Program.GUIHandling.hide_percentile_noise_editor(app);
+            Program.GUIHandling.apply_percentile_threshold_measurement(app, percentile_value);
+        end
+
+        function apply_percentile_threshold_measurement(app, percentile_value)
             channels = Program.GUIHandling.processing_measurement_frames(app);
             if isempty(channels)
                 return
             end
-
-            check = inputdlg( ...
-                "Which percentile should be used for each mapped channel's minimum?", ...
-                "NeuroPAL_ID", [1 125], {'90'});
-            if isempty(check)
-                return
-            end
-
-            percentile_value = str2double(check{1});
-            if ~isfinite(percentile_value)
-                return
-            end
-            percentile_value = min(max(percentile_value, 0), 100);
 
             updated = false;
             for n = 1:numel(channels)
@@ -2391,7 +3110,10 @@ classdef GUIHandling
             end
 
             if updated
+                setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
+                Program.Helpers.sync_main_display_from_processing(app, false);
                 Program.Routines.Processing.render();
+                Program.Routines.ID.render();
                 drawnow limitrate nocallbacks;
             end
         end
@@ -2415,8 +3137,7 @@ classdef GUIHandling
         function channels = processing_measurement_frames(app)
             channels = struct('prefix', {}, 'frame', {});
             raw = Program.GUIHandling.get_active_volume(app, 'request', 'array');
-            state = Program.Handlers.channels.processing_state(app);
-            rows = state.rows([state.rows.source_idx] > 0);
+            rows = Program.GUIHandling.processing_threshold_target_rows(app);
 
             for n = 1:numel(rows)
                 row = rows(n);
@@ -2572,7 +3293,9 @@ classdef GUIHandling
             app.ProcXYFactorEditField.Value = snapshot.xy_factor;
             app.ProcZSlicesEditField.Value = snapshot.z_slices;
             Program.GUIHandling.sanitize_processing_downsample_fields(app);
-            Program.GUIHandling.set_proc_threshold_value(app, 0, false);
+            Program.GUIHandling.update_processing_histogram_interactivity(app);
+            Program.GUIHandling.update_processing_threshold_target_options(app);
+            Program.GUIHandling.update_processing_zslider_visibility(app);
         end
 
         function tf = processing_channel_windows_active(app)
@@ -2613,8 +3336,15 @@ classdef GUIHandling
 
         function reset_processing_runtime_state(app)
             app.flags = struct();
+            Program.GUIHandling.clear_processing_zslider_event_listeners(app);
             if isappdata(app.CELL_ID, 'proc_mip_cache')
                 rmappdata(app.CELL_ID, 'proc_mip_cache');
+            end
+            if isappdata(app.CELL_ID, 'proc_live_mip_cache')
+                rmappdata(app.CELL_ID, 'proc_live_mip_cache');
+            end
+            if isappdata(app.CELL_ID, 'proc_view_cache')
+                rmappdata(app.CELL_ID, 'proc_view_cache');
             end
             if isappdata(app.CELL_ID, 'proc_render_cache')
                 rmappdata(app.CELL_ID, 'proc_render_cache');
@@ -2624,6 +3354,15 @@ classdef GUIHandling
             end
             if isappdata(app.CELL_ID, 'proc_histogram_signature')
                 rmappdata(app.CELL_ID, 'proc_histogram_signature');
+            end
+            if isappdata(app.CELL_ID, 'proc_render_view_dims')
+                rmappdata(app.CELL_ID, 'proc_render_view_dims');
+            end
+            if isappdata(app.CELL_ID, 'proc_live_z_value')
+                rmappdata(app.CELL_ID, 'proc_live_z_value');
+            end
+            if isappdata(app.CELL_ID, 'proc_suspend_zslider_callbacks')
+                rmappdata(app.CELL_ID, 'proc_suspend_zslider_callbacks');
             end
             Program.GUIHandling.clear_rotation_preview_cache(app);
             Program.GUIHandling.reset_rotation_controls(app);

@@ -81,18 +81,20 @@ classdef histograms
 
             switch string(app.VolumeDropDown.Value)
                 case "Colormap"
-                    [~, ~, ~, nc_data] = size(app.proc_image, 'data');
+                    context = Program.Helpers.processing_colormap_context(app);
+                    source_array = context.volume;
+                    prefs = context.prefs;
+                    [~, ~, ~, nc_data] = size(source_array);
                     max_idx = min(max_idx, nc_data);
                     if app.ProcShowMIPCheckBox.Value
-                        array = app.proc_image.data(:, :, :, 1:max_idx);
+                        array = source_array(:, :, :, 1:max_idx);
                     else
-                        [~, ~, nz_data, ~] = size(app.proc_image, 'data');
-                        prefs = app.proc_image.prefs;
+                        [~, ~, nz_data, ~] = size(source_array);
                         z_gui = Program.Helpers.gui_z_to_data_index(app.proc_zSlider.Value, nz_data, false);
                         z_idx = Program.Helpers.gui_z_to_data_index( ...
                             z_gui, nz_data, ...
                             isfield(prefs, 'is_Z_flip') && prefs.is_Z_flip);
-                        array = app.proc_image.data(:, :, z_idx, 1:max_idx);
+                        array = source_array(:, :, z_idx, 1:max_idx);
                         if ndims(array) == 3
                             array = reshape(array, size(array,1), size(array,2), 1, size(array,3));
                         end

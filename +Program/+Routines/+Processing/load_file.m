@@ -10,6 +10,12 @@ function load_file(mode, path)
             if isappdata(app.CELL_ID, 'proc_mip_cache')
                 rmappdata(app.CELL_ID, 'proc_mip_cache');
             end
+            if isappdata(app.CELL_ID, 'proc_live_mip_cache')
+                rmappdata(app.CELL_ID, 'proc_live_mip_cache');
+            end
+            if isappdata(app.CELL_ID, 'proc_view_cache')
+                rmappdata(app.CELL_ID, 'proc_view_cache');
+            end
             if isappdata(app.CELL_ID, 'proc_render_cache')
                 rmappdata(app.CELL_ID, 'proc_render_cache');
             end
@@ -22,8 +28,15 @@ function load_file(mode, path)
             if isappdata(app.CELL_ID, 'proc_render_view_dims')
                 rmappdata(app.CELL_ID, 'proc_render_view_dims');
             end
+            if isappdata(app.CELL_ID, 'proc_live_z_value')
+                rmappdata(app.CELL_ID, 'proc_live_z_value');
+            end
+            if isappdata(app.CELL_ID, 'proc_suspend_zslider_callbacks')
+                rmappdata(app.CELL_ID, 'proc_suspend_zslider_callbacks');
+            end
             app.rotation_stack.cache = struct('Colormap', {{}}, 'Video', {{}});
             gammas = [];
+            had_main_image = ~isempty(app.image_data) && ~isempty(app.image_file);
             
             [filepath, name, ext] = fileparts(path);
 
@@ -37,32 +50,55 @@ function load_file(mode, path)
                     end
 
                     app.proc_image = matfile(mat_file);
+                    prefs = app.proc_image.prefs;
+                    current_path = string(app.image_file);
+                    if isempty(app.image_data) || current_path ~= string(mat_file)
+                        app.image_file = mat_file;
+                        app.image_data = app.proc_image.data;
+                        app.image_data_zscored = Methods.Preprocess.zscore_frame(app.image_data);
+                        app.image_prefs = prefs;
+                        app.image_gamma = Program.Helpers.expand_gamma( ...
+                            prefs.gamma, ...
+                            length(Program.GUIHandling.pos_prefixes));
+                        try
+                            app.image_info = app.proc_image.info;
+                            if isfield(app.image_info, 'scale')
+                                app.image_um_scale = app.image_info.scale;
+                            end
+                        catch
+                        end
+                        if isappdata(app.CELL_ID, 'proc_runtime_dirty')
+                            rmappdata(app.CELL_ID, 'proc_runtime_dirty');
+                        end
+                    end
 
-                    vol_size = size(app.proc_image, 'data');
+                    context = Program.Helpers.processing_colormap_context(app);
+                    vol_size = context.dims;
                     nx = vol_size(2);
                     ny = vol_size(1);
                     nz = vol_size(3);
                     nc = vol_size(4);
                     nt = 1;
 
-                    prefs = app.proc_image.prefs;
-                    gammas = prefs.gamma;
+                    gammas = Program.Helpers.expand_gamma( ...
+                        app.image_gamma, ...
+                        length(Program.GUIHandling.pos_prefixes));
                     Program.Helpers.debug_event('ProcLoad', ...
                         'image prefs: size=%s gamma=%s is_Z_flip=%d RGBW=%s DIC=%s GFP=%s', ...
                         mat2str(vol_size), ...
                         mat2str(gammas(:)'), ...
-                        Program.Helpers.struct_field(prefs, 'is_Z_flip', 0), ...
-                        mat2str(Program.Helpers.struct_field(prefs, 'RGBW', [])), ...
-                        mat2str(Program.Helpers.struct_field(prefs, 'DIC', [])), ...
-                        mat2str(Program.Helpers.struct_field(prefs, 'GFP', [])));
+                        Program.Helpers.struct_field(app.image_prefs, 'is_Z_flip', 0), ...
+                        mat2str(Program.Helpers.struct_field(app.image_prefs, 'RGBW', [])), ...
+                        mat2str(Program.Helpers.struct_field(app.image_prefs, 'DIC', [])), ...
+                        mat2str(Program.Helpers.struct_field(app.image_prefs, 'GFP', [])));
 
                     % Using intmax is faster as it avoids loading the
                     % entire variable, but it also distorts the histograms.
-                    % max_val = double(intmax(class(app.proc_image.data(1, 1, 1, 1))));
-                    maximum_value = double(max(app.proc_image.data, [], 'all'));
+                    % max_val = double(intmax(class(app.image_data(1, 1, 1, 1))));
+                    maximum_value = double(max(app.image_data, [], 'all'));
 
-                    app.VolumeDropDown.Value = 'Colormap';
                     app.data_flags.('NeuroPAL_Volume') = 1;
+                    Program.GUIHandling.refresh_processing_volume_dropdown(app, 'Colormap');
                     Program.Routines.GUI.toggle_colormap();
 
                 case "video"
@@ -76,8 +112,8 @@ function load_file(mode, path)
                     nc = app.video_info.nc;
                     nt = app.video_info.nt;
 
-                    app.VolumeDropDown.Value = 'Video';
                     app.data_flags.('Video_Volume') = 1;
+                    Program.GUIHandling.refresh_processing_volume_dropdown(app, 'Video');
                     
                     Program.Routines.GUI.toggle_video();
             end
@@ -101,6 +137,7 @@ function load_file(mode, path)
             Program.Routines.GUI.set_limits(nx, ny, nz, nt);
             Program.GUIHandling.install_processing_slider_callbacks(app);
             Program.GUIHandling.install_processing_histogram_callbacks(app);
+            Program.GUIHandling.install_processing_action_callbacks(app);
             Program.GUIHandling.install_processing_advanced_callback(app);
             Program.GUIHandling.configure_processing_color_panel(app);
             Program.GUIHandling.configure_processing_sidebar_layout(app);
@@ -125,17 +162,12 @@ function load_file(mode, path)
                 app.(sprintf('%s_GammaEditField', Program.GUIHandling.pos_prefixes{n})).Value = gammas(n);
             end
 
-            if mode == "image"
+            if mode == "image" && had_main_image
                 synced = Program.Helpers.sync_processing_from_main(app, mat_file);
                 Program.Helpers.debug_event('ProcLoad', ...
                     'sync_processing_from_main=%d final_gammas=%s', ...
                     synced, mat2str(gammas(:)'));
             end
-    
-            d.Value = 5 / 5;
-            d.Message = sprintf('Drawing image...');
-            app.drawProcImage();
-            Program.GUIHandling.capture_processing_defaults(app, lower(string(app.VolumeDropDown.Value)), true);
 
             app.ImageProcessingTab.Tag = 'rendered';
             set(app.ProcessingButton, 'Visible', 'off');
@@ -144,16 +176,28 @@ function load_file(mode, path)
             app.TabGroup.SelectedTab = app.ImageProcessingTab;
             drawnow limitrate nocallbacks;
             Program.GUIHandling.apply_processing_responsive_layout(app);
+
+            d.Value = 5 / 5;
+            d.Message = sprintf('Drawing image...');
+            Program.Routines.Processing.render();
+            Program.GUIHandling.capture_processing_defaults(app, lower(string(app.VolumeDropDown.Value)), true);
             close(d)
 
-            check = uiconfirm(app.CELL_ID, "We recommend starting by cropping your image to ensure that there is no superfluous space taking up memory. Do you want to do so now?", "NeuroPAL_ID", "Options", ["Yes", "No, skip cropping."]);
-            switch check
-                case "Yes"
-                    app.ProcCropImageButtonPushed([]);
-                    Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
-                case "No, skip cropping."
-                    app.drawProcImage();
-                    Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
+            skip_crop_prompt = ~usejava('desktop');
+            if isappdata(app.CELL_ID, 'proc_skip_crop_recommendation')
+                skip_crop_prompt = skip_crop_prompt || ...
+                    logical(getappdata(app.CELL_ID, 'proc_skip_crop_recommendation'));
+            end
+
+            if ~skip_crop_prompt
+                check = uiconfirm(app.CELL_ID, "We recommend starting by cropping your image to ensure that there is no superfluous space taking up memory. Do you want to do so now?", "NeuroPAL_ID", "Options", ["Yes", "No, skip cropping."]);
+                switch check
+                    case "Yes"
+                        app.ProcCropImageButtonPushed([]);
+                        Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
+                    case "No, skip cropping."
+                        Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
+                end
             end
 
             Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');

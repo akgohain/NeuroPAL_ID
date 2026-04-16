@@ -13,7 +13,21 @@ function reset()
     switch current_mode
         case "colormap"
             app.volume_crop_roi = [];
-            vol_size = size(app.proc_image, 'data');
+            if isa(app.proc_image, 'matlab.io.MatFile')
+                app.image_data = app.proc_image.data;
+                app.image_data_zscored = Methods.Preprocess.zscore_frame(app.image_data);
+                try
+                    app.image_prefs = app.proc_image.prefs;
+                    app.image_gamma = Program.Helpers.expand_gamma( ...
+                        app.image_prefs.gamma, ...
+                        length(Program.GUIHandling.pos_prefixes));
+                catch
+                end
+            end
+            if isappdata(app.CELL_ID, 'proc_runtime_dirty')
+                rmappdata(app.CELL_ID, 'proc_runtime_dirty');
+            end
+            vol_size = Program.Helpers.processing_colormap_context(app).dims;
             ny = vol_size(1);
             nx = vol_size(2);
             nz = vol_size(3);
@@ -48,6 +62,9 @@ function reset()
 
     d.Message = "Redrawing preview...";
     Program.Routines.Processing.render();
+    if strcmp(current_mode, "colormap")
+        Program.Helpers.sync_main_display_from_processing(app, true);
+    end
 
     close(d);
 end

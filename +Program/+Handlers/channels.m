@@ -660,6 +660,7 @@ classdef channels
 
         function channel = build_main_channel(app, key, name, dd_handle, cb_handle, gamma, color)
             idx = Program.Handlers.channels.dropdown_index(app.(dd_handle));
+            settings = Program.Handlers.channels.main_display_settings(app, key, gamma);
             channel = struct( ...
                 'key', key, ...
                 'name', name, ...
@@ -670,7 +671,34 @@ classdef channels
                 'enabled', logical(app.(cb_handle).Value), ...
                 'bool', logical(app.(cb_handle).Value), ...
                 'color', color, ...
-                'settings', struct('gamma', gamma, 'low_high_in', [], 'low_high_out', []));
+                'settings', settings);
+        end
+
+        function settings = main_display_settings(app, key, gamma)
+            settings = struct('gamma', gamma, 'low_high_in', [], 'low_high_out', []);
+            if isempty(app) || ~isvalid(app) || ...
+                    ~Program.GUIHandling.processing_tab_rendered(app) || ...
+                    ~strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap')
+                return
+            end
+
+            try
+                state = Program.Handlers.channels.processing_state(app);
+                row = Program.Handlers.channels.get_processing_role(state.rows, lower(string(key)));
+            catch
+                return
+            end
+
+            if isempty(row) || row.row < 1 || row.source_idx < 1 || ~isstruct(row.settings)
+                return
+            end
+
+            if isfield(row.settings, 'low_high_in')
+                settings.low_high_in = row.settings.low_high_in;
+            end
+            if isfield(row.settings, 'low_high_out')
+                settings.low_high_out = row.settings.low_high_out;
+            end
         end
 
         function row = empty_processing_row()

@@ -3,8 +3,7 @@ function pass_to_main()
 
     switch app.VolumeDropDown.Value
         case 'Colormap'
-            Program.Routines.open(app.proc_image.Properties.Source);
-            Program.Helpers.sync_main_from_processing(app);
+            Program.Helpers.sync_main_display_from_processing(app, true);
             app.TabGroup.SelectedTab = app.NeuroPALIDTab;
 
         case 'Video'

@@ -54,6 +54,8 @@ for n = 1:length(Program.GUIHandling.pos_prefixes)
 end
 
 z_value = min(max(round(app.ZSlider.Value), app.proc_zSlider.Limits(1)), app.proc_zSlider.Limits(2));
+Program.GUIHandling.suspend_processing_zslider_callbacks(app, true);
+cleanup = onCleanup(@() Program.GUIHandling.suspend_processing_zslider_callbacks(app, false));
 app.proc_zSlider.Value = z_value;
 app.proc_zEditField.Value = z_value;
 app.proc_hor_zSlider.Value = z_value;
