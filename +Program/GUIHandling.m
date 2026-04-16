@@ -39,6 +39,7 @@ classdef GUIHandling
             'blue_measure', ...
             'background_measure', ...
             'SigmagaussEditField', ...
+            'SigmagaussEditFieldLabel', ...
             'red_r', ...
             'red_g', ...
             'red_b', ...
@@ -51,6 +52,8 @@ classdef GUIHandling
             'background_r', ...
             'background_g', ...
             'background_b', ...
+            'DropperradiusSpinner', ...
+            'DropperRadiusEditFieldLabel', ...
             'ProcWCheckBox', ...
             'ProcWDropDown', ...
             'ProcDICCheckBox', ...
@@ -858,7 +861,63 @@ classdef GUIHandling
             Program.GUIHandling.install_processing_resize_callback(app);
             Program.GUIHandling.install_processing_histogram_callbacks(app);
             Program.GUIHandling.configure_processing_color_panel(app);
+            Program.GUIHandling.configure_spectral_unmixing_controls(app);
             Program.GUIHandling.apply_processing_responsive_layout(app);
+        end
+
+        function configure_spectral_unmixing_controls(app)
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            tooltip = ['Radius in pixels for the disk-shaped ROI averaged by the spectral eyedropper. ' ...
+                'Minimum value is 1.'];
+
+            if isprop(app, 'DropperradiusSpinner') && isvalid(app.DropperradiusSpinner)
+                app.DropperradiusSpinner.Editable = 'on';
+                if isprop(app.DropperradiusSpinner, 'RoundFractionalValues')
+                    app.DropperradiusSpinner.RoundFractionalValues = 'on';
+                end
+                if isprop(app.DropperradiusSpinner, 'Limits')
+                    app.DropperradiusSpinner.Limits = [1 Inf];
+                end
+                if ~isfinite(double(app.DropperradiusSpinner.Value)) || double(app.DropperradiusSpinner.Value) < 1
+                    app.DropperradiusSpinner.Value = 1;
+                end
+                app.DropperradiusSpinner.Tooltip = tooltip;
+            end
+
+            if isprop(app, 'DropperRadiusEditFieldLabel') && isvalid(app.DropperRadiusEditFieldLabel)
+                app.DropperRadiusEditFieldLabel.Tooltip = tooltip;
+            end
+        end
+
+        function set_processing_spectral_unmixing_state(app, enabled)
+            if nargin < 2
+                enabled = true;
+            end
+
+            Program.GUIHandling.configure_spectral_unmixing_controls(app);
+
+            if enabled
+                desired_state = 'on';
+            else
+                desired_state = 'off';
+            end
+
+            if isprop(app, 'SpectralUnmixingGrid') && isvalid(app.SpectralUnmixingGrid)
+                components = [app.SpectralUnmixingGrid; findall(app.SpectralUnmixingGrid)];
+                for comp = 1:numel(components)
+                    component = components(comp);
+                    if isprop(component, 'Enable')
+                        component.Enable = desired_state;
+                    end
+                end
+            end
+
+            if isprop(app, 'DropperradiusSpinner') && isvalid(app.DropperradiusSpinner)
+                app.DropperradiusSpinner.Editable = desired_state;
+            end
         end
 
         function handle_processing_histogram_toggle(app)
@@ -1741,16 +1800,14 @@ classdef GUIHandling
             Program.GUIHandling.set_thresholds(app, max(max_val, 255));
             Program.Routines.GUI.(sprintf("toggle_%s", mode));
 
-            spectral_unmixing_gui = app.SpectralUnmixingGrid.Children;
-            for comp=1:length(spectral_unmixing_gui)
-                component = spectral_unmixing_gui(comp);
-                if ismember(properties(component), 'Enable')
-                    component.Enable = ~component.Enable;
-                end
-            end
+            Program.GUIHandling.set_processing_spectral_unmixing_state( ...
+                app, strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap'));
 
             for comp=1:length(Program.GUIHandling.cm_exclusive_gui)
-                app.(Program.GUIHandling.cm_exclusive_gui{comp}).Enable = strcmp(app.VolumeDropDown.Value, 'Colormap');
+                handle_name = Program.GUIHandling.cm_exclusive_gui{comp};
+                if isprop(app, handle_name) && isvalid(app.(handle_name)) && isprop(app.(handle_name), 'Enable')
+                    app.(handle_name).Enable = strcmp(app.VolumeDropDown.Value, 'Colormap');
+                end
             end
 
             Program.GUIHandling.capture_processing_defaults(app, mode, false);
@@ -2277,8 +2334,6 @@ classdef GUIHandling
             end
 
             try
-                app.SpectralUnmixingPanel.Visible = 'off';
-                app.ProcAdvancedOptionsButton.Text = 'Advanced';
                 Program.GUIHandling.configure_processing_sidebar_layout(app);
             catch
             end
@@ -2394,8 +2449,12 @@ classdef GUIHandling
             Program.GUIHandling.refresh_rotation_preview(app);
         end
 
-        function target = dropper(message, display, image, z)
-            target = struct('pixels', {[]}, 'values', {[]});
+        function target = dropper(message, display, image, z, radius)
+            if nargin < 5 || isempty(radius) || ~isfinite(radius)
+                radius = 1;
+            end
+
+            target = struct('pixels', {[]}, 'roi_pixels', {[]}, 'values', {[]});
 
             app = Program.GUIHandling.get_parent_app(display);
             child_fig = properties(Program.GUIHandling.get_parent_app(display));
@@ -2411,26 +2470,72 @@ classdef GUIHandling
                     pos = round(color_roi.Position);
                     delete(color_roi);
 
-                    if exist('z', 'var')
+                    if nargin >= 4 && ~isempty(z)
                         target.pixels = [pos(1), pos(2), z];
-                        target.values = zeros([1, size(image, 4)]);
-
-                        for c=1:size(image, 4)
-                            target.values(c) = unique(impixel(image(:, :, z, c), pos(1), pos(2)));
-                        end
-
                     else
                         target.pixels = [pos(1), pos(2)];
-                        target.values = zeros([1, size(image, 3)]);
-
-                        for c=1:size(image, 3)
-                            target.values(c) = unique(impixel(image(:, :, c), pos(1), pos(2)));
-                        end
-
                     end
+
+                    target.roi_pixels = Program.GUIHandling.dropper_roi_pixels(image, target.pixels, radius);
+                    target.values = Program.GUIHandling.dropper_roi_values(image, target.roi_pixels);
 
                 case 'Select different slice'
                     return
+            end
+        end
+
+        function roi_pixels = dropper_roi_pixels(image, pixels, radius)
+            if nargin < 3 || isempty(radius) || ~isfinite(radius)
+                radius = 1;
+            end
+
+            radius = max(1, round(double(radius)));
+            x = min(max(round(double(pixels(1))), 1), size(image, 2));
+            y = min(max(round(double(pixels(2))), 1), size(image, 1));
+
+            if numel(pixels) >= 3
+                z = min(max(round(double(pixels(3))), 1), size(image, 3));
+            else
+                z = [];
+            end
+
+            x_range = max(1, x - radius):min(size(image, 2), x + radius);
+            y_range = max(1, y - radius):min(size(image, 1), y + radius);
+            [xx, yy] = meshgrid(x_range, y_range);
+            mask = (xx - x).^2 + (yy - y).^2 <= radius.^2;
+
+            if isempty(z)
+                roi_pixels = [xx(mask), yy(mask)];
+            else
+                roi_pixels = [xx(mask), yy(mask), repmat(z, nnz(mask), 1)];
+            end
+        end
+
+        function values = dropper_roi_values(image, roi_pixels)
+            if isempty(roi_pixels)
+                values = [];
+                return
+            end
+
+            if size(roi_pixels, 2) >= 3
+                linear_idx = sub2ind(size(image, 1:3), ...
+                    roi_pixels(:, 2), roi_pixels(:, 1), roi_pixels(:, 3));
+                n_channels = size(image, 4);
+                values = zeros(1, n_channels);
+
+                for c = 1:n_channels
+                    channel = image(:, :, :, c);
+                    values(c) = mean(double(channel(linear_idx)), 'omitnan');
+                end
+            else
+                linear_idx = sub2ind(size(image, 1:2), roi_pixels(:, 2), roi_pixels(:, 1));
+                n_channels = size(image, 3);
+                values = zeros(1, n_channels);
+
+                for c = 1:n_channels
+                    channel = image(:, :, c);
+                    values(c) = mean(double(channel(linear_idx)), 'omitnan');
+                end
             end
         end
 

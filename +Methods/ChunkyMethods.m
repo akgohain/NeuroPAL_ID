@@ -271,7 +271,7 @@ classdef ChunkyMethods
                 drawnow limitrate nocallbacks;
             end
 
-            radius = max(0, round(double(app.DropperradiusSpinner.Value)));
+            radius = max(1, round(double(app.DropperradiusSpinner.Value)));
             sigma_gauss = max(0, double(app.SigmagaussEditField.Value));
             cache = Methods.ChunkyMethods.ensure_spectral_cache(app);
             cache.rgb_source_idx = rgb_source_idx;
@@ -281,10 +281,14 @@ classdef ChunkyMethods
             vol = Methods.ChunkyMethods.spectral_source_volume(app);
             vol = Methods.ChunkyMethods.apply_preview_actions(app, vol, {'debleed'});
 
+            prompt = sprintf( ...
+                'Click on the center of the %d-pixel radius ROI on this slice that best represents %s.', ...
+                radius, channel);
+
             % Pick & update ideal channel representations.
             target = Program.GUIHandling.dropper( ...
-                sprintf('Click on the pixel on this slice that best represents %s.', channel), ...
-                app.proc_xyAxes, vol, app.proc_zSlider.Value);
+                prompt, ...
+                app.proc_xyAxes, vol, app.proc_zSlider.Value, radius);
 
             if isempty(target.values)
                 return
@@ -293,7 +297,7 @@ classdef ChunkyMethods
             filtered_vol = Methods.ChunkyMethods.spectral_cached_filtered_rgb_volume( ...
                 app, vol, rgb_source_idx, sigma_gauss);
             measured_vector = Methods.ChunkyMethods.spectral_roi_vector( ...
-                filtered_vol, target.pixels, radius);
+                filtered_vol, target.roi_pixels);
 
             switch channel
                 case {'bg', 'background'}
@@ -558,10 +562,15 @@ classdef ChunkyMethods
 
             switch char(string(app.VolumeDropDown.Value))
                 case 'Colormap'
-                    dims = size(app.proc_image, 'data');
+                    context = Program.Helpers.processing_colormap_context(app);
+                    dims = context.dims;
+                    if isempty(context.volume)
+                        vol = zeros(dims(1), dims(2), dims(3), 1, 'uint8');
+                        return
+                    end
                     n_channels = dims(4);
                     max_idx = min(max_idx, n_channels);
-                    vol = app.proc_image.data(:, :, :, 1:max_idx);
+                    vol = context.volume(:, :, :, 1:max_idx);
 
                 case 'Video'
                     frame = app.retrieve_frame(app.proc_tSlider.Value);
@@ -610,16 +619,53 @@ classdef ChunkyMethods
             app.spectral_cache = cache;
         end
 
-        function measured_vector = spectral_roi_vector(filtered_vol, pixel, radius)
+        function measured_vector = spectral_roi_vector(filtered_vol, pixels, radius)
+            if nargin < 3
+                radius = [];
+            end
+
+            if isempty(pixels)
+                measured_vector = nan(1, size(filtered_vol, 4));
+                return
+            end
+
+            if isvector(pixels)
+                roi_pixels = Methods.ChunkyMethods.spectral_disk_pixels(filtered_vol, pixels, radius);
+            else
+                roi_pixels = round(double(pixels));
+            end
+
+            if isempty(roi_pixels)
+                measured_vector = nan(1, size(filtered_vol, 4));
+                return
+            end
+
+            linear_idx = sub2ind(size(filtered_vol, 1:3), ...
+                roi_pixels(:, 2), roi_pixels(:, 1), roi_pixels(:, 3));
+            measured_vector = nan(1, size(filtered_vol, 4));
+
+            for c = 1:size(filtered_vol, 4)
+                channel = filtered_vol(:, :, :, c);
+                measured_vector(c) = mean(channel(linear_idx), 'omitnan');
+            end
+        end
+
+        function roi_pixels = spectral_disk_pixels(filtered_vol, pixel, radius)
+            if nargin < 3 || isempty(radius) || ~isfinite(radius)
+                radius = 1;
+            end
+
+            radius = max(1, round(double(radius)));
             x = min(max(round(double(pixel(1))), 1), size(filtered_vol, 2));
             y = min(max(round(double(pixel(2))), 1), size(filtered_vol, 1));
             z = min(max(round(double(pixel(3))), 1), size(filtered_vol, 3));
 
             x_range = max(1, x - radius):min(size(filtered_vol, 2), x + radius);
             y_range = max(1, y - radius):min(size(filtered_vol, 1), y + radius);
+            [xx, yy] = meshgrid(x_range, y_range);
+            mask = (xx - x).^2 + (yy - y).^2 <= radius.^2;
 
-            roi = filtered_vol(y_range, x_range, z, :);
-            measured_vector = reshape(mean(roi, [1 2], 'omitnan'), 1, []);
+            roi_pixels = [xx(mask), yy(mask), repmat(z, nnz(mask), 1)];
         end
 
         function cast_channel = cast_like_channel(channel, reference_channel)
