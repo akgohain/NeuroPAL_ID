@@ -137,29 +137,206 @@ classdef GUIHandling
             figure_size = Program.GUIHandling.constrain_app_window_position(figure_size);
             app.CELL_ID.Position = figure_size;
 
-            % Set up placeholder buttons
-            button_locations = figure_size;
-            
-            if any(button_locations <= 0)
-                button_locations = figure_size;
-            end
-
-            button_locations(1:2) = [1 1];
-            
-            app.ProcessingButton.Parent = app.ProcessingGridLayout.Parent;
-            app.ProcessingButton.Position = button_locations;
-            set(app.ProcessingButton, 'Visible', 'on');
-
-            app.IdButton.Parent = app.IdGridLayout.Parent;
-            app.IdButton.Position = button_locations;
-            set(app.IdButton, 'Visible', 'on');
-
-            app.TrackingButton.Parent = app.VideoGridLayout.Parent;
-            app.TrackingButton.Position = button_locations;
-            set(app.TrackingButton, 'Visible', 'on');
+            Program.GUIHandling.prepare_unloaded_module_views(app);
 
             Program.GUIHandling.install_processing_resize_callback(app);
+            Program.GUIHandling.install_main_processing_sync_callbacks(app);
             Program.GUIHandling.apply_processing_responsive_layout(app);
+        end
+
+        function prepare_unloaded_module_views(app)
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            if isempty(app) || ~isvalid(app)
+                return
+            end
+
+            Program.GUIHandling.hide_startup_load_buttons(app);
+
+            if isprop(app, 'IdGridLayout') && isvalid(app.IdGridLayout)
+                set(app.IdGridLayout, 'Visible', 'on');
+            end
+            if isprop(app, 'ProcessingGridLayout') && isvalid(app.ProcessingGridLayout)
+                set(app.ProcessingGridLayout, 'Visible', 'on');
+            end
+            if isprop(app, 'VideoGridLayout') && isvalid(app.VideoGridLayout)
+                set(app.VideoGridLayout, 'Visible', 'on');
+            end
+        end
+
+        function hide_startup_load_buttons(app)
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            if isempty(app) || ~isvalid(app)
+                return
+            end
+
+            button_names = {'ProcessingButton', 'IdButton', 'TrackingButton'};
+            for n = 1:numel(button_names)
+                name = button_names{n};
+                if ~isprop(app, name) || isempty(app.(name)) || ~isvalid(app.(name))
+                    continue
+                end
+
+                if isprop(app.(name), 'Enable')
+                    app.(name).Enable = 'off';
+                end
+                if isprop(app.(name), 'Visible')
+                    app.(name).Visible = 'off';
+                end
+            end
+        end
+
+        function tf = processing_tab_rendered(app)
+            tf = false;
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            if isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'ImageProcessingTab') || isempty(app.ImageProcessingTab) || ...
+                    ~isvalid(app.ImageProcessingTab)
+                return
+            end
+
+            tf = strcmpi(char(string(app.ImageProcessingTab.Tag)), 'rendered');
+        end
+
+        function install_main_processing_sync_callbacks(app)
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            if isempty(app) || ~isvalid(app)
+                return
+            end
+
+            targets = { ...
+                'RDropDown', 'ValueChangedFcn'; ...
+                'GDropDown', 'ValueChangedFcn'; ...
+                'BDropDown', 'ValueChangedFcn'; ...
+                'WDropDown', 'ValueChangedFcn'; ...
+                'DICDropDown', 'ValueChangedFcn'; ...
+                'GFPDropDown', 'ValueChangedFcn'; ...
+                'RCheckBox', 'ValueChangedFcn'; ...
+                'GCheckBox', 'ValueChangedFcn'; ...
+                'BCheckBox', 'ValueChangedFcn'; ...
+                'WCheckBox', 'ValueChangedFcn'; ...
+                'DICCheckBox', 'ValueChangedFcn'; ...
+                'GFPCheckBox', 'ValueChangedFcn'; ...
+                'ZSlider', 'ValueChangedFcn'; ...
+                'ZAxisDropDown', 'ValueChangedFcn'; ...
+                'ZCenterEditField', 'ValueChangedFcn'; ...
+                'FlipZButton', 'ButtonPushedFcn'; ...
+                'DownsampleImageMenu', 'MenuSelectedFcn'; ...
+                'ThresholdImageMenu', 'MenuSelectedFcn'; ...
+                'HistogramMatchingMenu', 'MenuSelectedFcn'; ...
+                'NormalizeColorsMenu', 'MenuSelectedFcn'; ...
+                'SpectralUnmixingMenu', 'MenuSelectedFcn'; ...
+                'AllChannels', 'MenuSelectedFcn'; ...
+                'IndividualChannels', 'MenuSelectedFcn'; ...
+                'AdjustHistogramMenu', 'MenuSelectedFcn'; ...
+                'RotateAllHorizontalMenu', 'MenuSelectedFcn'; ...
+                'RotateAllVerticalMenu', 'MenuSelectedFcn'; ...
+                'RotateAllClockwiseMenu', 'MenuSelectedFcn'; ...
+                'RotateAllAntiClockwiseMenu', 'MenuSelectedFcn'; ...
+                'RotateImageHorizontalMenu', 'MenuSelectedFcn'; ...
+                'RotateImageVerticalMenu', 'MenuSelectedFcn'; ...
+                'RotateImageClockwiseMenu', 'MenuSelectedFcn'; ...
+                'RotateImageAntiClockwiseMenu', 'MenuSelectedFcn'};
+
+            for n = 1:size(targets, 1)
+                Program.GUIHandling.wrap_main_processing_sync_callback( ...
+                    app, targets{n, 1}, targets{n, 2});
+            end
+        end
+
+        function wrap_main_processing_sync_callback(app, component_name, callback_name)
+            if ~isprop(app, component_name)
+                return
+            end
+
+            component = app.(component_name);
+            if isempty(component) || ~isvalid(component) || ~isprop(component, callback_name)
+                return
+            end
+
+            install_key = sprintf('main_proc_sync_%s_installed', callback_name);
+            legacy_key = sprintf('main_proc_sync_%s_legacy', callback_name);
+            if isappdata(component, install_key) && logical(getappdata(component, install_key))
+                return
+            end
+
+            setappdata(component, install_key, true);
+            setappdata(component, legacy_key, component.(callback_name));
+            component.(callback_name) = @(src, event) ...
+                Program.GUIHandling.execute_main_processing_sync_callback( ...
+                    app, component, callback_name, src, event);
+        end
+
+        function execute_main_processing_sync_callback(app, component, callback_name, src, event)
+            legacy_key = sprintf('main_proc_sync_%s_legacy', callback_name);
+            legacy_callback = [];
+            if isappdata(component, legacy_key)
+                legacy_callback = getappdata(component, legacy_key);
+            end
+
+            guard_key = 'main_proc_sync_guard';
+            if isappdata(app.CELL_ID, guard_key) && logical(getappdata(app.CELL_ID, guard_key))
+                Program.GUIHandling.invoke_gui_callback(legacy_callback, src, event);
+                return
+            end
+
+            setappdata(app.CELL_ID, guard_key, true);
+            cleanup = onCleanup(@() setappdata(app.CELL_ID, guard_key, false));
+
+            Program.GUIHandling.invoke_gui_callback(legacy_callback, src, event);
+            Program.GUIHandling.sync_processing_after_main_change(app);
+        end
+
+        function invoke_gui_callback(callback_handle, src, event)
+            if isempty(callback_handle)
+                return
+            end
+
+            if isa(callback_handle, 'function_handle')
+                callback_handle(src, event);
+                return
+            end
+
+            if iscell(callback_handle) && ~isempty(callback_handle)
+                feval(callback_handle{1}, src, event, callback_handle{2:end});
+                return
+            end
+
+            feval(callback_handle, src, event);
+        end
+
+        function sync_processing_after_main_change(app)
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            if isempty(app) || ~isvalid(app) || isempty(app.image_data)
+                return
+            end
+
+            if Program.GUIHandling.processing_tab_rendered(app) && ...
+                    strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap')
+                Program.GUIHandling.hide_percentile_noise_editor(app);
+                Program.GUIHandling.clear_processing_preview_cache(app);
+                Program.Helpers.sync_processing_from_main(app, app.image_file);
+                Program.GUIHandling.update_processing_downsample_field_limits(app);
+                Program.GUIHandling.update_processing_histogram_interactivity(app);
+                Program.GUIHandling.update_processing_threshold_target_options(app);
+                Program.Routines.Processing.render();
+            end
+
+            Program.Routines.ID.render();
         end
 
         function gui_lock(app, action, group, event)
@@ -180,10 +357,12 @@ classdef GUIHandling
 
                 case 'identification_tab'
                     gui_components = Program.GUIHandling.id_components;
+                    Program.GUIHandling.set_descendant_enable_state(app.IdGridLayout, state);
                     Program.GUIHandling.gui_lock(app, state, 'neuron_gui');
 
                 case 'processing_tab'
                     gui_components = Program.GUIHandling.proc_components;
+                    Program.GUIHandling.set_descendant_enable_state(app.ProcessingGridLayout, state);
 
                     for pos=1:length(Program.GUIHandling.pos_prefixes)
                         app.(sprintf('%s_hist_slider', Program.GUIHandling.pos_prefixes{pos})).Enable = state;
@@ -191,6 +370,10 @@ classdef GUIHandling
                     end
 
                     Program.GUIHandling.set_threshold_stepper_state(app, state);
+
+                case 'video_tab'
+                    gui_components = {};
+                    Program.GUIHandling.set_descendant_enable_state(app.VideoGridLayout, state);
 
             end
 
@@ -700,6 +883,169 @@ classdef GUIHandling
             end
 
             Program.Handlers.loading.done();
+        end
+
+        function tf = processing_colormap_available(app)
+            tf = false;
+
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            if ~isempty(app.image_data)
+                tf = true;
+                return
+            end
+
+            try
+                if isa(app.proc_image, 'matlab.io.MatFile')
+                    size(app.proc_image, 'data');
+                    tf = true;
+                    return
+                end
+            catch
+            end
+
+            try
+                image_path = string(app.image_file);
+                if strlength(image_path) > 0
+                    image_path = char(image_path);
+                    if isfile(image_path)
+                        tf = true;
+                        return
+                    end
+
+                    [filepath, name, ext] = fileparts(image_path);
+                    if ~strcmpi(ext, '.mat') && isfile(fullfile(filepath, [name, '.mat']))
+                        tf = true;
+                        return
+                    end
+                end
+            catch
+            end
+
+            try
+                tf = isfield(app.data_flags, 'NeuroPAL_Volume') && logical(app.data_flags.('NeuroPAL_Volume'));
+            catch
+            end
+        end
+
+        function tf = processing_video_available(app)
+            tf = false;
+
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+
+            try
+                info = app.video_info;
+            catch
+                info = [];
+            end
+
+            if isempty(info) || ~isstruct(info)
+                return
+            end
+
+            required_fields = {'nx', 'ny', 'nz', 'nt', 'nc'};
+            if ~all(isfield(info, required_fields))
+                return
+            end
+
+            dims = double([info.nx, info.ny, info.nz, info.nt, info.nc]);
+            if any(~isfinite(dims)) || any(dims < 1)
+                return
+            end
+
+            if isfield(info, 'file')
+                try
+                    tf = strlength(string(info.file)) > 0;
+                catch
+                    tf = ~isempty(info.file);
+                end
+            else
+                tf = true;
+            end
+        end
+
+        function [items, default_mode] = processing_volume_dropdown_items(app)
+            has_image = Program.GUIHandling.processing_colormap_available(app);
+            has_video = Program.GUIHandling.processing_video_available(app);
+
+            items = {};
+            if has_image
+                items{end+1} = 'Colormap'; %#ok<AGROW>
+            end
+
+            if has_image || has_video
+                items{end+1} = 'Video'; %#ok<AGROW>
+            end
+
+            if isempty(items)
+                items = {'Colormap'};
+            end
+
+            if has_image
+                default_mode = 'Colormap';
+            elseif has_video
+                default_mode = 'Video';
+            else
+                default_mode = items{1};
+            end
+        end
+
+        function mode = refresh_processing_volume_dropdown(app, preferred_mode)
+            if nargin < 2 || isempty(preferred_mode)
+                try
+                    preferred_mode = char(string(app.VolumeDropDown.Value));
+                catch
+                    preferred_mode = '';
+                end
+            end
+
+            [items, default_mode] = Program.GUIHandling.processing_volume_dropdown_items(app);
+            app.VolumeDropDown.Items = items;
+
+            if any(strcmpi(preferred_mode, items))
+                match_idx = find(strcmpi(preferred_mode, items), 1, 'first');
+                mode = char(items{match_idx});
+            else
+                mode = default_mode;
+            end
+
+            app.VolumeDropDown.Value = mode;
+        end
+
+        function [mode, is_available, unavailable_message] = resolve_processing_volume_request(app, requested_mode)
+            if nargin < 2 || isempty(requested_mode)
+                requested_mode = 'Colormap';
+            end
+
+            requested_mode = lower(char(string(requested_mode)));
+            has_image = Program.GUIHandling.processing_colormap_available(app);
+            has_video = Program.GUIHandling.processing_video_available(app);
+
+            switch requested_mode
+                case 'video'
+                    is_available = has_video;
+                    unavailable_message = 'No video data is loaded for the current file.';
+                    if has_image
+                        mode = 'colormap';
+                    else
+                        mode = 'video';
+                    end
+
+                otherwise
+                    is_available = has_image;
+                    unavailable_message = 'No colormap image data is loaded for the current file.';
+                    if has_image
+                        mode = 'colormap';
+                    elseif has_video
+                        mode = 'video';
+                    else
+                        mode = 'colormap';
+                    end
+            end
         end
 
 

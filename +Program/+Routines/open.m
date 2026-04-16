@@ -298,10 +298,9 @@ function open(path)
 
     set(app.VolumeDropDown, 'Enable', 'on');
     
-    if ~any(ismember(app.VolumeDropDown.Items, 'Colormap'))
-        app.VolumeDropDown.Items{end+1} = 'Colormap';
-    end
-    app.VolumeDropDown.Value = 'Colormap';
+    Program.GUIHandling.refresh_processing_volume_dropdown(app, 'Colormap');
+    Program.GUIHandling.hide_startup_load_buttons(app);
+    Program.GUIHandling.gui_lock(app, 'enable', 'processing_tab');
 
     set(app.IdGridLayout, 'Visible', 'on');
     set(app.ProcessingGridLayout, 'Visible', 'on');
