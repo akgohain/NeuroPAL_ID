@@ -17,7 +17,7 @@ end
 function dims = local_volume_dims(app)
 switch char(string(app.VolumeDropDown.Value))
     case 'Colormap'
-        dims = size(app.proc_image, 'data');
+        dims = Program.Helpers.processing_colormap_context(app).dims;
     case 'Video'
         dims = [app.video_info.ny, app.video_info.nx, app.video_info.nz, app.video_info.nc, app.video_info.nt];
     otherwise
