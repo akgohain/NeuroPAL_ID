@@ -18,7 +18,9 @@ classdef ChunkyMethods
 
             switch action
                 case 'crop'
-                    rotated_mask = imrotate(app.rotation_stack.cache.(app.VolumeDropDown.Value).mask, app.rotation_stack.cache.(app.VolumeDropDown.Value).angle);
+                    rotated_mask = imrotate( ...
+                        app.rotation_stack.cache.(app.VolumeDropDown.Value).mask, ...
+                        -app.rotation_stack.cache.(app.VolumeDropDown.Value).angle);
                     nonzero_rows = squeeze(any(any(rotated_mask, 2), 3));
                     nonzero_columns = squeeze(any(any(rotated_mask, 1), 3));
                     
@@ -85,7 +87,7 @@ classdef ChunkyMethods
                     output_slice = slice;
 
                 case 'crop'
-                    output_slice = Program.rotation_gui.apply_mask(app, slice);
+                    output_slice = Program.crop_rotate_gui.apply_mask(app, slice);
 
                 case 'hori'
                     output_slice = slice(:,end:-1:1,end:-1:1,:,:);

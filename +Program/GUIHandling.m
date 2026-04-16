@@ -1706,7 +1706,7 @@ classdef GUIHandling
             roi = drawrectangle(app.proc_xyAxes,'Color','black','StripeColor','m');
             Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
 
-            Program.rotation_gui.draw(app, roi);
+            Program.crop_rotate_gui.draw(app, roi);
         end
 
         function swap_volumes(app, event)
