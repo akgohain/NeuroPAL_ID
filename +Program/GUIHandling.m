@@ -1784,9 +1784,19 @@ classdef GUIHandling
                 return
             end
 
-            app.ProcSavePanel.Layout.Row = 4;
-            app.ProcAdvancedOptionsButton.Layout.Row = 5;
-            app.SpectralUnmixingPanel.Layout.Row = 6;
+            has_advanced_button = isprop(app, 'ProcAdvancedOptionsButton') && ...
+                ~isempty(app.ProcAdvancedOptionsButton) && isvalid(app.ProcAdvancedOptionsButton);
+
+            if has_advanced_button
+                app.ProcSavePanel.Layout.Row = 4;
+                app.ProcAdvancedOptionsButton.Layout.Row = 5;
+                app.SpectralUnmixingPanel.Layout.Row = 6;
+            else
+                % Some local mlapp packages still use the older processing sidebar
+                % layout without a dedicated advanced-options button row.
+                app.SpectralUnmixingPanel.Layout.Row = 4;
+                app.ProcSavePanel.Layout.Row = 6;
+            end
 
             is_image_mode = strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap');
             row3_height = 72;
@@ -1798,26 +1808,43 @@ classdef GUIHandling
             catch
             end
 
-            row5_height = 0;
-            if is_image_mode
-                row6_height = 212;
-                app.SpectralUnmixingPanel.Visible = 'on';
+            if has_advanced_button
+                row5_height = 0;
+                if is_image_mode
+                    row6_height = 212;
+                    app.SpectralUnmixingPanel.Visible = 'on';
+                else
+                    row6_height = 0;
+                    app.SpectralUnmixingPanel.Visible = 'off';
+                end
+
+                app.ProcAdvancedOptionsButton.Visible = 'off';
+                if isprop(app.ProcAdvancedOptionsButton, 'Enable')
+                    app.ProcAdvancedOptionsButton.Enable = 'off';
+                end
+
+                app.ProcSideGrid.RowHeight = {95, 'fit', row3_height, 93, row5_height, row6_height};
             else
-                row6_height = 0;
-                app.SpectralUnmixingPanel.Visible = 'off';
-            end
+                row4_height = 212;
+                if is_image_mode
+                    app.SpectralUnmixingPanel.Visible = 'on';
+                else
+                    row4_height = 0;
+                    app.SpectralUnmixingPanel.Visible = 'off';
+                end
 
-            app.ProcAdvancedOptionsButton.Visible = 'off';
-            if isprop(app.ProcAdvancedOptionsButton, 'Enable')
-                app.ProcAdvancedOptionsButton.Enable = 'off';
+                app.ProcSideGrid.RowHeight = {95, 'fit', row3_height, row4_height, '1x', 93};
             end
-
-            app.ProcSideGrid.RowHeight = {95, 'fit', row3_height, 93, row5_height, row6_height};
         end
 
         function install_processing_advanced_callback(app)
             if nargin < 1 || isempty(app)
                 app = Program.app;
+            end
+
+            if ~isprop(app, 'ProcAdvancedOptionsButton') || isempty(app.ProcAdvancedOptionsButton) || ...
+                    ~isvalid(app.ProcAdvancedOptionsButton)
+                return
             end
 
             app.ProcAdvancedOptionsButton.Visible = 'off';
