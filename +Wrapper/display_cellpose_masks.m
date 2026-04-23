@@ -5,21 +5,34 @@ function display_cellpose_masks(masksMatPath, varargin)
 %   variables image_XYZC, masks_3D, masks_stitched (3rd dim = Z).
 %
 %   USAGE
-%     display_cellpose_masks
-%     display_cellpose_masks('/out/prefix_masks.mat')
-%     display_cellpose_masks('.../prefix_masks.mat', 'ZDim', 3)   % default
+%     display_cellpose_masks                    % file picker
+%     display_cellpose_masks(<full path to *_masks.mat>)   % must exist on disk
+%     <full path> example (this repo on your machine):
+%       /Users/swethasaseendran/Documents/MATLAB/DEV/NeuroPAL_ID/+CellPose/Output/000715_sub11_masks.mat
+%     display_cellpose_masks(p, 'ZDim', 3)   % default
+%     display_cellpose_masks(p, 'PlotCentroids', true)  % centroid marks on MIPs
 %
-%   From command line, call as a package (repo root on path):
-%     Wrapper.display_cellpose_masks('/path/prefix_masks.mat');
+%   Name-Value
+%     'PlotCentroids' — (default false) if true, mark each instance centroid on the
+%         Z-MIP (mean of row/col in the 2D label MIP, matching the displayed image).
+%         Label 0 is background and is ignored.
+%
+%   From command line, call as a package (repo root on path), e.g.:
+%     Wrapper.display_cellpose_masks( ...
+%       '/Users/swethasaseendran/Documents/MATLAB/DEV/NeuroPAL_ID/+CellPose/Output/000715_sub11_masks.mat', ...
+%       'PlotCentroids', true);
 %
 %   If RGB looks transposed vs Python, your .mat may be (X,Y,3,Z) (scipy) vs (X,Y,Z,3) — this
 %   function permutes the former to (X,Y,Z,3) so Z is always dim 3. Masks stay (X,Y,Z), Z=3.
 
 p = inputParser;
 addParameter(p, 'ZDim', 3, @(n) isnumeric(n) && isscalar(n) && n == floor(n) && n >= 1);
+addParameter(p, 'PlotCentroids', false, @islogical);
 parse(p, varargin{:});
+plotCent = p.Results.PlotCentroids;
 % ZDim (default 3) reserved for custom layouts; auto-permute above handles (X,Y,3,Z) -> (X,Y,Z,3)
 useIpt = exist('label2rgb', 'file') == 2 && exist('imoverlay', 'file') == 2;
+cc = [0.1 0.9 0.9];  % plot color: cyan, visible on RGB and yellow overlay
 
 if nargin < 1 || (isstring(masksMatPath) && strlength(masksMatPath) == 0) || ...
    (ischar(masksMatPath) && isempty(masksMatPath))
@@ -30,7 +43,7 @@ if nargin < 1 || (isstring(masksMatPath) && strlength(masksMatPath) == 0) || ...
     masksMatPath = fullfile(pth, f);
 end
 
-if ~isfile(masksMatPath)
+if exist(masksMatPath, 'file') ~= 2
     error('display_cellpose_masks:NotFound', 'File not found: %s', char(masksMatPath));
 end
 
@@ -84,12 +97,17 @@ if size(imgMIP, 3) ~= 3
 end
 imgMIP = im2uint8(imgMIP);
 
+[cx, cy, ~] = local_centroids_from_label2d_mip(m3MIP);
+
 f = figure('Name', 'Cellpose Z-MIP', 'Color', 'w', 'NumberTitle', 'off');
 tiled = tiledlayout(2, 2, 'Padding', 'compact', 'TileSpacing', 'compact');
 title(tiled, 'Cellpose outputs (Z-Maximum Intensity Projection)');
 
 nexttile(tiled);
 imshow(imgMIP, []);
+if plotCent
+    local_hold_scatter_centroids(gca, cx, cy, cc, 1);
+end
 title('Volume RGB (Z-MIP)');
 
 nexttile(tiled);
@@ -103,6 +121,9 @@ else
     colormap(gray(256));
     colorbar;
 end
+if plotCent
+    local_hold_scatter_centroids(gca, cx, cy, cc, 0.4);
+end
 title('3D run — labels (Z-MIP)');
 
 nexttile(tiled);
@@ -115,6 +136,10 @@ if ~isempty(mSMIP) && any(mSMIP(:) > 0)
         set(gca, 'YDir', 'normal', 'XTick', [], 'YTick', []);
         colormap(gray(256));
         colorbar;
+    end
+    if plotCent
+        [cxs, cys, ~] = local_centroids_from_label2d_mip(mSMIP);
+        local_hold_scatter_centroids(gca, cxs, cys, [1 0.3 0.1], 0.5);
     end
     title('2D+stitch — labels (Z-MIP)');
 else
@@ -136,8 +161,47 @@ else
     b(:, :, 2) = b(:, :, 2) + 0.35 * double(w);
     imshow(b, []);
 end
+if plotCent
+    local_hold_scatter_centroids(gca, cx, cy, [0.05 0.1 0.6], 1.2);
+end
 title('RGB Z-MIP + 3D foreground (yellow)');
 
+end
+
+function [cx, cy, ids] = local_centroids_from_label2d_mip(m2d)
+% 2D label MIP: plot coords are (col,row) = (x, y) for imshow, i.e. mean(c) and mean(r)
+L = double(m2d);
+ids = unique(L(:));
+ids = ids(ids > 0);
+n = numel(ids);
+cx = nan(n, 1);
+cy = nan(n, 1);
+for t = 1:n
+    [r, c] = find(L == ids(t));
+    if isempty(r)
+        continue
+    end
+    cx(t) = mean(c);
+    cy(t) = mean(r);
+end
+ke = isfinite(cx) & isfinite(cy);
+ids = ids(ke);
+cx = cx(ke);
+cy = cy(ke);
+end
+
+function local_hold_scatter_centroids(ax, cx, cy, col, mk)
+% Plot (+) on image axes. mk scales markers.
+if isempty(cx) || isempty(cy) || numel(cx) ~= numel(cy)
+    return
+end
+hold(ax, 'on');
+hL = plot(ax, cx, cy, '+', 'Color', col, 'MarkerSize', 4 * max(mk, 0.1), 'LineWidth', 1.4 * max(mk, 0.1), ...
+    'Clipping', 'on');
+hold(ax, 'off');
+if isgraphics(hL)
+    uistack(hL, 'top');
+end
 end
 
 function mip = local_mip_mask_xy(M, x, y, zd)
