@@ -206,3 +206,8 @@ test.mlapp
 rotation_debug.mat
 /External_Dependencies
 /wip_merge
+neuropal_env_new/
+
+launch_visualize_light.m
++CellPose/models/
++CellPose/Output/*
