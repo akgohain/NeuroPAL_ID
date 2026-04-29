@@ -91,6 +91,7 @@ function initialize()
             case 'cellpose'
                 app.ToggleNeuronDetectionMenu.Text = 'Use MP-Detect Neurons';
         end
+        Program.GUIHandling.install_cellpose_mask_button(app);
 
         % This is a new user, give them some help!
     else

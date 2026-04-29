@@ -15,8 +15,8 @@ classdef CellposeDetect
                 options.Prefix (1,1) string = ""
                 options.MaskSource (1,1) string = "stitched"
                 options.OutputDir (1,1) string = ""
-                options.KeepArtifacts (1,1) logical = false
-                options.SaveMasksMat (1,1) logical = false
+                options.KeepArtifacts (1,1) logical = true
+                options.SaveMasksMat (1,1) logical = true
             end
 
             prefix = char(options.Prefix);

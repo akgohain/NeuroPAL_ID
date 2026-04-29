@@ -141,7 +141,111 @@ classdef GUIHandling
 
             Program.GUIHandling.install_processing_resize_callback(app);
             Program.GUIHandling.install_main_processing_sync_callbacks(app);
+            Program.GUIHandling.install_cellpose_mask_button(app);
             Program.GUIHandling.apply_processing_responsive_layout(app);
+        end
+
+        function install_cellpose_mask_button(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app)
+                return
+            end
+
+            if ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
+                return
+            end
+
+            if ~isprop(app, 'ImageMenu') || isempty(app.ImageMenu) || ~isvalid(app.ImageMenu)
+                return
+            end
+
+            if ~isappdata(app.CELL_ID, 'show_cellpose_mask_overlay')
+                setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', false);
+            end
+
+            has_masks = Program.GUIHandling.cellpose_masks_available(app);
+            if ~has_masks
+                setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', false);
+            end
+
+            parent_menu = app.ImageMenu;
+            if isprop(app, 'ToggleNeuronDetectionMenu') && ...
+                    ~isempty(app.ToggleNeuronDetectionMenu) && isvalid(app.ToggleNeuronDetectionMenu) && ...
+                    ~isempty(app.ToggleNeuronDetectionMenu.Parent) && isvalid(app.ToggleNeuronDetectionMenu.Parent)
+                parent_menu = app.ToggleNeuronDetectionMenu.Parent;
+            end
+
+            existing = findall(parent_menu, 'Type', 'uimenu', 'Tag', 'show_cellpose_masks_menu');
+            if ~isempty(existing)
+                delete(existing);
+            end
+            % Also clear any stale copies from previous attempts in other menus.
+            stale = findall(app.CELL_ID, 'Type', 'uimenu', 'Tag', 'show_cellpose_masks_menu');
+            if ~isempty(stale)
+                delete(stale);
+            end
+
+            toggle_menu = uimenu(parent_menu, ...
+                'Text', 'Show Cellpose Mask', ...
+                'Tag', 'show_cellpose_masks_menu', ...
+                'Enable', 'on', ...
+                'MenuSelectedFcn', @(src, ~) Program.GUIHandling.show_cellpose_mask(src));
+            toggle_menu.Checked = 'off';
+            setappdata(app.CELL_ID, 'cellpose_mask_overlay_menu_handle', toggle_menu);
+        end
+
+        function show_cellpose_mask(menu_handle)
+            app = Program.app;
+            if isempty(app) || ~isvalid(app) || ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
+                return
+            end
+
+            if ~Program.GUIHandling.cellpose_masks_available(app)
+                setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', false);
+                uialert(app.CELL_ID, ...
+                    'Cellpose masks are not available for the current file yet. Run Cellpose detection first.', ...
+                    'No Cellpose Masks', 'Icon', 'warning');
+                return
+            end
+
+            % One-click action: always show masks when invoked.
+            setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', true);
+            Program.Routines.ID.render();
+        end
+
+        function tf = cellpose_masks_available(app)
+            tf = false;
+            if nargin < 1 || isempty(app) || ~isvalid(app)
+                return
+            end
+
+            mask_path = '';
+
+            if isprop(app, 'mp_params') && isstruct(app.mp_params) && ...
+                    isfield(app.mp_params, 'masks_mat_path') && ~isempty(app.mp_params.masks_mat_path)
+                mask_path = char(string(app.mp_params.masks_mat_path));
+            end
+
+            if isempty(mask_path) && isprop(app, 'id_file') && ~isempty(app.id_file) && isfile(app.id_file)
+                try
+                    id_payload = load(app.id_file, 'mp_params');
+                    if isfield(id_payload, 'mp_params') && isstruct(id_payload.mp_params) && ...
+                            isfield(id_payload.mp_params, 'masks_mat_path') && ~isempty(id_payload.mp_params.masks_mat_path)
+                        mask_path = char(string(id_payload.mp_params.masks_mat_path));
+                    end
+                catch
+                    mask_path = '';
+                end
+            end
+
+            tf = ~isempty(mask_path) && isfile(mask_path);
+        end
+
+        function value = checked_state_text(tf)
+            if logical(tf)
+                value = 'on';
+            else
+                value = 'off';
+            end
         end
 
         function prepare_unloaded_module_views(app)
