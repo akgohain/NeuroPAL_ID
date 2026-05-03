@@ -77,9 +77,6 @@ function get_slice(slider, view, ax)
         current_z_indices = neuron_locations(:,3)>z-z_dot_view & neuron_locations(:,3)<z+z_dot_view;
         positions = neuron_locations(current_z_indices, 1:2);
 
-        local_log_id_marker_sizes(app, z_num, z, marker_size_scale, ...
-            marker_line_scale, neuron_line_size, neuron_marker_sizes(current_z_indices));
-
         % Draw the neuron markers.
         neuron_marker_plot = scatter(ax, positions(:, 2), positions(:, 1), ...
             neuron_marker_sizes(current_z_indices) * marker_size_scale, ...
@@ -163,47 +160,6 @@ function get_slice(slider, view, ax)
                 app.image_neurons, app.worm, 'ax', app.XY, 'z', z);
         end
     end
-end
-
-function local_log_id_marker_sizes(app, z_gui, z_data, marker_size_scale, ...
-        marker_line_scale, neuron_line_base, sizes_vec)
-% Print scatter SizeData / LineWidth actually used (Command Window).
-mask_on = false;
-try
-    if isprop(app, 'CELL_ID') && ~isempty(app.CELL_ID) && isvalid(app.CELL_ID) && ...
-            isappdata(app.CELL_ID, 'show_cellpose_mask_overlay')
-        mask_on = logical(getappdata(app.CELL_ID, 'show_cellpose_mask_overlay'));
-    end
-catch
-end
-
-line_used = neuron_line_base * marker_line_scale;
-dot_prefs = Program.GUIPreferences.instance().neuron_dot;
-ms_sel = dot_prefs.marker.selected;
-ms_uns = dot_prefs.marker.unselected;
-n = numel(sizes_vec);
-stamp = datestr(now, 'yyyy-mm-dd HH:MM:SS');
-if n > 0
-    raw_min = min(sizes_vec);
-    raw_mean = mean(double(sizes_vec(:)));
-    raw_max = max(sizes_vec);
-    eff = double(sizes_vec(:)) * marker_size_scale;
-    fprintf(1, ['[NeuroPAL_ID:get_slice %s] z_gui=%g z_data=%g mask_overlay=%d ', ...
-        'prefs_marker_selected=%g prefs_marker_unselected=%g ', ...
-        'marker_size_scale=%.6g marker_line_scale=%.6g scatter_LineWidth=%.6g ', ...
-        '(line_base=%.6g) n_visible=%d SizeData_raw[min mean max]=[%g %g %g] ', ...
-        'SizeData_used[min mean max]=[%g %g %g]\n'], ...
-        stamp, z_gui, z_data, mask_on, ms_sel, ms_uns, marker_size_scale, ...
-        marker_line_scale, line_used, neuron_line_base, n, raw_min, raw_mean, raw_max, ...
-        min(eff), mean(eff), max(eff));
-else
-    fprintf(1, ['[NeuroPAL_ID:get_slice %s] z_gui=%g z_data=%g mask_overlay=%d ', ...
-        'prefs_marker_selected=%g prefs_marker_unselected=%g ', ...
-        'marker_size_scale=%.6g marker_line_scale=%.6g scatter_LineWidth=%.6g ', ...
-        '(line_base=%.6g) n_visible=0\n'], ...
-        stamp, z_gui, z_data, mask_on, ms_sel, ms_uns, marker_size_scale, ...
-        marker_line_scale, line_used, neuron_line_base);
-end
 end
 
 function local_draw_cellpose_mask_overlay(app, ax, z_data)

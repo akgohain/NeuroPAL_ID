@@ -166,6 +166,7 @@ classdef GUIHandling
             if ~has_masks
                 setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', false);
             end
+            overlay_on = logical(getappdata(app.CELL_ID, 'show_cellpose_mask_overlay'));
 
             parent_menu = app.ImageMenu;
             if isprop(app, 'ToggleNeuronDetectionMenu') && ...
@@ -174,22 +175,29 @@ classdef GUIHandling
                 parent_menu = app.ToggleNeuronDetectionMenu.Parent;
             end
 
-            existing = findall(parent_menu, 'Type', 'uimenu', 'Tag', 'show_cellpose_masks_menu');
-            if ~isempty(existing)
-                delete(existing);
-            end
-            % Also clear any stale copies from previous attempts in other menus.
-            stale = findall(app.CELL_ID, 'Type', 'uimenu', 'Tag', 'show_cellpose_masks_menu');
-            if ~isempty(stale)
-                delete(stale);
+            toggle_menu = [];
+            existing = findall(app.CELL_ID, 'Type', 'uimenu', 'Tag', 'show_cellpose_masks_menu');
+            for n = 1:numel(existing)
+                if isempty(toggle_menu) && isvalid(existing(n)) && isequal(existing(n).Parent, parent_menu)
+                    toggle_menu = existing(n);
+                else
+                    delete(existing(n));
+                end
             end
 
-            toggle_menu = uimenu(parent_menu, ...
-                'Text', 'Show Cellpose Mask', ...
-                'Tag', 'show_cellpose_masks_menu', ...
-                'Enable', 'on', ...
-                'MenuSelectedFcn', @(src, ~) Program.GUIHandling.show_cellpose_mask(src));
-            toggle_menu.Checked = 'off';
+            if isempty(toggle_menu)
+                toggle_menu = uimenu(parent_menu, ...
+                    'Tag', 'show_cellpose_masks_menu', ...
+                    'Enable', 'on');
+            end
+
+            if overlay_on
+                toggle_menu.Text = 'Hide Cellpose Mask';
+            else
+                toggle_menu.Text = 'Show Cellpose Mask';
+            end
+            toggle_menu.MenuSelectedFcn = @(src, ~) Program.GUIHandling.show_cellpose_mask(src);
+            toggle_menu.Checked = Program.GUIHandling.checked_state_text(overlay_on);
             setappdata(app.CELL_ID, 'cellpose_mask_overlay_menu_handle', toggle_menu);
         end
 
@@ -199,16 +207,33 @@ classdef GUIHandling
                 return
             end
 
+            overlay_on = false;
+            if isappdata(app.CELL_ID, 'show_cellpose_mask_overlay')
+                overlay_on = logical(getappdata(app.CELL_ID, 'show_cellpose_mask_overlay'));
+            end
+            next_overlay_on = ~overlay_on;
+
             if ~Program.GUIHandling.cellpose_masks_available(app)
                 setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', false);
+                if nargin >= 1 && ~isempty(menu_handle) && isvalid(menu_handle)
+                    menu_handle.Text = 'Show Cellpose Mask';
+                    menu_handle.Checked = 'off';
+                end
                 uialert(app.CELL_ID, ...
                     'Cellpose masks are not available for the current file yet. Run Cellpose detection first.', ...
                     'No Cellpose Masks', 'Icon', 'warning');
                 return
             end
 
-            % One-click action: always show masks when invoked.
-            setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', true);
+            setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', next_overlay_on);
+            if nargin >= 1 && ~isempty(menu_handle) && isvalid(menu_handle)
+                if next_overlay_on
+                    menu_handle.Text = 'Hide Cellpose Mask';
+                else
+                    menu_handle.Text = 'Show Cellpose Mask';
+                end
+                menu_handle.Checked = Program.GUIHandling.checked_state_text(next_overlay_on);
+            end
             Program.Routines.ID.render();
         end
 
