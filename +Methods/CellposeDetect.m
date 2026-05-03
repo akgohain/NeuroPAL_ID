@@ -17,6 +17,7 @@ classdef CellposeDetect
                 options.OutputDir (1,1) string = ""
                 options.KeepArtifacts (1,1) logical = true
                 options.SaveMasksMat (1,1) logical = true
+                options.ColorReadoutData = []
             end
 
             prefix = char(options.Prefix);
@@ -45,7 +46,10 @@ classdef CellposeDetect
                 centroids = reshape(centroids, 1, []);
             end
 
-            supervoxels = Methods.CellposeDetect.centroidsToSupervoxels(centroids, data);
+            color_readout_data = Methods.CellposeDetect.resolveColorReadoutData( ...
+                data, options.ColorReadoutData);
+            supervoxels = Methods.CellposeDetect.centroidsToSupervoxels( ...
+                centroids, color_readout_data);
             params = Methods.CellposeDetect.buildParams(response, size(supervoxels.positions, 1));
         end
 
@@ -74,8 +78,11 @@ classdef CellposeDetect
 
             save(np_file, 'worm', '-append');
 
-            data_RGBW = data(:,:,:,prefs.RGBW(~isnan(prefs.RGBW)));
-            [sp, mp] = Methods.CellposeDetect.detect(file, data_RGBW, info.scale');
+            rgbw = prefs.RGBW(~isnan(prefs.RGBW));
+            data_RGBW = data(:,:,:,rgbw);
+            readout_RGBW = Methods.Preprocess.zscore_frame(data_RGBW);
+            [sp, mp] = Methods.CellposeDetect.detect(file, data_RGBW, info.scale', ...
+                'ColorReadoutData', readout_RGBW);
 
             version = Program.ProgramInfo.version;
             mp_params = mp;
@@ -121,6 +128,30 @@ classdef CellposeDetect
             centroids = round(double(centroids));
             for axis = 1:3
                 centroids(:, axis) = max(1, min(volume_size_xyz(axis), centroids(:, axis)));
+            end
+        end
+
+        function color_readout_data = resolveColorReadoutData(data, color_readout_data)
+            %RESOLVECOLORREADOUTDATA Validate the volume used for neuron colors.
+
+            if isempty(color_readout_data)
+                color_readout_data = data;
+                return;
+            end
+
+            data_size = size(data);
+            readout_size = size(color_readout_data);
+            if numel(data_size) < 4
+                data_size(4) = 1;
+            end
+            if numel(readout_size) < 4
+                readout_size(4) = 1;
+            end
+
+            if ~isequal(data_size(1:3), readout_size(1:3))
+                error('Methods:CellposeDetect:ColorReadoutSizeMismatch', ...
+                    ['ColorReadoutData must have the same spatial dimensions ' ...
+                     'as the Cellpose detection volume.']);
             end
         end
 

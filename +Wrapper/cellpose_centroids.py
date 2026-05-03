@@ -184,8 +184,6 @@ def choose_mask_source(
     if requested == "3d":
         return "masks_3d", masks_3d
     if requested in {"stitched", "2d_stitched"}:
-        if not has_stitched:
-            raise ValueError("Requested masks_stitched, but the Cellpose run did not return stitched masks.")
         return "masks_stitched", masks_stitched
     if has_stitched:
         return "masks_stitched", masks_stitched
@@ -215,6 +213,8 @@ def infer_mask_permutation(mask_shape: tuple[int, int, int], volume_shape_xyz: t
 
 def extract_mask_centroids(mask_data: np.ndarray, volume_shape_xyz: tuple[int, int, int]) -> list[dict]:
     mask_data = np.asarray(mask_data)
+    if mask_data.size == 0:
+        return []
     if mask_data.ndim != 3:
         raise ValueError(f"Expected a 3D mask volume, got {mask_data.shape}")
 
