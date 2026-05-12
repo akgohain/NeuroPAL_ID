@@ -55,6 +55,9 @@ function load(file)
 
     app.video_frame_cache = [];
     app.video_frame_cache_key = struct('file', '', 't', NaN);
+    if ismethod(app, 'resetVideoViewCache')
+        app.resetVideoViewCache();
+    end
     app.clearVideoTimeSliderLiveState();
 
     app.xyAxes.XLim = [1, app.video_info.nx];

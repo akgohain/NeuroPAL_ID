@@ -306,6 +306,9 @@ classdef ChunkyMethods
 
                 app.video_frame_cache = [];
                 app.video_frame_cache_key = struct('file', '', 't', NaN);
+                if ismethod(app, 'resetVideoViewCache')
+                    app.resetVideoViewCache();
+                end
 
                 Program.Handlers.dialogue.resolve();
             end
