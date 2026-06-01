@@ -49,12 +49,15 @@ function initialize()
 
     % Initialize the structured properties.
     Program.GUIHandling.init_click_states(app);
+    Program.GUIHandling.remove_redundant_processing_menus(app);
     app.neuron_marker.shape = 'c';
     app.neuron_marker.color.edge = [0,0,0];
     Program.GUIHandling.prepare_unloaded_module_views(app);
+    Program.GUI.setup_zephir_video_tab(app);
     Program.GUIHandling.gui_lock(app, 'disable', 'identification_tab');
     Program.GUIHandling.gui_lock(app, 'disable', 'processing_tab');
     Program.GUIHandling.gui_lock(app, 'disable', 'video_tab');
+    Program.GUI.update_zephir_video_tab(app);
 
     % Initialize the neuron birth times.
     [app.hermaphrodite_neurons.names, ...

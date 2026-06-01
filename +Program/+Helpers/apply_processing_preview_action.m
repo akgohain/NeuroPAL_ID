@@ -25,21 +25,21 @@ if isempty(current_volume)
     return
 end
 
+source_dims = size(current_volume);
+if numel(source_dims) < 4
+    source_dims(end+1:4) = 1;
+end
+
 for n = 1:numel(actions)
     action = actions{n};
     current_volume = Methods.ChunkyMethods.apply_vol(app, action, current_volume);
     if isfield(app.flags, action)
         app.flags = rmfield(app.flags, action);
     end
-    if strcmpi(action, 'histmatch')
-        if ~isstruct(app.image_prefs)
-            app.image_prefs = struct();
-        end
-        app.image_prefs.is_matched = 1;
-    end
 end
 
 app.image_data = current_volume;
+Program.Helpers.update_processing_image_scale(app, actions, source_dims);
 app.image_data_zscored = Methods.Preprocess.zscore_frame(app.image_data);
 setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
 
@@ -102,6 +102,11 @@ end
 
 source = context.reader;
 metadata = local_read_metadata(source, app, actions);
+updated_scale = Program.Helpers.update_processing_image_scale(app, actions, dims);
+if ~isfield(metadata, 'info') || ~isstruct(metadata.info)
+    metadata.info = struct();
+end
+metadata.info.scale = updated_scale;
 save(target_path, '-struct', 'metadata', '-v7.3');
 target = matfile(target_path, 'Writable', true);
 
@@ -148,7 +153,7 @@ Program.Routines.Processing.render();
 applied = true;
 end
 
-function metadata = local_read_metadata(source, app, actions)
+function metadata = local_read_metadata(source, app, ~)
 metadata = struct();
 vars = {'version', 'info', 'prefs', 'worm'};
 for i = 1:numel(vars)
@@ -161,9 +166,6 @@ end
 
 if ~isfield(metadata, 'prefs') || ~isstruct(metadata.prefs)
     metadata.prefs = app.image_prefs;
-end
-if any(strcmpi(actions, 'histmatch'))
-    metadata.prefs.is_matched = 1;
 end
 end
 

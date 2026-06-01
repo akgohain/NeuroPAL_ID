@@ -19,16 +19,27 @@ Program.Helpers.sync_main_display_from_processing(app, false);
 
 data = app.image_data;
 prefs = app.image_prefs;
+info = app.image_info;
+if isstruct(info)
+    info.scale = app.image_um_scale;
+end
 
 if isa(app.proc_image, 'matlab.io.MatFile')
     app.proc_image.Properties.Writable = true;
     cleanup = onCleanup(@() local_make_readonly(app));
     app.proc_image.data = data;
+    if isstruct(info) && ~isempty(fieldnames(info))
+        app.proc_image.info = info;
+    end
     if isstruct(prefs) && ~isempty(fieldnames(prefs))
         app.proc_image.prefs = prefs;
     end
 else
-    save(context.path, 'data', 'prefs', '-append');
+    if isstruct(info) && ~isempty(fieldnames(info))
+        save(context.path, 'data', 'prefs', 'info', '-append');
+    else
+        save(context.path, 'data', 'prefs', '-append');
+    end
 end
 
 if isappdata(app.CELL_ID, 'proc_runtime_dirty')

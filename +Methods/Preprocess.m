@@ -82,9 +82,20 @@ classdef Preprocess < handle
             end
        end
 
-       function nvideo = normalize_frame(video)
-        % Normalize each channel onto a positive full-scale range while
-        % preserving the input channel class.
+       function nvideo = normalize_frame(video, background_percentile, max_percentile)
+        % Normalize each channel with percentile-based black/white points.
+            if nargin < 2
+                percentiles = Methods.Preprocess.normalize_percentile_defaults();
+            else
+                if nargin < 3
+                    max_percentile = [];
+                end
+                percentiles = Methods.Preprocess.validate_normalize_percentiles( ...
+                    background_percentile, max_percentile);
+            end
+
+            background_percentile = percentiles(1);
+            max_percentile = percentiles(2);
             nvideo = zeros(size(video), 'like', video);
 
             for ch = 1:size(video, 4)
@@ -96,14 +107,22 @@ classdef Preprocess < handle
 
                 data(~finite_mask) = 0;
                 finite_vals = data(finite_mask);
-                min_val = min(finite_vals, [], 'all');
-                data = data - min_val;
+                background_val = prctile(finite_vals, background_percentile);
+                data = data - background_val;
+                data(data < 0) = 0;
 
-                max_val = max(data(finite_mask), [], 'all');
+                foreground_vals = data(finite_mask);
+                foreground_vals = foreground_vals(foreground_vals > 0);
+                if isempty(foreground_vals)
+                    continue
+                end
+
+                max_val = prctile(foreground_vals, max_percentile);
                 if ~isfinite(max_val) || max_val <= 0
                     continue
                 end
 
+                data(data > max_val) = max_val;
                 normalized = data / max_val;
                 if isfloat(video)
                     nvideo(:,:,:,ch,:) = cast(normalized, class(video));
@@ -112,6 +131,25 @@ classdef Preprocess < handle
                     nvideo(:,:,:,ch,:) = cast(round(scale * normalized), class(video));
                 end
             end
+       end
+
+       function percentiles = normalize_percentile_defaults()
+            percentiles = [1, 99.9];
+       end
+
+       function percentiles = validate_normalize_percentiles(background_percentile, max_percentile)
+            defaults = Methods.Preprocess.normalize_percentile_defaults();
+            if nargin < 1 || isempty(background_percentile)
+                background_percentile = defaults(1);
+            end
+            if nargin < 2 || isempty(max_percentile)
+                max_percentile = defaults(2);
+            end
+
+            percentiles = [double(background_percentile), double(max_percentile)];
+            invalid = ~isfinite(percentiles);
+            percentiles(invalid) = defaults(invalid);
+            percentiles = min(max(percentiles, 0), 100);
        end
         
        function volume = area_filter(volume, point, threshold, dim)

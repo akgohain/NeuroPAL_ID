@@ -11,6 +11,7 @@ end
 frame = local_validate_frame(app, frame);
 img = local_get_frame_handle(ax);
 frame_size = size(frame);
+reset_view = false;
 
 if isempty(img) || ~isgraphics(img)
     img = image(frame, 'Parent', ax, ...
@@ -19,7 +20,8 @@ if isempty(img) || ~isgraphics(img)
         'PickableParts', 'none');
     setappdata(ax, 'proc_frame_handle', img);
     setappdata(ax, 'proc_frame_dims', frame_size);
-    local_set_axis_limits(ax, frame_size);
+    reset_view = true;
+    local_configure_frame_ticks(app, ax, frame_size, reset_view);
     return
 end
 
@@ -33,12 +35,16 @@ end
 
 if ~isequal(previous_size, frame_size)
     setappdata(ax, 'proc_frame_dims', frame_size);
-    local_set_axis_limits(ax, frame_size);
+    reset_view = true;
+elseif ~local_viewport_is_valid(ax, frame_size)
+    reset_view = true;
 end
+
+local_configure_frame_ticks(app, ax, frame_size, reset_view);
 end
 
 function frame = local_validate_frame(app, frame)
-if ndims(frame) == 2
+if ismatrix(frame)
     return
 end
 
@@ -102,7 +108,44 @@ if ~isempty(img) && isgraphics(img)
 end
 end
 
-function local_set_axis_limits(ax, frame_size)
-ax.XLim = [1, max(1, frame_size(2))];
-ax.YLim = [1, max(1, frame_size(1))];
+function local_configure_frame_ticks(app, ax, frame_size, reset_view)
+scale_xy = local_frame_scale(app, ax);
+if reset_view
+    Program.Helpers.configure_image_axes_ticks( ...
+        ax, frame_size, scale_xy, ...
+        'XLim', [1, max(1, frame_size(2))], ...
+        'YLim', [1, max(1, frame_size(1))]);
+else
+    Program.Helpers.configure_image_axes_ticks(ax, frame_size, scale_xy);
+end
+end
+
+function scale_xy = local_frame_scale(app, ax)
+plane = "xy";
+try
+    if isvalid(app.proc_xzAxes) && ax == app.proc_xzAxes
+        plane = "xz";
+    elseif isvalid(app.proc_yzAxes) && ax == app.proc_yzAxes
+        plane = "yz";
+    end
+catch
+end
+scale_xy = Program.Helpers.processing_axis_scale(app, plane);
+end
+
+function tf = local_viewport_is_valid(ax, frame_size)
+tf = false;
+if isempty(ax) || ~isvalid(ax)
+    return
+end
+
+limits = [ax.XLim ax.YLim];
+if any(~isfinite(limits)) || diff(ax.XLim) <= 0 || diff(ax.YLim) <= 0
+    return
+end
+
+nx = max(1, frame_size(2));
+ny = max(1, frame_size(1));
+tf = ax.XLim(1) >= 1 && ax.XLim(2) <= nx && ...
+    ax.YLim(1) >= 1 && ax.YLim(2) <= ny;
 end

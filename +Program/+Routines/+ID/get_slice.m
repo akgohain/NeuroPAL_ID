@@ -46,11 +46,20 @@ function get_slice(slider, view, ax)
     [xy, ~, z] = Program.Helpers.get_current_display_slice(app, 'main', view);
     Program.Helpers.debug_array_summary('IDSlice', 'xy_slice', xy);
     % Display the current slice in the XY axis.
-    gui_image = image(xy, 'Parent', ax); hold(ax, 'on');
+    gui_image = image(xy, 'Parent', ax);
+    Program.Helpers.configure_image_axes_ticks( ...
+        ax, size(xy), app.image_um_scale(1:2), ...
+        'XLim', [0, size(xy, 2)], ...
+        'YLim', [0, size(xy, 1)]);
+    hold(ax, 'on');
     local_draw_cellpose_mask_overlay(app, ax, z);
 
     if strcmp(app.TabGroup.SelectedTab.Title, 'Image Processing') & strcmp(app.VolumeDropDown.Value, 'Colormap')
         image(xy, 'Parent', app.proc_xyAxes);
+        Program.Helpers.configure_image_axes_ticks( ...
+            app.proc_xyAxes, size(xy), app.image_um_scale(1:2), ...
+            'XLim', [1, size(xy, 2)], ...
+            'YLim', [1, size(xy, 1)]);
     end
 
     % Add the AddNeuron function as mouse click listener.

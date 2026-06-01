@@ -257,25 +257,15 @@ function open(path)
     daspect(app.MaxProjection,[1 1 1]);
     axis(app.MaxProjection, 'off');
 
-    % Constrain the image.
-    app.XY.XLim = [0, size(app.image_data, 2)];
-    app.XY.YLim = [0, size(app.image_data, 1)];
-
     % Label the image.
     app.XY.Title.Interpreter = 'none';
     app.XY.Title.String = app.image_name;
     app.XY.TitleFontSizeMultiplier = 2;
     app.XY.TitleFontWeight = 'bold';
-    x_ticks = linspace(0, size(app.image_data, 2), 15);
-    y_ticks = linspace(0, size(app.image_data, 1), 5);
-    app.XY.XTick = x_ticks;
-    app.XY.YTick = y_ticks;
-    x_labels = arrayfun(@(x) num2str(x, '%.1f'), x_ticks * info.scale(1), 'UniformOutput', false);
-    y_labels = arrayfun(@(y) num2str(y, '%.1f'), y_ticks * info.scale(2), 'UniformOutput', false);
-    x_labels{1} = '0';
-    y_labels{1} = '0';
-    app.XY.XTickLabel = x_labels;
-    app.XY.YTickLabel = flip(y_labels);
+    Program.Helpers.configure_image_axes_ticks( ...
+        app.XY, size(app.image_data), info.scale(1:2), ...
+        'XLim', [0, size(app.image_data, 2)], ...
+        'YLim', [0, size(app.image_data, 1)]);
 
     % Select no neurons.
     app.selected_neuron = [];

@@ -60,22 +60,15 @@ classdef ChunkyMethods
 
         function output_slice = apply_slice(app, action, slice)
             % Apply operation to a slice.
-            state = Program.Handlers.channels.processing_state(app);
-            RGBW = [state.r.source_idx, state.g.source_idx, state.b.source_idx, state.white.source_idx];
-
-            if size(slice, 4) < max(RGBW)
-                RGBW = 1:size(slice, 4);
-            end
-
             output_slice = slice;
             
             switch action
                 case 'zscore'
-                    output_slice = Methods.Preprocess.normalize_frame(slice); 
+                    percentiles = Methods.ChunkyMethods.proc_normalize_percentiles(app);
+                    output_slice = Methods.Preprocess.normalize_frame(slice, percentiles(1), percentiles(2));
 
                 case 'histmatch'
-                    slice(:, :, :, RGBW(1:3)) = Methods.run_histmatch(slice, RGBW);
-                    output_slice = slice;
+                    output_slice = Methods.Preprocess.histmatch_frame(slice);
 
                 case 'crop'
                     output_slice = Program.crop_rotate_gui.apply_mask(app, slice);
@@ -178,6 +171,10 @@ classdef ChunkyMethods
                 return
             end
 
+            source_dims = size(context.volume);
+            if numel(source_dims) < 4
+                source_dims(end+1:4) = 1;
+            end
             new_dims = size(context.volume);
             for a=1:length(actions)
                 new_dims = Methods.ChunkyMethods.calc_pp_size(app, actions{a}, new_dims);
@@ -192,6 +189,7 @@ classdef ChunkyMethods
             end
 
             app.image_data = current_vol;
+            Program.Helpers.update_processing_image_scale(app, actions, source_dims);
             app.image_data_zscored = Methods.Preprocess.zscore_frame(app.image_data);
             setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
             Program.Helpers.write_processing_colormap_to_file(app);
@@ -951,6 +949,25 @@ classdef ChunkyMethods
                     output(:, :, :, source_idx), ...
                     window_settings(n).low_high_in);
             end
+        end
+
+        function percentiles = proc_normalize_percentiles(app)
+            percentiles = Methods.Preprocess.normalize_percentile_defaults();
+            try
+                if isempty(app) || ~isvalid(app) || ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID)
+                    return
+                end
+
+                if isappdata(app.CELL_ID, 'proc_normalize_background_percentile')
+                    percentiles(1) = double(getappdata(app.CELL_ID, 'proc_normalize_background_percentile'));
+                end
+                if isappdata(app.CELL_ID, 'proc_normalize_max_percentile')
+                    percentiles(2) = double(getappdata(app.CELL_ID, 'proc_normalize_max_percentile'));
+                end
+            catch
+            end
+
+            percentiles = Methods.Preprocess.validate_normalize_percentiles(percentiles(1), percentiles(2));
         end
 
         function window_settings = proc_window_settings(app, n_channels)
