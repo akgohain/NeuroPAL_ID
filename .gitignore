@@ -75,6 +75,7 @@ octave-core
 
 # omit bash scripts
 *.sh
+!scripts/launch_visualize_light_debug.sh
 
 # pictures
 *.jpg
