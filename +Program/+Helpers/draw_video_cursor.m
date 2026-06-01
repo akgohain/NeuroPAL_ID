@@ -1,6 +1,12 @@
 function draw_video_cursor(y, x, z)
     app = Program.app;
 
+    if isappdata(app.CELL_ID, 'zephir_show_video_crosshair') && ...
+            ~logical(getappdata(app.CELL_ID, 'zephir_show_video_crosshair'))
+        clear_cursor_lines(app);
+        return
+    end
+
     cursor_marker = '--';
     cursor_color = '#9c9c9c';
     cursor_width = 0.2;
@@ -18,6 +24,27 @@ function draw_video_cursor(y, x, z)
     delete(findobj(app.xyAxes,'Type','images.roi.Point'));
     delete(findobj(app.yzAxes,'Type','images.roi.Point'));
     delete(findobj(app.xzAxes,'Type','images.roi.Point'));
+end
+
+function clear_cursor_lines(app)
+    handles = {'xy_yline', 'yz_yline', 'xz_yline', ...
+        'xy_xline', 'xz_xline', 'yz_xline'};
+    for idx = 1:numel(handles)
+        field = handles{idx};
+        if ~isprop(app, field) || isempty(app.(field))
+            continue
+        end
+        try
+            if isvalid(app.(field))
+                delete(app.(field));
+            end
+        catch
+        end
+        try
+            app.(field) = [];
+        catch
+        end
+    end
 end
 
 function line_handle = update_line(line_handle, ax, orientation, value, marker, color, width)

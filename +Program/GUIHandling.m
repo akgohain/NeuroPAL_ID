@@ -361,14 +361,6 @@ classdef GUIHandling
                 'ZAxisDropDown', 'ValueChangedFcn'; ...
                 'ZCenterEditField', 'ValueChangedFcn'; ...
                 'FlipZButton', 'ButtonPushedFcn'; ...
-                'DownsampleImageMenu', 'MenuSelectedFcn'; ...
-                'ThresholdImageMenu', 'MenuSelectedFcn'; ...
-                'HistogramMatchingMenu', 'MenuSelectedFcn'; ...
-                'NormalizeColorsMenu', 'MenuSelectedFcn'; ...
-                'SpectralUnmixingMenu', 'MenuSelectedFcn'; ...
-                'AllChannels', 'MenuSelectedFcn'; ...
-                'IndividualChannels', 'MenuSelectedFcn'; ...
-                'AdjustHistogramMenu', 'MenuSelectedFcn'; ...
                 'RotateAllHorizontalMenu', 'MenuSelectedFcn'; ...
                 'RotateAllVerticalMenu', 'MenuSelectedFcn'; ...
                 'RotateAllClockwiseMenu', 'MenuSelectedFcn'; ...
@@ -381,6 +373,32 @@ classdef GUIHandling
             for n = 1:size(targets, 1)
                 Program.GUIHandling.wrap_main_processing_sync_callback( ...
                     app, targets{n, 1}, targets{n, 2});
+            end
+        end
+
+        function remove_redundant_processing_menus(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app)
+                return
+            end
+
+            menu_names = { ...
+                'DownsampleImageMenu', ...      % Replaced by Image Processing downsample panel.
+                'ThresholdImageMenu', ...       % Replaced by Image Processing threshold controls.
+                'HistogramMatchingMenu', ...    % Legacy normalization path; current UI uses Normalize Colors.
+                'NormalizeColorsMenu', ...      % Same operation as the Image Processing Normalize Colors button.
+                'SpectralUnmixingMenu', ...     % Replaced by the Image Processing spectral unmixing panel.
+                'AdjustGammaMenu', ...          % Replaced by per-channel gamma controls in Image Processing.
+                'AdjustBrightnessMenu', ...     % Disabled dead menu item.
+                'AdjustHistogramMenu'};         % Replaced by Image Processing histogram controls.
+
+            for n = 1:numel(menu_names)
+                menu_name = menu_names{n};
+                if isprop(app, menu_name)
+                    menu_handle = app.(menu_name);
+                    if ~isempty(menu_handle) && isvalid(menu_handle)
+                        delete(menu_handle);
+                    end
+                end
             end
         end
 
@@ -457,6 +475,7 @@ classdef GUIHandling
             if Program.GUIHandling.processing_tab_rendered(app) && ...
                     strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap')
                 Program.GUIHandling.hide_percentile_noise_editor(app);
+                Program.GUIHandling.hide_normalize_colors_editor(app);
                 Program.GUIHandling.clear_processing_preview_cache(app);
                 Program.Helpers.sync_processing_from_main(app, app.image_file);
                 Program.GUIHandling.update_processing_downsample_field_limits(app);
@@ -1578,7 +1597,7 @@ classdef GUIHandling
             if request.is_identity
                 Program.GUIHandling.restore_identity_downsample_preview(app, request);
             else
-                Program.Routines.Processing.save_prompt('ds');
+                Program.GUIHandling.apply_processing_downsample_preview(app);
             end
 
             Program.Routines.GUI.set_manipulation_panel('closed');
@@ -1586,7 +1605,19 @@ classdef GUIHandling
 
         function handle_processing_downsample_field_changed(app)
             request = Program.GUIHandling.sanitize_processing_downsample_fields(app);
-            Program.GUIHandling.restore_identity_downsample_preview(app, request);
+            if request.is_identity
+                Program.GUIHandling.restore_identity_downsample_preview(app, request);
+                return
+            end
+
+            Program.GUIHandling.apply_processing_downsample_preview(app);
+        end
+
+        function apply_processing_downsample_preview(app)
+            app.flags.ds = 1;
+            Program.GUIHandling.clear_processing_preview_cache(app);
+            Program.Routines.Processing.render();
+            drawnow limitrate nocallbacks;
         end
 
         function request = sanitize_processing_downsample_fields(app)
@@ -1618,6 +1649,7 @@ classdef GUIHandling
                 'proc_live_mip_cache', ...
                 'proc_view_cache', ...
                 'proc_render_cache', ...
+                'proc_raw_cache', ...
                 'proc_histogram_signature', ...
                 'proc_render_view_dims', ...
                 'proc_live_z_value', ...
@@ -1724,11 +1756,14 @@ classdef GUIHandling
 
             if isprop(app, 'ProcNormalizeColorsButton') && isvalid(app.ProcNormalizeColorsButton)
                 app.ProcNormalizeColorsButton.ButtonPushedFcn = @(src, event) ...
-                    Program.GUIHandling.apply_processing_runtime_action(app, 'zscore');
+                    Program.GUIHandling.apply_processing_normalize_colors(app);
+                app.ProcNormalizeColorsButton.Tooltip = ...
+                    'Set per-channel background and max percentiles, then clamp and rescale colors.';
             end
             if isprop(app, 'ProcHistogramMatchingButton') && isvalid(app.ProcHistogramMatchingButton)
-                app.ProcHistogramMatchingButton.ButtonPushedFcn = @(src, event) ...
-                    Program.GUIHandling.apply_processing_runtime_action(app, 'histmatch');
+                app.ProcHistogramMatchingButton.Visible = 'off';
+                app.ProcHistogramMatchingButton.Enable = 'off';
+                app.ProcHistogramMatchingButton.ButtonPushedFcn = [];
             end
             if isprop(app, 'ProcCropImageButton') && isvalid(app.ProcCropImageButton)
                 app.ProcCropImageButton.ButtonPushedFcn = @(src, event) ...
@@ -1764,8 +1799,185 @@ classdef GUIHandling
             Program.Routines.Processing.save_prompt(action);
         end
 
+        function apply_processing_normalize_colors(app)
+            controls = Program.GUIHandling.ensure_normalize_colors_editor(app);
+            if isempty(controls)
+                return
+            end
+
+            if strcmp(controls.panel.Visible, 'on')
+                if ~Program.GUIHandling.store_normalize_colors_editor_values(app)
+                    return
+                end
+                Program.GUIHandling.hide_normalize_colors_editor(app);
+                Program.GUIHandling.apply_processing_runtime_action(app, 'zscore');
+                return
+            end
+
+            Program.GUIHandling.show_normalize_colors_editor(app);
+        end
+
+        function controls = ensure_normalize_colors_editor(app)
+            controls = Program.GUIHandling.normalize_colors_editor(app);
+            if ~isempty(controls)
+                return
+            end
+
+            panel = uipanel(app.CELL_ID, ...
+                'Title', 'Normalize Colors', ...
+                'Visible', 'off', ...
+                'Units', 'pixels', ...
+                'AutoResizeChildren', 'off');
+            panel.Position(3:4) = [238, 98];
+
+            grid = uigridlayout(panel, ...
+                'RowHeight', {28, 28}, ...
+                'ColumnWidth', {'1x', 72}, ...
+                'ColumnSpacing', 6, ...
+                'RowSpacing', 6, ...
+                'Padding', [10 8 10 12]);
+
+            bg_label = uilabel(grid, ...
+                'Text', 'Background percentile', ...
+                'HorizontalAlignment', 'left');
+            bg_label.Layout.Row = 1;
+            bg_label.Layout.Column = 1;
+            bg_label.Tooltip = 'Background percentile on each channel, 0-100.';
+
+            bg_field = uieditfield(grid, 'numeric', ...
+                'Limits', [0 100], ...
+                'ValueDisplayFormat', '%.4g', ...
+                'ValueChangedFcn', @(src, event) ...
+                    Program.GUIHandling.store_normalize_colors_editor_values(app));
+            bg_field.Layout.Row = 1;
+            bg_field.Layout.Column = 2;
+
+            max_label = uilabel(grid, ...
+                'Text', 'Max percentile', ...
+                'HorizontalAlignment', 'left');
+            max_label.Layout.Row = 2;
+            max_label.Layout.Column = 1;
+            max_label.Tooltip = 'Foreground max percentile after background removal, 0-100.';
+
+            max_field = uieditfield(grid, 'numeric', ...
+                'Limits', [0 100], ...
+                'ValueDisplayFormat', '%.4g', ...
+                'ValueChangedFcn', @(src, event) ...
+                    Program.GUIHandling.store_normalize_colors_editor_values(app));
+            max_field.Layout.Row = 2;
+            max_field.Layout.Column = 2;
+
+            controls = struct( ...
+                'panel', panel, ...
+                'grid', grid, ...
+                'bg_label', bg_label, ...
+                'bg_field', bg_field, ...
+                'max_label', max_label, ...
+                'max_field', max_field);
+            setappdata(app.CELL_ID, 'proc_normalize_colors_editor', controls);
+        end
+
+        function controls = normalize_colors_editor(app)
+            controls = [];
+            if ~isappdata(app.CELL_ID, 'proc_normalize_colors_editor')
+                return
+            end
+
+            controls = getappdata(app.CELL_ID, 'proc_normalize_colors_editor');
+            required = {'panel', 'grid', 'bg_label', 'bg_field', 'max_label', ...
+                'max_field'};
+            for n = 1:numel(required)
+                name = required{n};
+                if ~isfield(controls, name) || isempty(controls.(name)) || ~isvalid(controls.(name))
+                    controls = [];
+                    if isappdata(app.CELL_ID, 'proc_normalize_colors_editor')
+                        rmappdata(app.CELL_ID, 'proc_normalize_colors_editor');
+                    end
+                    return
+                end
+            end
+        end
+
+        function show_normalize_colors_editor(app)
+            controls = Program.GUIHandling.ensure_normalize_colors_editor(app);
+            if isempty(controls)
+                return
+            end
+
+            percentiles = Methods.Preprocess.normalize_percentile_defaults();
+
+            if isappdata(app.CELL_ID, 'proc_normalize_background_percentile')
+                percentiles(1) = double(getappdata(app.CELL_ID, 'proc_normalize_background_percentile'));
+            end
+            if isappdata(app.CELL_ID, 'proc_normalize_max_percentile')
+                percentiles(2) = double(getappdata(app.CELL_ID, 'proc_normalize_max_percentile'));
+            end
+
+            percentiles = Methods.Preprocess.validate_normalize_percentiles(percentiles(1), percentiles(2));
+            controls.bg_field.Value = percentiles(1);
+            controls.max_field.Value = percentiles(2);
+            controls.panel.Visible = 'on';
+            Program.GUIHandling.position_normalize_colors_editor(app);
+        end
+
+        function hide_normalize_colors_editor(app)
+            controls = Program.GUIHandling.normalize_colors_editor(app);
+            if isempty(controls)
+                return
+            end
+
+            controls.panel.Visible = 'off';
+        end
+
+        function position_normalize_colors_editor(app)
+            controls = Program.GUIHandling.normalize_colors_editor(app);
+            if isempty(controls) || ~strcmp(controls.panel.Visible, 'on') || ...
+                    ~isprop(app, 'ProcNormalizeColorsButton') || isempty(app.ProcNormalizeColorsButton) || ...
+                    ~isvalid(app.ProcNormalizeColorsButton)
+                return
+            end
+
+            drawnow limitrate nocallbacks;
+            button_pos = getpixelposition(app.ProcNormalizeColorsButton, true);
+            figure_pos = app.CELL_ID.Position;
+            panel_size = [238, 98];
+
+            x = button_pos(1) - panel_size(1) - 8;
+            if x < 10
+                x = button_pos(1) + button_pos(3) + 8;
+            end
+            x = min(max(x, 10), max(10, figure_pos(3) - panel_size(1) - 10));
+
+            y = button_pos(2) + button_pos(4) - panel_size(2);
+            y = min(max(y, 10), max(10, figure_pos(4) - panel_size(2) - 10));
+
+            controls.panel.Position = [x, y, panel_size];
+        end
+
+        function stored = store_normalize_colors_editor_values(app)
+            stored = false;
+            controls = Program.GUIHandling.normalize_colors_editor(app);
+            if isempty(controls)
+                return
+            end
+
+            parsed = [double(controls.bg_field.Value), double(controls.max_field.Value)];
+            if any(~isfinite(parsed)) || parsed(1) < 0 || parsed(1) > 100 || ...
+                    parsed(2) < 0 || parsed(2) > 100
+                uialert(app.CELL_ID, ...
+                    'Normalize Colors percentiles must be finite values between 0 and 100.', ...
+                    'Invalid Normalize Colors Parameters', 'Icon', 'warning');
+                return
+            end
+
+            setappdata(app.CELL_ID, 'proc_normalize_background_percentile', parsed(1));
+            setappdata(app.CELL_ID, 'proc_normalize_max_percentile', parsed(2));
+            stored = true;
+        end
+
         function handle_processing_mip_toggled(app)
             Program.GUIHandling.hide_percentile_noise_editor(app);
+            Program.GUIHandling.hide_normalize_colors_editor(app);
             Program.GUIHandling.update_processing_zslider_visibility(app);
             Program.GUIHandling.clear_processing_preview_cache(app);
             Program.Routines.Processing.render();
@@ -1829,6 +2041,7 @@ classdef GUIHandling
             Program.Handlers.loading.start('Swapping volumes...');
             cleanup = onCleanup(@() Program.Handlers.loading.done());
             Program.GUIHandling.hide_percentile_noise_editor(app);
+            Program.GUIHandling.hide_normalize_colors_editor(app);
             Program.GUIHandling.swap_volumes(app, event);
             Program.GUIHandling.update_processing_threshold_target_options(app);
             Program.Routines.Processing.render();
@@ -2451,6 +2664,7 @@ classdef GUIHandling
             Program.GUIHandling.layout_processing_threshold_controls(app, stack_threshold_panel);
             Program.GUIHandling.layout_processing_histogram_panels(app, histogram_columns, histogram_width);
             Program.GUIHandling.position_percentile_noise_editor(app);
+            Program.GUIHandling.position_normalize_colors_editor(app);
         end
 
         function width = processing_container_width(app)
@@ -2515,45 +2729,47 @@ classdef GUIHandling
         end
 
         function layout_processing_threshold_controls(app, compact)
-            row_heights = app.ProcThresholdGrid.RowHeight;
-            if numel(row_heights) >= 9
-                row_heights{3} = 30;
-                row_heights{4} = 30;
-                row_heights{5} = 20;
-                row_heights{6} = 0;
-                row_heights{7} = 30;
-                row_heights{8} = 30;
-                row_heights{9} = 20;
+            row_heights = repmat({0}, 1, max(13, numel(app.ProcThresholdGrid.RowHeight)));
+            app.ProcThresholdGrid.RowSpacing = 6;
+            app.ProcThresholdGrid.Padding = [8 8 8 8];
+
+            if isprop(app, 'ProcThresholdManipulationLabel') && isvalid(app.ProcThresholdManipulationLabel)
+                app.ProcThresholdManipulationLabel.Visible = 'off';
+                app.ProcThresholdManipulationLabel.Text = '';
+            end
+            if isprop(app, 'ProcHistogramManipulationLabel') && isvalid(app.ProcHistogramManipulationLabel)
+                app.ProcHistogramManipulationLabel.Visible = 'off';
+                app.ProcHistogramManipulationLabel.Text = '';
+            end
+            if isprop(app, 'ProcThresholdKnobPanel') && isvalid(app.ProcThresholdKnobPanel)
+                app.ProcThresholdKnobPanel.Visible = 'off';
             end
 
             if compact
                 app.ProcThresholdGrid.ColumnWidth = {'1x', '1x'};
-                if numel(row_heights) >= 9
-                    row_heights{4} = 0;
-                    row_heights{8} = 0;
-                end
+                row_heights(1:3) = {30, 30, 24};
 
-                app.ProcMeasureROINoiseButton.Layout.Row = 3;
+                app.ProcMeasureROINoiseButton.Layout.Row = 1;
                 app.ProcMeasureROINoiseButton.Layout.Column = 1;
-                app.ProcMeasure90pthNoiseButton.Layout.Row = 3;
+                app.ProcMeasure90pthNoiseButton.Layout.Row = 1;
                 app.ProcMeasure90pthNoiseButton.Layout.Column = 2;
-                app.ProcNormalizeColorsButton.Layout.Row = 7;
-                app.ProcNormalizeColorsButton.Layout.Column = 1;
-                app.ProcHistogramMatchingButton.Layout.Row = 7;
-                app.ProcHistogramMatchingButton.Layout.Column = 2;
-                app.Panel_87.Layout.Row = 9;
+                app.ProcNormalizeColorsButton.Layout.Row = 2;
+                app.ProcNormalizeColorsButton.Layout.Column = [1 2];
+                app.ProcHistogramMatchingButton.Visible = 'off';
+                app.Panel_87.Layout.Row = 3;
                 app.Panel_87.Layout.Column = [1 2];
             else
                 app.ProcThresholdGrid.ColumnWidth = {'1x'};
-                app.ProcMeasureROINoiseButton.Layout.Row = 3;
+                row_heights(1:4) = {30, 30, 30, 24};
+
+                app.ProcMeasureROINoiseButton.Layout.Row = 1;
                 app.ProcMeasureROINoiseButton.Layout.Column = 1;
-                app.ProcMeasure90pthNoiseButton.Layout.Row = 4;
+                app.ProcMeasure90pthNoiseButton.Layout.Row = 2;
                 app.ProcMeasure90pthNoiseButton.Layout.Column = 1;
-                app.ProcNormalizeColorsButton.Layout.Row = 7;
+                app.ProcNormalizeColorsButton.Layout.Row = 3;
                 app.ProcNormalizeColorsButton.Layout.Column = 1;
-                app.ProcHistogramMatchingButton.Layout.Row = 8;
-                app.ProcHistogramMatchingButton.Layout.Column = 1;
-                app.Panel_87.Layout.Row = 9;
+                app.ProcHistogramMatchingButton.Visible = 'off';
+                app.Panel_87.Layout.Row = 4;
                 app.Panel_87.Layout.Column = 1;
             end
 
@@ -2739,8 +2955,8 @@ classdef GUIHandling
             app.ProcThresholdGrid.RowHeight = row_heights;
 
             if isprop(app, 'ProcThresholdManipulationLabel') && isvalid(app.ProcThresholdManipulationLabel)
-                app.ProcThresholdManipulationLabel.Visible = 'on';
-                app.ProcThresholdManipulationLabel.Text = 'Threshold BG';
+                app.ProcThresholdManipulationLabel.Visible = 'off';
+                app.ProcThresholdManipulationLabel.Text = '';
                 app.ProcThresholdManipulationLabel.Tooltip = ...
                     'Threshold/background helpers for setting per-channel lower bounds.';
             end
@@ -2883,14 +3099,13 @@ classdef GUIHandling
         end
 
         function crop_routine(app)
-            mip_flag = 0;
-
-            if ~app.ProcShowMIPCheckBox.Value
-                app.ProcShowMIPCheckBox.Value = 1;
-            end
-
             frame = Methods.ChunkyMethods.load_proc_image(app);
             image(frame.xy, 'Parent', app.proc_xyAxes);
+            Program.Helpers.configure_image_axes_ticks( ...
+                app.proc_xyAxes, size(frame.xy), ...
+                Program.Helpers.processing_axis_scale(app, "xy"), ...
+                'XLim', [1, size(frame.xy, 2)], ...
+                'YLim', [1, size(frame.xy, 1)]);
             
             if app.ProcPreviewZslowCheckBox.Value
                 image(flipud(rot90(frame.yz)), 'Parent', app.proc_xzAxes);
@@ -3003,7 +3218,8 @@ classdef GUIHandling
             grid = app.ProcThresholdKnobGrid;
             app.ProcNoiseThresholdKnob.Visible = 'off';
             app.ProcThresholdKnobPanel.Visible = 'on';
-            app.ProcThresholdManipulationLabel.Text = 'Threshold BG';
+            app.ProcThresholdManipulationLabel.Visible = 'off';
+            app.ProcThresholdManipulationLabel.Text = '';
             app.ProcThresholdManipulationLabel.Tooltip = ...
                 'Targeted helpers for setting per-channel lower bounds on the user-facing uint8 scale (0-255).';
             grid.ColumnWidth = {46, '1x', 0, 24, 24};
@@ -3335,6 +3551,7 @@ classdef GUIHandling
             end
 
             Program.GUIHandling.hide_percentile_noise_editor(app);
+            Program.GUIHandling.hide_normalize_colors_editor(app);
 
             Program.GUIHandling.processing_roi_lock(app, 'lock');
             roi_lock_cleanup = onCleanup(@() Program.GUIHandling.processing_roi_lock(app, 'unlock'));
@@ -3951,8 +4168,11 @@ classdef GUIHandling
             end
 
             image(app.proc_xyAxes, preview_img);
-            app.proc_xyAxes.XLim(2) = size(preview_img, 2);
-            app.proc_xyAxes.YLim(2) = size(preview_img, 1);
+            Program.Helpers.configure_image_axes_ticks( ...
+                app.proc_xyAxes, size(preview_img), ...
+                Program.Helpers.processing_axis_scale(app, "xy"), ...
+                'XLim', [1, size(preview_img, 2)], ...
+                'YLim', [1, size(preview_img, 1)]);
         end
 
         function handle_rotation_value_changed(app, value)
