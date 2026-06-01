@@ -2,16 +2,7 @@ function reload(path)
     app = Program.app;
     app.video_info.file = path;
     if endsWith(lower(path), '.h5')
-        data_info = h5info(path, '/data');
-        dims = data_info.Dataspace.Size;
-        if numel(dims) < 5
-            dims(5) = 1;
-        end
-        app.video_info.ny = dims(1);
-        app.video_info.nx = dims(2);
-        app.video_info.nz = dims(3);
-        app.video_info.nc = dims(4);
-        app.video_info.nt = dims(5);
+        app.video_info = Program.Helpers.h5_video_info(path);
     else
         [~, ~, ext] = fileparts(path);
         switch lower(ext)

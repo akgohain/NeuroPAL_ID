@@ -25,15 +25,65 @@ def get_slice(dataset: Path, t: int, filename: Optional[str] = None) -> np.ndarr
     global nwbfile
     global nd2file
 
-    filename = dataset / "data.h5" if filename is None else Path(dataset / filename)
+    if filename is None or filename is False or str(filename) == "":
+        filename = dataset / "data.h5"
+    else:
+        filename = Path(filename)
+        if not filename.is_absolute():
+            filename = dataset / filename
 
     if filename.suffix == '.h5':
+        is_data_layout = False
         with h5py.File(filename, 'r') as f:
-            frame = f["data"][t]
-        if frame.ndim == 4:
+            if "data" in f:
+                is_data_layout = True
+                frame = f["data"][t]
+            elif f"t{t}" in f:
+                t_group = f[f"t{t}"]
+                channel_keys = sorted(
+                    [key for key in t_group.keys() if key.startswith("c")],
+                    key=lambda key: int(key[1:]),
+                )
+                if not channel_keys:
+                    raise KeyError(f"Grouped H5 frame /t{t} has no c* channel datasets.")
+                frame = np.stack([np.asarray(t_group[key]) for key in channel_keys], axis=0)
+                # ASCENT grouped H5 stores each channel volume as [Z, Y, X],
+                # which is already ZephIR's expected [C, Z, Y, X] after stacking.
+            else:
+                raise KeyError(
+                    f"Unsupported H5 structure in {filename}: expected /data or /t{t}/c*."
+                )
+        if is_data_layout and frame.ndim == 4:
             # MATLAB writes /data as [Y X Z C T], which h5py exposes as
-            # [T C Z X Y]. ZephIR expects [C Z Y X].
-            frame = np.transpose(frame, [0, 1, 3, 2])
+            # [T C Z X Y]. Native ZephIR H5 is commonly [T C Z Y X].
+            # Use metadata when available so both layouts return [C Z Y X].
+            try:
+                metadata = get_metadata(dataset)
+                expected_zyx = (
+                    metadata["shape_c"],
+                    metadata["shape_z"],
+                    metadata["shape_y"],
+                    metadata["shape_x"],
+                )
+                expected_zxy = (
+                    metadata["shape_c"],
+                    metadata["shape_z"],
+                    metadata["shape_x"],
+                    metadata["shape_y"],
+                )
+            except (FileNotFoundError, KeyError, json.JSONDecodeError):
+                expected_zyx = None
+                expected_zxy = None
+
+            if expected_zyx is not None and tuple(frame.shape) == expected_zyx:
+                pass
+            elif expected_zxy is None or tuple(frame.shape) == expected_zxy:
+                frame = np.transpose(frame, [0, 1, 3, 2])
+            else:
+                raise ValueError(
+                    f"Unsupported H5 frame shape {frame.shape}; expected "
+                    f"{expected_zyx} or {expected_zxy} from metadata."
+                )
     elif filename.suffix == '.nwb':
         if nwbfile is None:
             io = NWBHDF5IO(filename, mode="r")

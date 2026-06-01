@@ -198,8 +198,8 @@ def run_zephir(dataset: Path, args: dict, filename=None):
         state = 'track'
 
     else:
-        zephir = get_checkpoint(dataset, 'zephir', filename=filename)
-        zephod = get_checkpoint(dataset, 'zephod', filename=filename)
+        zephir = n_io.get_checkpoint(dataset, 'zephir', filename=filename)
+        zephod = n_io.get_checkpoint(dataset, 'zephod', filename=filename)
 
     # tracking all frames in _t_list
     if state == 'track':
@@ -221,7 +221,7 @@ def run_zephir(dataset: Path, args: dict, filename=None):
             n_epoch=int(args['--n_epoch']),
             n_epoch_d=(int(args['--n_epoch_d'])
                        if float(args['--lambda_d']) > 0 else 0),
-            _t_list=get_checkpoint(dataset, '_t_list'),
+            _t_list=n_io.get_checkpoint(dataset, '_t_list', filename=filename),
             filename=filename
         )
 
@@ -248,7 +248,12 @@ def run_zephir(dataset: Path, args: dict, filename=None):
 
     now = datetime.datetime.now()
     now_ = now.strftime("%m_%d_%Y_%H_%M_%S")
-    shutil.copy(dataset / 'checkpoint.pt',
+    checkpoint_path = dataset / 'checkpoint.pt'
+    if filename is not None:
+        filename_checkpoint = dataset / f'{filename}_checkpoint.pt'
+        if filename_checkpoint.is_file():
+            checkpoint_path = filename_checkpoint
+    shutil.copy(checkpoint_path,
                 dataset / 'backup' / f'checkpoint_{now_}.pt')
 
     print('\n\n*** DONE!')
@@ -260,8 +265,13 @@ def main():
     args = docopt(__doc__, version=f'ZephIR {__version__}')
     # print(args, '\n')
 
-    dataset = Path(args['--dataset']).parent
-    filename = Path(args['--dataset']).name
+    dataset_arg = Path(args['--dataset'])
+    if dataset_arg.is_dir():
+        dataset = dataset_arg
+        filename = None
+    else:
+        dataset = dataset_arg.parent
+        filename = dataset_arg.name
 
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         print('Running deployed...')
@@ -273,9 +283,9 @@ def main():
         print('Running in a normal Python process...')
 
     run_zephir(
-        dataset=Path(dataset),
+        dataset=dataset,
         args=args,
-        filename=Path(filename),
+        filename=filename,
     )
 
 

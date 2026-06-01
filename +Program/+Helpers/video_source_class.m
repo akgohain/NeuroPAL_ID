@@ -6,7 +6,12 @@ class_name = 'uint8';
 try
     file = char(app.video_info.file);
     if endsWith(lower(file), '.h5')
-        sample = h5read(file, '/data', [1 1 1 1 1], [1 1 1 1 1]);
+        if isfield(app.video_info, 'h5_layout') && strcmp(app.video_info.h5_layout, 'grouped-tc')
+            sample = Program.Helpers.read_h5_video_plane(app.video_info, 1, 1, 1);
+            sample = sample(1);
+        else
+            sample = h5read(file, '/data', [1 1 1 1 1], [1 1 1 1 1]);
+        end
         class_name = class(sample);
         return
     end

@@ -48,6 +48,7 @@ import pandas as pd
 import getters
 import h5py
 import torch
+import n_io
 
 _torch_load = torch.load
 
@@ -103,7 +104,7 @@ def extract_traces(
         dev = 'cpu'
     print(f'\nUsing device: {dev}\n\n')
 
-    container = get_checkpoint(dataset, 'container', verbose=True)
+    container = n_io.get_checkpoint(dataset, 'container', verbose=True, filename=filename)
     container.update({
         'dev': dev,
         'exclude_self': False,
@@ -334,10 +335,17 @@ def extract_traces(
 def main():
     args = docopt(__doc__, version=f'Zephir extract_traces {__version__}')
     print(args, '\n')
+    dataset_arg = Path(args['--dataset'])
+    if dataset_arg.is_dir():
+        dataset = dataset_arg
+        filename = None
+    else:
+        dataset = dataset_arg.parent
+        filename = dataset_arg.name
 
     extract_traces(
-        dataset=Path(args['--dataset']).parent,
-        filename=Path(args['--dataset']).name,
+        dataset=dataset,
+        filename=filename,
         channel=int(args['--channel']) if args['--channel'] else None,
         cuda=args['--cuda'] in ['True', 'Y', 'y'],
         cutoff=float(args['--cutoff']),

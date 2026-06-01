@@ -18,6 +18,7 @@ Options:
     --n_frames=<n_frames>  					number of reference frames to search for. [default: 5]
     --n_iter=<n_iter>  						number of iterations for optimizing results; -1 to uncap. [default: 0]
     --t_list=<t_list>  						frames to analyze.
+    --max_candidate_frames=<max_candidate_frames>   maximum frames to include when --t_list is omitted. [default: 512]
     --channel=<channel>  					data channel to use for calculating correlation coefficients.
     --nx=<nx>  	                            size of x-axis.
     --ny=<ny>  	                            size of y-axis.
@@ -34,6 +35,7 @@ import h5py.h5ac
 import h5py._proxy
 
 import ast
+import hashlib
 from collections import OrderedDict
 from docopt import docopt
 
@@ -62,7 +64,15 @@ def dist_corrcoef(image_1, image_2):
 
     dist = 0
     for x1, x2 in zip(image_1, image_2):
-        dist += (1 - np.corrcoef(x1.ravel(), x2.ravel())[0, 1])/len(image_1)
+        flat_1 = x1.ravel()
+        flat_2 = x2.ravel()
+        if flat_1.size < 2 or flat_2.size < 2:
+            corr = 0.0
+        elif np.std(flat_1) == 0 or np.std(flat_2) == 0:
+            corr = 1.0 if np.array_equal(flat_1, flat_2) else 0.0
+        else:
+            corr = np.corrcoef(flat_1, flat_2)[0, 1]
+        dist += (1 - corr)/len(image_1)
     return dist
 
 
@@ -116,8 +126,64 @@ def get_all_pdists(dataset, filename, shape_t, channel,
 
     d_full = d + np.transpose(d)
     if save:
-        np.save(str(f), d_full, allow_pickle=True)
+        try:
+            np.save(str(f), d_full, allow_pickle=True)
+        except OSError as exc:
+            print(
+                f'Warning: unable to write distance cache {f}: {exc}. '
+                'Continuing without cache.',
+                file=sys.stderr,
+            )
 
+    return d_full
+
+
+def frame_cache_path(dataset, filename, channel, t_list):
+    """Return a cache path scoped to the exact candidate frame list."""
+
+    suffix = hashlib.sha1(np.asarray(t_list, dtype=np.int64).tobytes()).hexdigest()[:12]
+    prefix = f'{filename}_' if filename else ''
+    channel_part = f'_c{channel}' if channel is not None else ''
+    return dataset / f'{prefix}pdcc{channel_part}_frames_{len(t_list)}_{suffix}.npy'
+
+
+def get_candidate_pdists(dataset, filename, t_list, channel,
+                         dist_fn=dist_corrcoef,
+                         load=True, save=True,
+                         scale=(4, 16, 16),
+                         pbar=False
+                         ) -> np.ndarray:
+    """Return pairwise distances only for the requested candidate frames."""
+
+    t_list = [int(t) for t in t_list]
+    cache_file = frame_cache_path(dataset, filename, channel, t_list)
+    if load and cache_file.is_file():
+        pdcc = np.load(str(cache_file), allow_pickle=True)
+        if pdcc.shape == (len(t_list), len(t_list)):
+            return pdcc
+
+    thumbnails = []
+    iterator = tqdm(t_list, desc='Compiling candidate thumbnails', unit='frames', file=sys.stdout)
+    for t in iterator:
+        thumbnails.append(get_thumbnail(dataset, filename, channel, t, scale))
+
+    d = np.zeros((len(t_list), len(t_list)), dtype=np.float32)
+    rows = tqdm(range(len(t_list)), desc='Calculating candidate distances', unit='frames', file=sys.stdout) if pbar else range(len(t_list))
+    for i in rows:
+        for j in range(i + 1, len(t_list)):
+            dist = dist_fn(thumbnails[i], thumbnails[j])
+            d[i, j] = 2.0 if np.isnan(dist) else dist
+
+    d_full = d + np.transpose(d)
+    if save:
+        try:
+            np.save(str(cache_file), d_full, allow_pickle=True)
+        except OSError as exc:
+            print(
+                f'Warning: unable to write distance cache {cache_file}: {exc}. '
+                'Continuing without cache.',
+                file=sys.stderr,
+            )
     return d_full
 
 
@@ -160,7 +226,7 @@ def get_partial_pdists(dataset, filename, shape_t, p_list, channel,
     return d_partial
 
 
-def recommend_frames(dataset, filename, n_frames, n_iter, t_list, channel, metadata, save_to_metadata, verbose):
+def recommend_frames(dataset, filename, n_frames, n_iter, t_list, channel, metadata, save_to_metadata, verbose, max_candidate_frames):
 
     if str(dataset)[-1] == '"':
         dataset = Path(str(dataset)[:-1])
@@ -169,11 +235,24 @@ def recommend_frames(dataset, filename, n_frames, n_iter, t_list, channel, metad
 
     shape_t = metadata['shape_t']
     if t_list is None:
-        t_list = list(range(shape_t))
+        if shape_t > max_candidate_frames:
+            t_list = np.unique(np.linspace(0, shape_t - 1, max_candidate_frames, dtype=int)).tolist()
+            print(
+                f'Using {len(t_list)} evenly spaced candidate frames out of {shape_t}. '
+                'Pass --t_list to override.',
+                flush=True,
+            )
+        else:
+            t_list = list(range(shape_t))
+    t_list = [int(t) for t in t_list]
+    if not t_list:
+        raise ValueError('No candidate frames were provided for reference-frame selection.')
+    if min(t_list) < 0 or max(t_list) >= shape_t:
+        raise ValueError(f'Candidate frames must be in [0, {shape_t - 1}], got range [{min(t_list)}, {max(t_list)}].')
+    n_frames = min(n_frames, len(t_list))
 
     print('Building frame correlation graph...')
-    d_full = get_all_pdists(dataset, filename, shape_t, channel, pbar=True)
-    d_slice = (d_full[t_list, :])[:, t_list]
+    d_slice = get_candidate_pdists(dataset, filename, t_list, channel, pbar=True)
 
     scores = np.mean(d_slice, axis=-1)
     opt_score, med_idx = np.min(scores), np.argmin(scores)
@@ -191,6 +270,7 @@ def recommend_frames(dataset, filename, n_frames, n_iter, t_list, channel, metad
         )
         d_opt = np.min(d_adj, axis=-1)
         iscores = np.mean(d_opt, axis=-1)
+        iscores[i_ref] = np.inf
         opt_score, new_midx = np.min(iscores), np.argmin(iscores)
 
         i_ref.append(new_midx)
@@ -217,6 +297,7 @@ def recommend_frames(dataset, filename, n_frames, n_iter, t_list, channel, metad
                 )
 
             iscores = np.mean(np.min(d_adj, axis=-1), axis=-1)
+            iscores[i_ref_temp] = np.inf
             jscore, new_midx = np.min(iscores), np.argmin(iscores)
 
             if jscore < kscore:
@@ -238,6 +319,13 @@ def recommend_frames(dataset, filename, n_frames, n_iter, t_list, channel, metad
 
 def main():
     args = docopt(__doc__, version=f'ZephIR recommend_frames {__version__}')
+    dataset_arg = Path(args['--dataset'])
+    if dataset_arg.is_dir():
+        dataset = dataset_arg
+        filename = None
+    else:
+        dataset = dataset_arg.parent
+        filename = dataset_arg.name
 
     metadata_dict = {
         'shape_x': int(args['--nx']),
@@ -248,8 +336,8 @@ def main():
     }
 
     t_ref = recommend_frames(
-        dataset=Path(args['--dataset']).parent,
-        filename=Path(args['--dataset']).name,
+        dataset=dataset,
+        filename=filename,
         n_frames=int(args['--n_frames']),
         n_iter=int(args['--n_iter']),
         t_list=parse_literal_arg(args['--t_list'], '--t_list') if args['--t_list'] else None,
@@ -257,6 +345,7 @@ def main():
         metadata=metadata_dict,
         save_to_metadata=args['--save_to_metadata'] in ['True', 'Y', 'y'],
         verbose=args['--verbose'] in ['True', 'Y', 'y'],
+        max_candidate_frames=int(args['--max_candidate_frames']),
     )
 
     return t_ref
