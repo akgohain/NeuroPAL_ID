@@ -1206,10 +1206,12 @@ classdef GUIHandling
             app.UserNeuronIDsListBox.Value = {};
             app.image_neurons = Neurons.Image(sp, app.worm.body, 'scale', app.image_um_scale');
             Methods.Utils.removeNearbyNeurons(app.image_neurons, 2, 2);
+            Program.GUIHandling.center_main_z_on_neurons(app);
             app.SaveIDToFile();
             app.UpdateNeuronLists();
             Program.GUIHandling.gui_lock(app, 'enable', 'neuron_gui');
-            app.DrawImageData();
+            Program.Routines.ID.render();
+            drawnow limitrate;
             uialert(app.CELL_ID, 'Auto-detect completed successfully.', ...
                 'Auto-detect Complete', 'Icon', 'success');
         end
@@ -1226,13 +1228,38 @@ classdef GUIHandling
                     'DatasetID', Program.GUIHandling.param_value(params, 'dataset_id', "000981"));
                 app.SaveIDToFile();
                 app.UpdateNeuronLists();
-                app.DrawImageData();
+                Program.Routines.ID.render();
+                drawnow limitrate;
                 message = Program.GUIHandling.transformer_match_success_message(app);
                 uialert(app.CELL_ID, message, ...
                     'Auto-ID Complete', 'Icon', 'success');
             catch ME
                 uialert(app.CELL_ID, Program.GUIHandling.method_error_message(ME), ...
                     'Auto-ID Failed', 'Icon', 'error');
+            end
+        end
+
+        function center_main_z_on_neurons(app)
+            try
+                if isempty(app.image_neurons) || app.image_neurons.num_neurons() < 1
+                    return
+                end
+                positions = app.image_neurons.get_positions();
+                if isempty(positions) || size(positions, 2) < 3
+                    return
+                end
+                z_value = round(median(double(positions(:, 3)), 'omitnan'));
+                if ~isfinite(z_value)
+                    return
+                end
+                nz = size(app.image_data, 3);
+                z_value = min(max(z_value, 1), nz);
+                Program.Helpers.configure_main_zslider(app, nz, z_value);
+                app.ZSlider.Value = z_value;
+                if isprop(app, 'ZSliderS') && isvalid(app.ZSliderS)
+                    app.ZSliderS.Value = z_value;
+                end
+            catch
             end
         end
 
