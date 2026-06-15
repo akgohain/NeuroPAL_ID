@@ -83,7 +83,7 @@ classdef TransformerAutoId
             end
 
             n = app.image_neurons.num_neurons();
-            prediction_to_neuron = Methods.TransformerAutoId.matchPredictionRows(app, predictions);
+            [prediction_to_neuron, match_stats] = Methods.TransformerAutoId.matchPredictionRows(app, predictions);
             for r = 1:height(predictions)
                 idx = prediction_to_neuron(r);
                 if idx < 1 || idx > n
@@ -103,12 +103,22 @@ classdef TransformerAutoId
                     neuron.probabilistic_probs = double(predictions.confidence(r));
                 end
             end
+            Methods.TransformerAutoId.storeMatchStats(app, match_stats);
         end
 
-        function prediction_to_neuron = matchPredictionRows(app, predictions)
+        function [prediction_to_neuron, stats] = matchPredictionRows(app, predictions)
             n_predictions = height(predictions);
             prediction_to_neuron = zeros(n_predictions, 1);
             n = app.image_neurons.num_neurons();
+            stats = struct( ...
+                'strategy', 'index', ...
+                'predictions', n_predictions, ...
+                'neurons', n, ...
+                'matched', 0, ...
+                'unmatched_predictions', n_predictions, ...
+                'unmatched_neurons', n, ...
+                'max_distance_um', NaN, ...
+                'mean_distance_um', NaN);
 
             coord_fields = {'coord_x_um', 'coord_y_um', 'coord_z_um'};
             has_coords = all(ismember(coord_fields, predictions.Properties.VariableNames));
@@ -131,6 +141,7 @@ classdef TransformerAutoId
 
                     available = true(n, 1);
                     max_distance_um = max(8, 4 * max(neuron_scale(1:3)));
+                    matched_distances = [];
                     for r = 1:n_predictions
                         delta = neuron_um - prediction_um(r, :);
                         distances = sqrt(sum(delta.^2, 2));
@@ -139,10 +150,19 @@ classdef TransformerAutoId
                         if isfinite(best_distance) && best_distance <= max_distance_um
                             prediction_to_neuron(r) = best_idx;
                             available(best_idx) = false;
+                            matched_distances(end + 1, 1) = best_distance; %#ok<AGROW>
                         end
                     end
 
                     if any(prediction_to_neuron > 0)
+                        stats.strategy = 'centroid';
+                        stats.matched = sum(prediction_to_neuron > 0);
+                        stats.unmatched_predictions = n_predictions - stats.matched;
+                        stats.unmatched_neurons = sum(available);
+                        if ~isempty(matched_distances)
+                            stats.max_distance_um = max(matched_distances);
+                            stats.mean_distance_um = mean(matched_distances);
+                        end
                         return
                     end
                 catch
@@ -157,6 +177,19 @@ classdef TransformerAutoId
                         prediction_to_neuron(r) = round(idx);
                     end
                 end
+            end
+            stats.strategy = 'index';
+            stats.matched = sum(prediction_to_neuron > 0);
+            stats.unmatched_predictions = n_predictions - stats.matched;
+            stats.unmatched_neurons = max(0, n - numel(unique(prediction_to_neuron(prediction_to_neuron > 0))));
+        end
+
+        function storeMatchStats(app, stats)
+            try
+                if isprop(app, 'CELL_ID') && ~isempty(app.CELL_ID) && isvalid(app.CELL_ID)
+                    setappdata(app.CELL_ID, 'transformer_autoid_match_stats', stats);
+                end
+            catch
             end
         end
 

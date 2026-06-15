@@ -611,7 +611,7 @@ classdef GUIHandling
 
             button_grid = uigridlayout(grid, ...
                 'RowHeight', {'1x'}, ...
-                'ColumnWidth', {78, '1x', 78, 78}, ...
+                'ColumnWidth', {78, 78, '1x', 78, 78}, ...
                 'ColumnSpacing', 6, ...
                 'Padding', [0 0 0 0]);
             button_grid.Layout.Row = 2;
@@ -624,18 +624,25 @@ classdef GUIHandling
             reset_button.Layout.Row = 1;
             reset_button.Layout.Column = 1;
 
+            browse_button = uibutton(button_grid, 'push', ...
+                'Text', 'Browse', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.browse_main_method_param(table, specs));
+            browse_button.Layout.Row = 1;
+            browse_button.Layout.Column = 2;
+
             apply_button = uibutton(button_grid, 'push', ...
                 'Text', 'Apply', ...
                 'ButtonPushedFcn', @(src, event) ...
                     Program.GUIHandling.apply_main_method_params_table(app, group, specs, table, fig));
             apply_button.Layout.Row = 1;
-            apply_button.Layout.Column = 3;
+            apply_button.Layout.Column = 4;
 
             close_button = uibutton(button_grid, 'push', ...
                 'Text', 'Close', ...
                 'ButtonPushedFcn', @(src, event) close(fig));
             close_button.Layout.Row = 1;
-            close_button.Layout.Column = 4;
+            close_button.Layout.Column = 5;
         end
 
         function fig = create_params_dialog_figure(app, title, num_specs)
@@ -681,6 +688,74 @@ classdef GUIHandling
             end
             table.Data = data;
             Program.GUIHandling.apply_main_method_params_table(app, group, specs, table, []);
+        end
+
+        function browse_main_method_param(table, specs)
+            if isempty(table) || ~isvalid(table) || isempty(specs)
+                return
+            end
+            row = [];
+            try
+                selection = table.Selection;
+                if ~isempty(selection)
+                    row = selection(1, 1);
+                end
+            catch
+                row = [];
+            end
+            if isempty(row) || row < 1 || row > numel(specs)
+                row = find(cellfun(@(spec) isfield(spec, 'path_kind'), specs), 1);
+            end
+            if isempty(row)
+                return
+            end
+
+            spec = specs{row};
+            if ~isfield(spec, 'path_kind')
+                return
+            end
+
+            current_path = "";
+            try
+                current_path = string(table.Data{row, 2});
+            catch
+            end
+            start_dir = Program.GUIHandling.path_start_dir(current_path);
+            switch char(string(spec.path_kind))
+                case 'file'
+                    [file_name, folder_name] = uigetfile({'*.*', 'All Files'}, ...
+                        sprintf('Select %s', spec.label), start_dir);
+                    if isequal(file_name, 0)
+                        return
+                    end
+                    selected = fullfile(folder_name, file_name);
+                case 'folder'
+                    selected = uigetdir(start_dir, sprintf('Select %s', spec.label));
+                    if isequal(selected, 0)
+                        return
+                    end
+                otherwise
+                    return
+            end
+            data = table.Data;
+            data{row, 2} = selected;
+            table.Data = data;
+        end
+
+        function start_dir = path_start_dir(path_value)
+            start_dir = pwd;
+            path_value = char(string(path_value));
+            if isempty(strtrim(path_value))
+                return
+            end
+            if exist(path_value, 'dir') == 7
+                start_dir = path_value;
+                return
+            end
+            parent = fileparts(path_value);
+            if exist(parent, 'dir') == 7
+                start_dir = parent;
+            end
         end
 
         function apply_main_method_params_table(app, group, specs, table, fig)
@@ -769,12 +844,12 @@ classdef GUIHandling
                         struct('key', 'exclusion_radius', 'label', 'Excl um', 'value', default_exclusion, 'limits', [0 100], 'integer', false, 'enabled', true)};
                 case "cellpose"
                     specs = { ...
-                        struct('key', 'model_path', 'label', 'Model', 'value', '', 'limits', [], 'integer', false, 'enabled', true), ...
+                        struct('key', 'model_path', 'label', 'Model', 'value', '', 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'file'), ...
                         struct('key', 'mask_source', 'label', 'Masks', 'value', 'stitched', 'limits', [], 'integer', false, 'enabled', true, 'allowed', {{'stitched', '3d', 'auto'}}), ...
                         struct('key', 'mode', 'label', 'Mode', 'value', 'cellpose', 'limits', [], 'integer', false, 'enabled', true, 'allowed', {{'cellpose', 'stub'}})};
                 case "yolo"
                     specs = { ...
-                        struct('key', 'weights_path', 'label', 'Weights', 'value', '/Users/adamg/neuroPAL/artifacts/swetha_yolo_inf/YOLO INF/best.pt', 'limits', [], 'integer', false, 'enabled', true), ...
+                        struct('key', 'weights_path', 'label', 'Weights', 'value', '/Users/adamg/neuroPAL/artifacts/swetha_yolo_inf/YOLO INF/best.pt', 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'file'), ...
                         struct('key', 'conf', 'label', 'Score', 'value', 0.45, 'limits', [0 1], 'integer', false, 'enabled', true), ...
                         struct('key', 'box_min_px', 'label', 'Box min', 'value', 2, 'limits', [0 512], 'integer', false, 'enabled', true), ...
                         struct('key', 'box_max_px', 'label', 'Box max', 'value', 80, 'limits', [1 2048], 'integer', false, 'enabled', true)};
@@ -792,7 +867,7 @@ classdef GUIHandling
                 case {"gat/transformer", "transformer", "anshita"}
                     specs = { ...
                         struct('key', 'confidence_threshold', 'label', 'Min conf', 'value', 0.5, 'limits', [0 1], 'integer', false, 'enabled', true), ...
-                        struct('key', 'checkpoint_path', 'label', 'Checkpoint', 'value', '/Users/adamg/neuroPAL/artifacts/anshita_transformer', 'limits', [], 'integer', false, 'enabled', true), ...
+                        struct('key', 'checkpoint_path', 'label', 'Checkpoint', 'value', '/Users/adamg/neuroPAL/artifacts/anshita_transformer', 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'folder'), ...
                         struct('key', 'dataset_id', 'label', 'DANDI ID', 'value', '000981', 'limits', [], 'integer', false, 'enabled', true), ...
                         struct('key', 'mc_samples', 'label', 'MC', 'value', 20, 'limits', [1 100], 'integer', true, 'enabled', true), ...
                         struct('key', 'min_neighbors', 'label', 'Min nbr', 'value', 2, 'limits', [0 20], 'integer', true, 'enabled', true), ...
@@ -1036,6 +1111,28 @@ classdef GUIHandling
                 return
             end
 
+            if any(strcmpi(char(id_method), {'Nearest'})) && Program.GUIHandling.is_nwb_backed_image(app)
+                choice = uiconfirm(app.CELL_ID, ...
+                    {'Nearest auto-ID is not reliable for this NWB-backed image representation yet.', ...
+                     '', ...
+                     'Transformer auto-ID is the recommended backend for NWB-derived neuron centroids.'}, ...
+                    'Use Transformer Auto-ID?', ...
+                    'Options', {'Use Transformer', 'Run Nearest Anyway', 'Cancel'}, ...
+                    'DefaultOption', 1, ...
+                    'CancelOption', 3, ...
+                    'Icon', 'warning');
+                if strcmp(choice, 'Use Transformer')
+                    if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
+                        controls.id_dropdown.Value = 'Transformer';
+                    end
+                    Program.GUIHandling.handle_main_id_method_changed(app, 'Transformer');
+                    Program.GUIHandling.run_transformer_auto_id(app);
+                    return
+                elseif strcmp(choice, 'Cancel')
+                    return
+                end
+            end
+
             Program.GUIHandling.invoke_gui_callback(callbacks.auto, src, event);
         end
 
@@ -1152,7 +1249,8 @@ classdef GUIHandling
                 app.SaveIDToFile();
                 app.UpdateNeuronLists();
                 app.DrawImageData();
-                uialert(app.CELL_ID, 'Auto-ID completed successfully.', ...
+                message = Program.GUIHandling.transformer_match_success_message(app);
+                uialert(app.CELL_ID, message, ...
                     'Auto-ID Complete', 'Icon', 'success');
             catch ME
                 uialert(app.CELL_ID, Program.GUIHandling.method_error_message(ME), ...
@@ -1189,6 +1287,47 @@ classdef GUIHandling
                     if ~isempty(report)
                         message = report;
                     end
+            end
+        end
+
+        function tf = is_nwb_backed_image(app)
+            tf = false;
+            try
+                image_file = string(app.image_file);
+                if strlength(image_file) == 0
+                    return
+                end
+                [folder, name, ext] = fileparts(image_file);
+                if strcmpi(ext, '.nwb')
+                    tf = true;
+                    return
+                end
+                tf = exist(fullfile(folder, [name, '.nwb']), 'file') == 2;
+            catch
+                tf = false;
+            end
+        end
+
+        function message = transformer_match_success_message(app)
+            message = 'Auto-ID completed successfully.';
+            try
+                if ~isappdata(app.CELL_ID, 'transformer_autoid_match_stats')
+                    return
+                end
+                stats = getappdata(app.CELL_ID, 'transformer_autoid_match_stats');
+                message = sprintf(['Auto-ID completed successfully.\n\n' ...
+                    'Assignment: %s matching\n' ...
+                    'Matched predictions: %d / %d\n' ...
+                    'Unmatched detections: %d'], ...
+                    char(string(stats.strategy)), ...
+                    round(stats.matched), round(stats.predictions), ...
+                    round(stats.unmatched_neurons));
+                if isfield(stats, 'max_distance_um') && isfinite(stats.max_distance_um)
+                    message = sprintf('%s\nMax match distance: %.2f um', ...
+                        message, stats.max_distance_um);
+                end
+            catch
+                message = 'Auto-ID completed successfully.';
             end
         end
 
