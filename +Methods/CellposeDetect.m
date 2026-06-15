@@ -219,44 +219,22 @@ classdef CellposeDetect
             if ~Methods.CellposeDetect.isCellposeMode(mode)
                 return
             end
-
-            app = Methods.CellposeDetect.currentApp();
-            if isempty(app)
-                return
-            end
-
-            progress = uiprogressdlg(app.CELL_ID, ...
-                'Title', 'Cellpose Detection', ...
-                'Message', 'Preparing Cellpose detection...', ...
-                'Indeterminate', 'on', ...
-                'Cancelable', 'off');
-            drawnow limitrate;
+            progress = Methods.MLProgress.open( ...
+                "Cellpose Detection", "Preparing Cellpose detection...");
         end
 
         function updateProgress(progress, value, message)
-            if isempty(progress) || ~isvalid(progress)
-                return
+            if nargin < 3
+                message = "";
             end
-
-            if nargin >= 3 && ~isempty(message)
-                progress.Message = char(string(message));
+            if nargin < 2
+                value = [];
             end
-            if nargin >= 2 && ~isempty(value) && isfinite(double(value))
-                progress.Indeterminate = 'off';
-                progress.Value = min(max(double(value), 0), 1);
-            end
-            drawnow limitrate;
+            Methods.MLProgress.update(progress, string(message), value);
         end
 
         function closeProgressDialog(progress)
-            if isempty(progress) || ~isvalid(progress)
-                return
-            end
-
-            try
-                close(progress);
-            catch
-            end
+            Methods.MLProgress.close(progress);
         end
 
         function tf = isCellposeMode(mode)

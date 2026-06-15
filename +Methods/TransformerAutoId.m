@@ -194,35 +194,17 @@ classdef TransformerAutoId
         end
 
         function progress = openProgressDialog(app)
-            progress = [];
-            try
-                progress = uiprogressdlg(app.CELL_ID, ...
-                    'Title', 'Transformer Auto-ID', ...
-                    'Message', 'Preparing transformer auto-ID...', ...
-                    'Indeterminate', 'on', ...
-                    'Cancelable', 'off');
-                drawnow limitrate;
-            catch
-                progress = [];
-            end
+            progress = Methods.MLProgress.open( ...
+                "Transformer Auto-ID", "Preparing transformer auto-ID...", ...
+                'App', app);
         end
 
         function updateProgress(progress, message)
-            if isempty(progress) || ~isvalid(progress)
-                return
-            end
-            progress.Message = char(string(message));
-            drawnow limitrate;
+            Methods.MLProgress.update(progress, string(message), []);
         end
 
         function closeProgressDialog(progress)
-            if isempty(progress) || ~isvalid(progress)
-                return
-            end
-            try
-                close(progress);
-            catch
-            end
+            Methods.MLProgress.close(progress);
         end
     end
 end

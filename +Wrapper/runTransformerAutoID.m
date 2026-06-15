@@ -23,6 +23,7 @@ end
 if exist(nwb_path, 'file') ~= 2
     error('Wrapper:MissingNWB', 'NWB file not found: %s', nwb_path);
 end
+local_progress(options.ProgressFcn, 'Checking transformer files...');
 repo_dir = char(options.RepoDir);
 script_path = fullfile(repo_dir, 'run_inference.py');
 if exist(script_path, 'file') ~= 2
@@ -42,6 +43,7 @@ if isempty(python_executable)
     error('Wrapper:NoPython', 'Could not resolve Python. Set NEUROPAL_TRANSFORMER_PYTHON or pass PythonExecutable.');
 end
 
+local_progress(options.ProgressFcn, 'Staging NWB for transformer preprocessing...');
 test_dir = tempname;
 mkdir(test_dir);
 cleanup = onCleanup(@() local_cleanup(test_dir)); %#ok<NASGU>
@@ -70,10 +72,11 @@ if strlength(options.Device) > 0
     command_parts(end+1:end+2) = {'--device', char(options.Device)};
 end
 
-local_progress(options.ProgressFcn, 'Running transformer auto-ID...');
+local_progress(options.ProgressFcn, 'Running transformer preprocessing and inference...');
 local_prepare_python_environment();
 command = sprintf('cd %s && %s', local_shell_quote(repo_dir), local_join_quoted_command(command_parts));
 [status, output] = system(command);
+local_emit_progress_lines(options.ProgressFcn, output);
 if status ~= 0
     friendly_message = local_transformer_failure_message(output, checkpoint_path);
     if ~isempty(friendly_message)
@@ -82,6 +85,7 @@ if status ~= 0
     error('Wrapper:TransformerCommandFailed', 'Transformer auto-ID failed (%d):\n%s', status, output);
 end
 
+local_progress(options.ProgressFcn, 'Reading transformer predictions...');
 run_dir = checkpoint_path;
 if exist(run_dir, 'file') == 2
     run_dir = fileparts(run_dir);
@@ -93,6 +97,7 @@ if exist(csv_path, 'file') ~= 2
 end
 
 predictions = readtable(csv_path, 'TextType', 'string');
+local_progress(options.ProgressFcn, sprintf('Transformer auto-ID finished: %d predictions.', height(predictions)));
 end
 
 function local_validate_checkpoint(checkpoint_path)
@@ -135,6 +140,20 @@ end
 try
     progress_fcn(char(string(message)));
 catch
+end
+end
+
+function local_emit_progress_lines(progress_fcn, output)
+if isempty(output)
+    return
+end
+lines = regexp(char(output), '\r\n|\n|\r', 'split');
+for n = 1:numel(lines)
+    line = strtrim(lines{n});
+    prefix = 'NEUROPAL_PROGRESS:';
+    if startsWith(line, prefix)
+        local_progress(progress_fcn, strtrim(extractAfter(line, strlength(prefix))));
+    end
 end
 end
 

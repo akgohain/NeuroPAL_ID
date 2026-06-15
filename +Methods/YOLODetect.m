@@ -96,38 +96,16 @@ classdef YOLODetect
         end
 
         function progress = openProgressDialog()
-            progress = [];
-            try
-                app = Program.app;
-                if ~isempty(app) && isvalid(app) && isprop(app, 'CELL_ID') && isvalid(app.CELL_ID)
-                    progress = uiprogressdlg(app.CELL_ID, ...
-                        'Title', 'YOLO Detection', ...
-                        'Message', 'Preparing YOLO detection...', ...
-                        'Indeterminate', 'on', ...
-                        'Cancelable', 'off');
-                    drawnow limitrate;
-                end
-            catch
-                progress = [];
-            end
+            progress = Methods.MLProgress.open( ...
+                "YOLO Detection", "Preparing YOLO detection...");
         end
 
         function updateProgress(progress, message)
-            if isempty(progress) || ~isvalid(progress)
-                return
-            end
-            progress.Message = char(string(message));
-            drawnow limitrate;
+            Methods.MLProgress.update(progress, string(message), []);
         end
 
         function closeProgressDialog(progress)
-            if isempty(progress) || ~isvalid(progress)
-                return
-            end
-            try
-                close(progress);
-            catch
-            end
+            Methods.MLProgress.close(progress);
         end
     end
 end
