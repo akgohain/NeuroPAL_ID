@@ -46,15 +46,25 @@ else
     ax.YLim = ylim;
 end
 
-[x_ticks, x_labels] = local_axis_ticks(xlim, scale_xy(1), opts.TargetXTicks, false);
-[y_ticks, y_labels] = local_axis_ticks(ylim, scale_xy(2), opts.TargetYTicks, true);
+[x_ticks, x_labels, x_minor_ticks] = local_axis_ticks(xlim, scale_xy(1), opts.TargetXTicks, false);
+[y_ticks, y_labels, y_minor_ticks] = local_axis_ticks(ylim, scale_xy(2), opts.TargetYTicks, true);
 
 ax.XTick = x_ticks;
 ax.XTickLabel = x_labels;
 ax.YTick = y_ticks;
 ax.YTickLabel = y_labels;
+ax.XTickMode = 'manual';
+ax.YTickMode = 'manual';
+ax.XTickLabelMode = 'manual';
+ax.YTickLabelMode = 'manual';
+Program.Helpers.configure_image_axes_minor_ticks(ax, x_minor_ticks, y_minor_ticks);
 ax.XTickLabelRotation = 0;
 ax.YTickLabelRotation = 0;
+ax.XLabel.String = 'um';
+ax.YLabel.String = 'um';
+if isprop(ax.Title, 'Margin')
+    ax.Title.Margin = 10;
+end
 ax.TickDir = 'out';
 ax.Box = 'on';
 end
@@ -78,12 +88,13 @@ for k = 1:2:numel(varargin)
 end
 end
 
-function [ticks, labels] = local_axis_ticks(limits, scale, target_count, invert_origin)
+function [ticks, labels, minor_ticks] = local_axis_ticks(limits, scale, target_count, invert_origin)
 limits = sort(double(limits));
 span_units = max(0, diff(limits) * scale);
 if span_units <= 0
     ticks = limits(1);
     labels = {'0'};
+    minor_ticks = [];
     return
 end
 
@@ -93,6 +104,8 @@ values = 0:step:span_units;
 if isempty(values)
     values = 0;
 end
+minor_step = step / 5;
+minor_values = 0:minor_step:span_units;
 
 if invert_origin
     ticks = limits(2) - values ./ scale;
@@ -101,19 +114,42 @@ if invert_origin
     values = values(keep);
     ticks = fliplr(ticks);
     values = fliplr(values);
+
+    minor_ticks = limits(2) - minor_values ./ scale;
+    minor_keep = minor_ticks >= limits(1) - eps(limits(1)) & minor_ticks <= limits(2) + eps(limits(2));
+    minor_ticks = fliplr(minor_ticks(minor_keep));
 else
     ticks = limits(1) + values ./ scale;
     keep = ticks >= limits(1) - eps(limits(1)) & ticks <= limits(2) + eps(limits(2));
     ticks = ticks(keep);
     values = values(keep);
+
+    minor_ticks = limits(1) + minor_values ./ scale;
+    minor_keep = minor_ticks >= limits(1) - eps(limits(1)) & minor_ticks <= limits(2) + eps(limits(2));
+    minor_ticks = minor_ticks(minor_keep);
 end
 
 if isempty(ticks)
     ticks = limits(1);
     values = 0;
 end
+minor_ticks = local_remove_major_ticks(minor_ticks, ticks);
 
 labels = arrayfun(@local_format_tick, values, 'UniformOutput', false);
+end
+
+function minor_ticks = local_remove_major_ticks(minor_ticks, major_ticks)
+if isempty(minor_ticks) || isempty(major_ticks)
+    return
+end
+
+keep = true(size(minor_ticks));
+all_ticks = [minor_ticks(:); major_ticks(:)];
+tol = max(1e-9, (max(all_ticks) - min(all_ticks)) * 1e-9);
+for i = 1:numel(major_ticks)
+    keep = keep & abs(minor_ticks - major_ticks(i)) > tol;
+end
+minor_ticks = minor_ticks(keep);
 end
 
 function step = local_nice_step(raw_step)

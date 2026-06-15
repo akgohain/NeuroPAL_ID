@@ -33,12 +33,12 @@ function configure_slice_zslider(slider, n_slices, current_slice, show_labels, l
         slider.Enable = 'on';
     end
 
-    if n_slices <= 8
+    max_labels = 5;
+    if n_slices <= max_labels
         major_ticks = 1:n_slices;
     elseif ~isempty(label_values) && isnumeric(label_values) && numel(label_values) >= n_slices
-        major_ticks = local_major_ticks_from_labels(label_values, n_slices, 8);
+        major_ticks = local_major_ticks_from_labels(label_values, n_slices, max_labels);
     else
-        max_labels = 8;
         major_ticks = unique(round(linspace(1, n_slices, max_labels)));
     end
 

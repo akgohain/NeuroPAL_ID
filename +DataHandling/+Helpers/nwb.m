@@ -71,6 +71,277 @@ classdef nwb
 
         end
 
+        function metadata = image_data_info(file)
+            %IMAGE_DATA_INFO Return HDF5 metadata for the NeuroPAL image volume.
+            %
+            % This intentionally avoids nwbRead. Some files contain valid
+            % NWB/NDX data that older MatNWB releases cannot fully parse
+            % because of unrelated acquisition objects. The NWB/HDMF
+            % on-disk representation exposes neurodata_type attributes and
+            % the underlying data dataset directly, which is enough for
+            % image size probing and fallback conversion.
+
+            acquisition = h5info(file, '/acquisition');
+            candidates = struct('group_path', {}, 'data_path', {}, ...
+                'imaging_volume_path', {}, 'name', {}, 'dims', {}, 'datatype', {}, ...
+                'bytes_per_sample', {}, 'num_bytes', {});
+
+            for i = 1:numel(acquisition.Groups)
+                group = acquisition.Groups(i);
+                neurodata_type = DataHandling.Helpers.nwb.h5_attr(group, 'neurodata_type', '');
+                if ~strcmp(char(string(neurodata_type)), 'MultiChannelVolume')
+                    continue
+                end
+
+                if isempty(group.Datasets)
+                    continue
+                end
+                data_idx = find(strcmp({group.Datasets.Name}, 'data'), 1);
+                if isempty(data_idx)
+                    continue
+                end
+
+                data_path = [group.Name '/data'];
+                data_info = h5info(file, data_path);
+                dims = double(data_info.Dataspace.Size);
+                bytes_per_sample = DataHandling.Helpers.nwb.h5_datatype_bytes(data_info.Datatype);
+                slash_idx = find(group.Name == '/', 1, 'last');
+                if isempty(slash_idx)
+                    group_name = group.Name;
+                else
+                    group_name = group.Name(slash_idx + 1:end);
+                end
+
+                imaging_volume_path = DataHandling.Helpers.nwb.link_target_path( ...
+                    file, [group.Name '/imaging_volume']);
+
+                candidates(end + 1) = struct( ... %#ok<AGROW>
+                    'group_path', group.Name, ...
+                    'data_path', data_path, ...
+                    'imaging_volume_path', imaging_volume_path, ...
+                    'name', group_name, ...
+                    'dims', dims, ...
+                    'datatype', data_info.Datatype, ...
+                    'bytes_per_sample', bytes_per_sample, ...
+                    'num_bytes', prod(dims) * bytes_per_sample);
+            end
+
+            if isempty(candidates)
+                error('DataHandling:Helpers:NWB:NoImageVolume', ...
+                    ['No acquisition group with neurodata_type ' ...
+                     'MultiChannelVolume and a data dataset was found.']);
+            end
+
+            names = string({candidates.name});
+            preferred = find(strcmpi(names, 'NeuroPALImageRaw'), 1);
+            if isempty(preferred)
+                preferred = 1;
+            end
+            metadata = candidates(preferred);
+        end
+
+        function num_bytes = image_data_size_bytes(file)
+            metadata = DataHandling.Helpers.nwb.image_data_info(file);
+            num_bytes = metadata.num_bytes;
+        end
+
+        function target_path = link_target_path(file, path)
+            target_path = path;
+            fid = [];
+            try
+                fid = H5F.open(file, 'H5F_ACC_RDONLY', 'H5P_DEFAULT');
+                cleanup = onCleanup(@() H5F.close(fid)); %#ok<NASGU>
+                link_info = H5L.get_info(fid, path, 'H5P_DEFAULT');
+                if link_info.type == H5ML.get_constant_value('H5L_TYPE_SOFT')
+                    target_path = H5L.get_val(fid, path, 'H5P_DEFAULT');
+                    if isa(target_path, 'uint8') || isa(target_path, 'int8')
+                        target_path = char(target_path(:).');
+                    end
+                end
+            catch
+                target_path = path;
+            end
+        end
+
+        function value = h5_attr(info, name, default_value)
+            value = default_value;
+            if ~isfield(info, 'Attributes') || isempty(info.Attributes)
+                return
+            end
+
+            idx = find(strcmp({info.Attributes.Name}, name), 1);
+            if isempty(idx)
+                return
+            end
+            value = info.Attributes(idx).Value;
+            if iscell(value) && numel(value) == 1
+                value = value{1};
+            end
+            if isa(value, 'uint8') || isa(value, 'int8')
+                value = char(value(:).');
+            end
+        end
+
+        function tf = h5_exists(file, path)
+            tf = false;
+            try
+                h5info(file, path);
+                tf = true;
+            catch
+            end
+        end
+
+        function value = h5_read_numeric(file, path, default_value)
+            value = default_value;
+            if ~DataHandling.Helpers.nwb.h5_exists(file, path)
+                return
+            end
+            try
+                value = h5read(file, path);
+            catch
+                value = default_value;
+            end
+        end
+
+        function values = h5_read_string_vector(file, path)
+            values = strings(1, 0);
+            if ~DataHandling.Helpers.nwb.h5_exists(file, path)
+                return
+            end
+
+            try
+                raw = h5read(file, path);
+                if iscell(raw)
+                    values = string(raw(:)).';
+                elseif isstring(raw)
+                    values = raw(:).';
+                elseif ischar(raw)
+                    values = string(cellstr(raw)).';
+                else
+                    values = string(raw(:)).';
+                end
+            catch
+                values = strings(1, 0);
+            end
+        end
+
+        function [rgbw, dic, gfp] = infer_image_channels(nwb_file, image_group, nc, default_rgbw)
+            if nargin < 4 || isempty(default_rgbw)
+                default_rgbw = 1:min(4, nc);
+            end
+
+            rgbw = DataHandling.Helpers.nwb.h5_read_numeric( ...
+                nwb_file, [image_group '/RGBW_channels'], default_rgbw);
+            rgbw = double(rgbw(:).');
+            if ~isempty(rgbw) && min(rgbw) <= 0
+                rgbw = rgbw + 1;
+            end
+            rgbw = rgbw(isfinite(rgbw));
+            rgbw = round(rgbw);
+            rgbw = rgbw(rgbw >= 1 & rgbw <= nc);
+            if numel(rgbw) < 4
+                fallback = setdiff(1:min(4, nc), rgbw, 'stable');
+                rgbw = [rgbw fallback];
+            end
+            rgbw = rgbw(1:min(4, numel(rgbw)));
+
+            image_info = DataHandling.Helpers.nwb.image_data_info(nwb_file);
+            volume_paths = unique(string({ ...
+                [image_group '/imaging_volume'], ...
+                image_info.imaging_volume_path}), 'stable');
+
+            channel_names = strings(1, 0);
+            for i = 1:numel(volume_paths)
+                channel_names = DataHandling.Helpers.nwb.h5_read_string_vector( ...
+                    nwb_file, char(strcat(volume_paths(i), "/order_optical_channels/channels")));
+                if ~isempty(channel_names)
+                    break
+                end
+            end
+            num_named_channels = numel(channel_names);
+
+            gfp = nan;
+            if ~isempty(channel_names)
+                normalized = lower(channel_names);
+                gfp_idx = find(contains(normalized, 'gcamp') | ...
+                    contains(normalized, 'gfp'), 1);
+                if ~isempty(gfp_idx) && gfp_idx <= nc
+                    gfp = gfp_idx;
+                end
+            end
+            if isnan(gfp) && nc > numel(rgbw)
+                unused = setdiff(1:nc, rgbw, 'stable');
+                if ~isempty(unused)
+                    gfp = unused(1);
+                end
+            end
+
+            dic = nan;
+            if num_named_channels > 0 && nc > num_named_channels
+                dic = nc;
+            end
+        end
+
+        function gamma = image_gamma(file, nc, default_gamma)
+            if nargin < 3 || isempty(default_gamma)
+                default_gamma = 0.8;
+            end
+
+            gamma = DataHandling.Helpers.nwb.h5_read_numeric( ...
+                file, '/processing/NeuroPAL/NeuroPAL_ID/gammas', []);
+            if isempty(gamma)
+                gamma = DataHandling.Helpers.nwb.h5_read_numeric( ...
+                    file, '/processing/NeuroPAL_IDSettings/gammas', []);
+            end
+            if isempty(gamma)
+                gamma = default_gamma;
+            end
+
+            gamma = double(gamma(:).');
+            if numel(gamma) > nc
+                gamma = gamma(1:nc);
+            end
+        end
+
+        function tf = has_neuropal_segmentation(file)
+            candidate_paths = { ...
+                '/processing/NeuroPAL/NeuroPALSegmentation', ...
+                '/processing/NeuroPAL/ImageSegmentation', ...
+                '/processing/NeuroPAL/VolumeSegmentation', ...
+                '/processing/NeuroPAL/NeuroPALNeurons'};
+            tf = false;
+            for i = 1:numel(candidate_paths)
+                if DataHandling.Helpers.nwb.h5_exists(file, candidate_paths{i})
+                    tf = true;
+                    return
+                end
+            end
+        end
+
+        function bytes = h5_datatype_bytes(datatype)
+            bytes = [];
+            if isfield(datatype, 'Size') && ~isempty(datatype.Size)
+                bytes = double(datatype.Size);
+            end
+
+            if isempty(bytes) || ~isfinite(bytes) || bytes <= 0
+                type_text = '';
+                if isfield(datatype, 'Type')
+                    type_text = char(string(datatype.Type));
+                elseif isfield(datatype, 'Class')
+                    type_text = char(string(datatype.Class));
+                end
+                bits = regexp(type_text, '\d+', 'match', 'once');
+                if ~isempty(bits)
+                    bytes = str2double(bits) / 8;
+                end
+            end
+
+            if isempty(bytes) || ~isfinite(bytes) || bytes <= 0
+                bytes = 2;
+            end
+        end
+
         function np_file = to_npal(file, is_video)
             %CONVERTNWB Convert an NWB file to NeuroPAL format.
             %

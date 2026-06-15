@@ -40,7 +40,7 @@ end
 
 app.image_data = current_volume;
 Program.Helpers.update_processing_image_scale(app, actions, source_dims);
-app.image_data_zscored = Methods.Preprocess.zscore_frame(app.image_data);
+app.image_data_zscored = [];
 setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
 
 Program.GUIHandling.clear_processing_preview_cache(app);
@@ -82,6 +82,15 @@ if ~isempty(unsupported)
         sprintf('The %s action is not yet chunk-safe for lazy colormap volumes. Crop/rotate/flip/channel-window actions can be streamed without full materialization.', ...
         strjoin(unsupported, ', ')), ...
         'Chunked Processing Limitation', 'Icon', 'warning');
+        return
+end
+
+non_slice_agnostic = local_non_slice_agnostic_actions(actions);
+if ~isempty(non_slice_agnostic)
+    uialert(app.CELL_ID, ...
+        sprintf('The %s action requires full-volume processing and is not safe for slice-wise lazy execution. Apply on a non-lazy colormap volume instead.', ...
+        strjoin(non_slice_agnostic, ', ')), ...
+        'Chunked Processing Limitation', 'Icon', 'warning');
     return
 end
 
@@ -94,8 +103,7 @@ if numel(dims) < 4 || any(dims(1:4) <= 0)
     return
 end
 
-[folder, name, ~] = fileparts(context.path);
-target_path = fullfile(folder, [name '_processed.mat']);
+target_path = local_processed_mat_path(context.path);
 if exist(target_path, 'file') == 2
     delete(target_path);
 end
@@ -116,8 +124,10 @@ d = uiprogressdlg(app.CELL_ID, ...
     'Indeterminate', 'off');
 cleanup = onCleanup(@() local_close_progress(d));
 
-sample = source.data(:, :, 1, :);
-sample = local_apply_actions_to_slice(app, sample, actions);
+sample_source_z = local_lazy_source_z(actions, dims, 1);
+slice_actions = local_slice_actions(actions);
+sample = source.data(:, :, sample_source_z, :);
+sample = local_apply_actions_to_slice(app, sample, slice_actions);
 sample = local_ensure_4d(sample);
 out_dims = [size(sample, 1), size(sample, 2), dims(3), size(sample, 4)];
 target.data(out_dims(1), out_dims(2), out_dims(3), out_dims(4)) = cast(0, class(sample));
@@ -126,8 +136,9 @@ target.data(:, :, 1, :) = sample;
 for z = 2:dims(3)
     d.Value = z / dims(3);
     d.Message = sprintf('Processing slice %d/%d...', z, dims(3));
-    slice = source.data(:, :, z, :);
-    slice = local_apply_actions_to_slice(app, slice, actions);
+    source_z = local_lazy_source_z(actions, dims, z);
+    slice = source.data(:, :, source_z, :);
+    slice = local_apply_actions_to_slice(app, slice, slice_actions);
     slice = local_ensure_4d(slice);
     target.data(:, :, z, :) = slice;
 end
@@ -175,6 +186,18 @@ for n = 1:numel(actions)
 end
 end
 
+function source_z = local_lazy_source_z(actions, dims, target_z)
+if any(strcmpi(actions, 'mirrorz'))
+    source_z = dims(3) - target_z + 1;
+else
+    source_z = target_z;
+end
+end
+
+function actions = local_slice_actions(actions)
+actions = actions(~strcmpi(actions, 'mirrorz'));
+end
+
 function array = local_ensure_4d(array)
 dims = size(array);
 if numel(dims) == 2
@@ -182,6 +205,21 @@ if numel(dims) == 2
 elseif numel(dims) == 3
     array = reshape(array, dims(1), dims(2), 1, dims(3));
 end
+end
+
+function path = local_processed_mat_path(source_path)
+[folder, name, ~] = fileparts(string(source_path));
+while endsWith(name, '_processed')
+    name = extractBefore(name, strlength(name) - 9);
+end
+path = fullfile(folder, [name '_processed.mat']);
+end
+
+function actions = local_non_slice_agnostic_actions(actions)
+safe_actions = {'zscore', 'histmatch', 'crop', 'hori', 'vert', 'mirrorz', 'rotate', 'cc', 'acc', 'window'};
+unsafe = setdiff(actions, safe_actions);
+unsafe = setdiff(unsafe, {'ds'});
+actions = sort(unique(unsafe));
 end
 
 function local_close_progress(d)

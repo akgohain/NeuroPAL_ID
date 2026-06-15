@@ -173,7 +173,7 @@ classdef NeuroPALImage
             
             % Check the image file version.
             if version < 1
-                
+
                 % Correct the worm info.
                 worm.body = prefs.body_part;
                 worm.age = 'Adult';
@@ -267,52 +267,64 @@ classdef NeuroPALImage
             % First, try to load from NWB file if it exists and companion ID file doesn't
             nwb_file = strrep(image_file, '.mat', '.nwb');
             if exist(nwb_file, 'file') && ~exist(id_file, 'file')
-                try
-                    Program.Helpers.debug_log('Attempting to load neuron data from NWB file: %s\n', nwb_file);
-                    nwb_data = nwbRead(nwb_file);
-                    [neurons_from_nwb, mp_from_nwb] = DataHandling.NeuroPALImage.loadNeuronDataFromNWB(nwb_data, worm.body, info.scale);
-                    
-                    if ~isempty(neurons_from_nwb) || ~isempty(mp_from_nwb)
-                        if ~isempty(neurons_from_nwb)
-                            neurons = neurons_from_nwb;
-                        end
-                        if ~isempty(mp_from_nwb)
-                            mp = mp_from_nwb;
-                        end
-                        version = ProgramInfo.version;
-                        Program.Helpers.debug_log('Successfully loaded neuron data from NWB file\n');
-                    end
-                catch ME
-                    warning(ME.identifier, 'Failed to load neuron data from NWB file: %s', ME.message);
+                if DataHandling.Helpers.nwb.has_neuropal_segmentation(nwb_file)
+                    Program.Helpers.debug_event('NWB', ...
+                        ['NWB segmentation metadata found in "%s", but automatic ' ...
+                         'MatNWB neuron import is skipped during image load.'], ...
+                        nwb_file);
                 end
             end
             
             % If we didn't get data from NWB, try the traditional ID file approach
             if isempty(neurons) && exist(id_file, 'file')
-                
+
                 % Load the neurons file.
                 id_data = load(id_file);
-                
+
                 % Get the ID file version.
                 if isfield(id_data, 'version')
                     version = id_data.version;
                 end
-                
+
                 % Setup the file contents.
-                mp = id_data.mp_params;
+                if isfield(id_data, 'mp_params') && isstruct(id_data.mp_params)
+                    mp = id_data.mp_params;
+                end
+                if ~isstruct(mp)
+                    mp = struct();
+                end
+                if ~isfield(mp, 'hnsz')
+                    mp.hnsz = round(round(3./info.scale')/2)*2+1;
+                end
+                if size(mp.hnsz,1) > 1
+                    mp.hnsz = mp.hnsz';
+                end
+                if ~isfield(mp, 'k')
+                    mp.k = 0;
+                end
+                if ~isfield(mp, 'exclusion_radius')
+                    mp.exclusion_radius = 1.5;
+                end
+                if ~isfield(mp, 'min_eig_thresh')
+                    mp.min_eig_thresh = 0.1;
+                end
 
                 % Check the ID file version.
                 % Version > 1.
                 if version > 1
-                    neurons = id_data.neurons;
-                    
+                    if isfield(id_data, 'neurons')
+                        neurons = id_data.neurons;
+                    end
+
                 % Version 1.
                 elseif version == 1
-                    
+
                     % Create the neurons.
-                    sp = id_data.sp;
+                    if isfield(id_data, 'sp')
+                        sp = id_data.sp;
+                    end
                     neurons = Neurons.Image(sp, worm.body, 'scale', info.scale);
-                    
+
                     % Update the file version.
                     version = ProgramInfo.version;
                     mp_params = mp;
@@ -320,9 +332,11 @@ classdef NeuroPALImage
                 
                 % No version.
                 elseif version < 1
-                    
+
                     % Are there any neurons?
-                    sp = id_data.sp;
+                    if isfield(id_data, 'sp')
+                        sp = id_data.sp;
+                    end
                     if ~isempty(sp)
                         
                         % Correct the neuron colors.
@@ -392,6 +406,7 @@ classdef NeuroPALImage
             np_file = [];
             [image_data, ~] = DataHandling.imreadCZI(czi_file);
             data = image_data.data;
+            image_data.data = [];
             
             % Fix the image orientation and scale.
             % Note: image dimensions are different than matrix dimensions
@@ -470,6 +485,7 @@ classdef NeuroPALImage
             np_file = strrep(czi_file, 'czi', 'mat');
             version = ProgramInfo.version;
             save(np_file, 'version', 'data', 'info', 'prefs', 'worm', '-v7.3');
+            clear data image_data
         end
         
         function np_file = convertND2(nd2_file)
@@ -492,9 +508,12 @@ classdef NeuroPALImage
             import Program.*;
             import DataHandling.*;
             
-            % Open the file.
-            np_file = [];
-            image_data = nwbRead(nwb_file);
+            % Prefer direct HDF5/HDMF image conversion. MatNWB parses the
+            % whole file and can fail on unrelated acquisition objects or
+            % broken ExternalLinks before reaching the NeuroPAL image.
+            np_file = DataHandling.NeuroPALImage.convertNWB_H5(nwb_file);
+            return
+
             data = image_data.acquisition.get('NeuroPALImageRaw').data.load();
         
             data_order = 1:ndims(data);
@@ -525,23 +544,12 @@ classdef NeuroPALImage
             info.scale = grid_spacing_data;
             info.DIC = nan;
                     
-            % Determine the color channels.
-            %colors = image_data.colors;
-            %colors = round(colors/max(colors(:)));
-            npalraw = image_data.acquisition.get('NeuroPALImageRaw');
-            rgbw = npalraw.RGBW_channels.load();
-
-            if min(rgbw) <= 0
-                info.RGBW = rgbw+1;
-            else
-                info.RGBW = rgbw;
-            end
-
-            if size(data, 4) < size(info.RGBW(~isnan(info.RGBW)), 1)
-                info.RGBW = info.RGBW(1:size(data, 4));
-            end
-
-            info.GFP = nan;
+            % Determine the color channels. Channel-order metadata is kept
+            % in HDF5/NDX fields even when MatNWB parses the volume object.
+            image_info = DataHandling.Helpers.nwb.image_data_info(nwb_file);
+            [info.RGBW, info.DIC, info.GFP] = ...
+                DataHandling.Helpers.nwb.infer_image_channels( ...
+                    nwb_file, image_info.group_path, size(data, 4), []);
 
             if any(ismember(image_data.processing.keys, 'NeuroPAL'))
                 if any(ismember(image_data.processing.get('NeuroPAL').dynamictable.keys, 'NeuroPAL_ID'))
@@ -552,13 +560,6 @@ classdef NeuroPALImage
                 end
             else
                 info.gamma = NeuroPALImage.gamma_default;
-            end
-
-            % Did we find the GFP channel?
-            if isnan(info.GFP) && size(data,4) > 4
-                % Assume the first unused channel is GFP.
-                unused = setdiff(1:size(data,4), info.RGBW);
-                info.GFP = unused(1);
             end
 
             % Initialize the worm info.
@@ -572,16 +573,12 @@ classdef NeuroPALImage
                 end
             end
 
-            valid_ages = {'Adult', 'L4', 'L3', 'L2', 'L1'};
-            if ~any(strcmp(valid_ages, image_data.general_subject.growth_stage))
-                worm.age = 'Adult';
-            else
-                worm.age = image_data.general_subject.growth_stage;
-            end
+            worm.age = DataHandling.NeuroPALImage.normalize_age( ...
+                image_data.general_subject.growth_stage);
 
             valid_sexes = {'XX', 'XO'}; % Isn't Massachusetts supposed to be deep blue?
             if ~any(strcmp(valid_sexes, image_data.general_subject.sex))
-                male_syns = {'M','Male', 'm', 'male'};
+                male_syns = {'M','Male', 'm', 'male', 'O', 'o'};
                 if ~any(strcmp(male_syns, image_data.general_subject.sex))
                     worm.sex = 'XX';
                 else
@@ -617,8 +614,141 @@ classdef NeuroPALImage
             
             % Try to load neuron data and detection parameters from NWB file
             [~, ~] = DataHandling.NeuroPALImage.loadNeuronDataFromNWB(image_data, worm.body, info.scale);
-            
+
             % Note: Neuron data is now stored directly in NWB file - no companion ID file created
+        end
+
+        function np_file = convertNWB_H5(nwb_file)
+            %CONVERTNWB_H5 Minimal NeuroPAL image conversion without MatNWB.
+            %
+            % Some valid NWB files trip MatNWB while parsing unrelated
+            % acquisition series metadata. For image loading, we only need
+            % the raw NeuroPAL image volume and a small amount of metadata,
+            % all of which are available directly through HDF5.
+
+            image_info = DataHandling.Helpers.nwb.image_data_info(nwb_file);
+            image_group = image_info.group_path;
+            image_volume_group = image_info.imaging_volume_path;
+
+            data = h5read(nwb_file, image_info.data_path);
+            if ndims(data) >= 4 && size(data, 4) ~= min(size(data))
+                data = permute(data, [3, 4, 2, 1]);
+            end
+
+            info = struct();
+            info.file = nwb_file;
+            info.scale = DataHandling.Helpers.nwb.h5_read_numeric( ...
+                nwb_file, [image_volume_group '/grid_spacing'], []);
+            if isempty(info.scale)
+                info.scale = DataHandling.Helpers.nwb.h5_read_numeric( ...
+                    nwb_file, [image_group '/imaging_volume/grid_spacing'], [1 1 1]);
+            end
+            info.scale = double(info.scale(:).');
+            [info.RGBW, info.DIC, info.GFP] = ...
+                DataHandling.Helpers.nwb.infer_image_channels( ...
+                    nwb_file, image_group, size(data, 4), 1:min(4, size(data, 4)));
+            info.gamma = DataHandling.Helpers.nwb.image_gamma( ...
+                nwb_file, size(data, 4), DataHandling.NeuroPALImage.gamma_default);
+
+            location = DataHandling.NeuroPALImage.h5_read_string( ...
+                nwb_file, [image_volume_group '/location'], '');
+            if isempty(location)
+                location = DataHandling.NeuroPALImage.h5_read_string( ...
+                    nwb_file, [image_group '/imaging_volume/location'], 'Head');
+            end
+            worm.body = DataHandling.NeuroPALImage.normalize_body(location);
+            worm.age = DataHandling.NeuroPALImage.normalize_age( ...
+                DataHandling.NeuroPALImage.h5_read_string( ...
+                    nwb_file, '/general/subject/growth_stage', 'Adult'));
+            worm.sex = DataHandling.NeuroPALImage.normalize_sex( ...
+                DataHandling.NeuroPALImage.h5_read_string(nwb_file, '/general/subject/sex', 'XX'));
+            worm.strain = DataHandling.NeuroPALImage.h5_read_string( ...
+                nwb_file, '/general/subject/strain', '');
+            worm.notes = DataHandling.NeuroPALImage.h5_read_string( ...
+                nwb_file, '/general/subject/description', '');
+
+            prefs.RGBW = info.RGBW;
+            prefs.DIC = info.DIC;
+            prefs.GFP = info.GFP;
+            prefs.gamma = info.gamma;
+            prefs.rotate.horizontal = false;
+            prefs.rotate.vertical = false;
+            prefs.z_center = ceil(size(data, 3) / 2);
+            prefs.is_Z_LR = true;
+            prefs.is_Z_flip = true;
+
+            np_file = strrep(nwb_file, '.nwb', '.mat');
+            version = Program.ProgramInfo.version;
+            save(np_file, 'version', 'data', 'info', 'prefs', 'worm', '-v7.3');
+        end
+
+        function tf = h5_exists(file, path)
+            tf = false;
+            try
+                h5info(file, path);
+                tf = true;
+            catch
+            end
+        end
+
+        function value = h5_read_string(file, path, default_value)
+            value = char(string(default_value));
+            if ~DataHandling.NeuroPALImage.h5_exists(file, path)
+                return
+            end
+            try
+                raw = h5read(file, path);
+                if iscell(raw)
+                    raw = raw{1};
+                end
+                if isa(raw, 'uint8') || isa(raw, 'int8')
+                    value = char(raw(:).');
+                else
+                    value = char(string(raw));
+                end
+            catch
+                value = char(string(default_value));
+            end
+        end
+
+        function body = normalize_body(location)
+            valid_locations = {'Whole Worm', 'Head', 'Midbody', 'Anterior Midbody', ...
+                'Central Midbody', 'Posterior Midbody', 'Tail'};
+            body = 'Head';
+            location = lower(char(string(location)));
+            for j = 1:numel(valid_locations)
+                if contains(lower(valid_locations{j}), location)
+                    body = valid_locations{j};
+                    return
+                end
+            end
+        end
+
+        function sex = normalize_sex(raw_sex)
+            raw_sex = char(string(raw_sex));
+            if any(strcmp(raw_sex, {'XO', 'O', 'o', 'M', 'm', 'Male', 'male'}))
+                sex = 'XO';
+            else
+                sex = 'XX';
+            end
+        end
+
+        function age = normalize_age(raw_age)
+            raw_age = upper(strtrim(char(string(raw_age))));
+            switch raw_age
+                case {'ADULT', 'A', 'YA', 'YOUNG ADULT', 'YOUNG_ADULT', 'DAY 1 ADULT'}
+                    age = 'Adult';
+                case {'L4', 'L4 LARVA', 'L4_LARVA'}
+                    age = 'L4';
+                case {'L3', 'L3 LARVA', 'L3_LARVA'}
+                    age = 'L3';
+                case {'L2', 'L2 LARVA', 'L2_LARVA'}
+                    age = 'L2';
+                case {'L1', 'L1 LARVA', 'L1_LARVA'}
+                    age = 'L1';
+                otherwise
+                    age = 'Adult';
+            end
         end
         
         function [neurons, mp_params] = loadNeuronDataFromNWB(nwb_data, body_part, scale)

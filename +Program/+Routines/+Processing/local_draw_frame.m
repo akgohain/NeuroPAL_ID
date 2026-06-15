@@ -110,6 +110,7 @@ end
 
 function local_configure_frame_ticks(app, ax, frame_size, reset_view)
 scale_xy = local_frame_scale(app, ax);
+local_configure_frame_title(app, ax);
 if reset_view
     Program.Helpers.configure_image_axes_ticks( ...
         ax, frame_size, scale_xy, ...
@@ -118,6 +119,36 @@ if reset_view
 else
     Program.Helpers.configure_image_axes_ticks(ax, frame_size, scale_xy);
 end
+end
+
+function local_configure_frame_title(app, ax)
+try
+    if ~isvalid(app.proc_xyAxes) || ax ~= app.proc_xyAxes
+        return
+    end
+catch
+    return
+end
+
+title_text = "";
+try
+    title_text = string(app.image_name);
+catch
+end
+if strlength(title_text) == 0
+    try
+        title_text = string(app.image_file);
+        [~, title_text, ext] = fileparts(title_text);
+        title_text = title_text + ext;
+    catch
+        title_text = "";
+    end
+end
+
+ax.Title.Interpreter = 'none';
+ax.Title.String = char(title_text);
+ax.TitleFontSizeMultiplier = 2;
+ax.TitleFontWeight = 'bold';
 end
 
 function scale_xy = local_frame_scale(app, ax)

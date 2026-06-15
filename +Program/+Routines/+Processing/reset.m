@@ -23,7 +23,7 @@ function reset()
                 end
                 if ~isempty(app.image_data)
                     app.image_data = app.proc_image.data;
-                    app.image_data_zscored = Methods.Preprocess.zscore_frame(app.image_data);
+                    app.image_data_zscored = [];
                 end
             end
             if isappdata(app.CELL_ID, 'proc_runtime_dirty')

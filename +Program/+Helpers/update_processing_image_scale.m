@@ -48,6 +48,16 @@ for n = 1:numel(actions)
 
         case {'cc', 'acc'}
             scale(1:2) = scale([2 1]);
+
+        case 'rotate'
+            angle = local_processing_rotation_angle(app);
+            if ismember(angle, [90, 270])
+                scale(1:2) = scale([2 1]);
+            else
+                scale(1) = local_preserve_extent_scale(scale(1), dims(2), next_dims(2));
+                scale(2) = local_preserve_extent_scale(scale(2), dims(1), next_dims(1));
+                scale(3) = local_preserve_extent_scale(scale(3), dims(3), next_dims(3));
+            end
     end
 
     dims = next_dims;
@@ -71,5 +81,19 @@ try
         app.image_info.scale = scale;
     end
 catch
+end
+end
+
+function angle = local_processing_rotation_angle(app)
+angle = [];
+if nargin < 1 || isempty(app) || ~isprop(app, 'proc_rot_spinner') || ...
+        isempty(app.proc_rot_spinner) || ~isvalid(app.proc_rot_spinner)
+    return
+end
+
+try
+    angle = Program.GUIHandling.canonical_rotation_angle(app.proc_rot_spinner.Value);
+catch
+    angle = [];
 end
 end

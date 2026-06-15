@@ -1,7 +1,7 @@
 function [render_volume, rgb_channels] = compose_display_volume(raw_volume, channels)
 % Compose the display RGB volume from a canonical channel-state struct.
 
-display_volume = double(Program.Helpers.to_user_uint8(raw_volume));
+display_volume = single(Program.Helpers.to_user_uint8(raw_volume));
 rgb_channels = {channels.r, channels.g, channels.b};
 rgb_names = {'red', 'green', 'blue'};
 n_channels = size(display_volume, 4);
@@ -103,7 +103,7 @@ if ~local_is_neutral_window(settings.low_high_in) || gamma_value ~= 1
         settings.low_high_out, ...
         gamma_value);
 end
-channel_volume = double(channel_volume);
+channel_volume = single(channel_volume);
 end
 
 function tf = local_is_neutral_window(low_high_in)

@@ -19,4 +19,21 @@ function configure_main_zslider(app, n_slices, current_slice)
 
     Program.Helpers.configure_slice_zslider( ...
         app.ZSlider, n_slices, current_slice, true, label_values);
+
+    if n_slices > 1 && isprop(app.ZSlider, 'MinorTicks')
+        app.ZSlider.MinorTicks = local_minor_ticks(n_slices, app.ZSlider.MajorTicks);
+    end
+end
+
+function minor_ticks = local_minor_ticks(n_slices, major_ticks)
+minor_ticks = [];
+
+if n_slices <= 1
+    return
+end
+
+candidate_ticks = setdiff(1:n_slices, major_ticks);
+if numel(candidate_ticks) <= 12
+    minor_ticks = candidate_ticks;
+end
 end

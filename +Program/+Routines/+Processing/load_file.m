@@ -69,7 +69,7 @@ function load_file(mode, path)
                         end
                         if local_should_materialize_colormap(app.proc_image)
                             app.image_data = app.proc_image.data;
-                            app.image_data_zscored = Methods.Preprocess.zscore_frame(app.image_data);
+                            app.image_data_zscored = [];
                             Program.Helpers.debug_event('ProcLoad', ...
                                 'materialized colormap volume for processing: size=%s class=%s', ...
                                 mat2str(size(app.image_data)), class(app.image_data));

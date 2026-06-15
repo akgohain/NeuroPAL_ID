@@ -7,12 +7,17 @@ end
 if nargin < 2 || strlength(string(target)) == 0
     target = "main";
 end
-if nargin < 3 || isempty(display_volume)
-    package = Program.Helpers.get_display_volume(app, target);
-    display_volume = package.display_volume;
-end
-
 target = lower(string(target));
+
+if nargin < 3 || isempty(display_volume)
+    if target == "main"
+        display_volume = Program.Helpers.render_main_display_view(app, app.ZSlider.Value, app.image_view);
+        app.image_view = display_volume;
+    else
+        package = Program.Helpers.get_display_volume(app, target);
+        display_volume = package.display_volume;
+    end
+end
 
 switch target
     case "main"
@@ -27,6 +32,18 @@ switch target
         is_z_flip = false;
     otherwise
         error('Unknown display target: %s', target);
+end
+
+if isstruct(display_volume) && isfield(display_volume, 'renderer') && ...
+        strcmp(char(string(display_volume.renderer)), 'main_display_view')
+    z_gui = Program.Helpers.gui_z_to_data_index(z_gui, size(app.image_data, 3), false);
+    if ~isfield(display_volume, 'z_gui') || display_volume.z_gui ~= z_gui
+        display_volume = Program.Helpers.render_main_display_view(app, z_gui, display_volume);
+        app.image_view = display_volume;
+    end
+    frame = squeeze(display_volume.display_slice);
+    z_data = display_volume.z_data;
+    return
 end
 
 [frame, z_gui, z_data] = Program.Helpers.extract_z_slice(display_volume, z_gui, is_z_flip);

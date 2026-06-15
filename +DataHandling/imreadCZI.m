@@ -215,7 +215,7 @@ end
 % Organize the image volume.
 %numC = numChannels;
 imageData = data{1,1};
-image.data = uint16(nan([image.pixels; numChannels]'));
+image.data = zeros([image.pixels; numChannels]', 'uint16');
 for i=1:size(imageData,1)
     
     % Get the image plane data.
