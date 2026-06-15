@@ -11,8 +11,10 @@ target = lower(string(target));
 
 if nargin < 3 || isempty(display_volume)
     if target == "main"
-        display_volume = Program.Helpers.render_main_display_view(app, app.ZSlider.Value, app.image_view);
-        app.image_view = display_volume;
+        display_volume = Program.Helpers.render_main_display_view(app, app.ZSlider.Value, ...
+            Program.Helpers.main_display_view_cache(app));
+        Program.Helpers.main_display_view_cache(app, display_volume);
+        app.image_view = display_volume.render_volume;
     else
         package = Program.Helpers.get_display_volume(app, target);
         display_volume = package.display_volume;
@@ -39,7 +41,8 @@ if isstruct(display_volume) && isfield(display_volume, 'renderer') && ...
     z_gui = Program.Helpers.gui_z_to_data_index(z_gui, size(app.image_data, 3), false);
     if ~isfield(display_volume, 'z_gui') || display_volume.z_gui ~= z_gui
         display_volume = Program.Helpers.render_main_display_view(app, z_gui, display_volume);
-        app.image_view = display_volume;
+        Program.Helpers.main_display_view_cache(app, display_volume);
+        app.image_view = display_volume.render_volume;
     end
     frame = squeeze(display_volume.display_slice);
     z_data = display_volume.z_data;
