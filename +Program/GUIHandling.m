@@ -1185,11 +1185,13 @@ classdef GUIHandling
             data_rgbw = app.image_data(:, :, :, rgbw);
             readout_rgbw = Methods.Preprocess.zscore_frame(data_rgbw);
             params = Program.GUIHandling.main_method_params(app, 'detect');
+            original_z = Program.GUIHandling.current_main_z(app);
             Program.GUIHandling.auto_detect_log(app, ...
-                'Input channels: rgbw=[%s], data_rgbw=%s, readout=%s', ...
+                'Input channels: rgbw=[%s], data_rgbw=%s, readout=%s, original_z=%s', ...
                 Program.GUIHandling.numvec_summary(rgbw), ...
                 Program.GUIHandling.array_summary(data_rgbw), ...
-                Program.GUIHandling.array_summary(readout_rgbw));
+                Program.GUIHandling.array_summary(readout_rgbw), ...
+                Program.GUIHandling.safe_mat2str(original_z));
             Program.GUIHandling.auto_detect_log(app, ...
                 'Detect params: %s', Program.GUIHandling.struct_summary(params));
 
@@ -1270,10 +1272,11 @@ classdef GUIHandling
                     'After removeNearbyNeurons: count=%d.', app.image_neurons.num_neurons());
 
                 Program.GUIHandling.auto_detect_log(app, ...
-                    'Calling center_main_z_on_neurons...');
-                Program.GUIHandling.center_main_z_on_neurons(app);
+                    'Restoring main Z slider to pre-detect slice %s...', ...
+                    Program.GUIHandling.safe_mat2str(original_z));
+                Program.GUIHandling.normalize_main_zslider(app, original_z);
                 Program.GUIHandling.auto_detect_log(app, ...
-                    'After z-center: slider=%s.', Program.GUIHandling.safe_mat2str(app.ZSlider.Value));
+                    'After Z restore: slider=%s.', Program.GUIHandling.safe_mat2str(app.ZSlider.Value));
 
                 Program.GUIHandling.auto_detect_log(app, ...
                     'Saving ID state...');
@@ -1295,6 +1298,7 @@ classdef GUIHandling
                 Program.GUIHandling.auto_detect_log(app, ...
                     'Calling Program.Routines.ID.render...');
                 Program.Routines.ID.render();
+                Program.GUIHandling.normalize_main_zslider(app, original_z);
                 drawnow limitrate;
                 Program.GUIHandling.auto_detect_log(app, ...
                     'Render complete: final count=%d.', app.image_neurons.num_neurons());
@@ -1547,6 +1551,38 @@ classdef GUIHandling
                     app.ZSliderS.Value = z_value;
                 end
             catch
+            end
+        end
+
+        function z_value = current_main_z(app)
+            nz = size(app.image_data, 3);
+            z_value = round(double(app.ZSlider.Value));
+            if ~isfinite(z_value)
+                z_value = round((nz + 1) / 2);
+            end
+            z_value = min(max(z_value, 1), nz);
+        end
+
+        function normalize_main_zslider(app, z_value)
+            if isempty(app.image_data)
+                return
+            end
+            nz = size(app.image_data, 3);
+            z_value = min(max(round(double(z_value)), 1), nz);
+            Program.Helpers.configure_main_zslider(app, nz, z_value);
+            app.ZSlider.Value = z_value;
+            if isprop(app, 'ZSliderS') && isvalid(app.ZSliderS)
+                app.ZSliderS.Limits = [1, nz];
+                app.ZSliderS.Value = z_value;
+                if isprop(app.ZSliderS, 'MajorTicks') && isprop(app.ZSlider, 'MajorTicks')
+                    app.ZSliderS.MajorTicks = app.ZSlider.MajorTicks;
+                end
+                if isprop(app.ZSliderS, 'MajorTickLabels') && isprop(app.ZSlider, 'MajorTickLabels')
+                    app.ZSliderS.MajorTickLabels = app.ZSlider.MajorTickLabels;
+                end
+                if isprop(app.ZSliderS, 'MinorTicks')
+                    app.ZSliderS.MinorTicks = [];
+                end
             end
         end
 
