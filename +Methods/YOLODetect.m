@@ -21,7 +21,14 @@ classdef YOLODetect
                 options.WeightsPath (1,1) string = ""
                 options.PythonExecutable (1,1) string = ""
                 options.ColorReadoutData = []
+                options.LogFcn = []
             end
+
+            Methods.YOLODetect.log(options.LogFcn, ...
+                'YOLODetect.detect entered: title="%s", data=%s, scale=[%s], conf=%.3f, box=[%.1f %.1f], output="%s", keep_artifacts=%d', ...
+                char(string(titlestr)), Methods.YOLODetect.arraySummary(data), ...
+                Methods.YOLODetect.numvecSummary(scale_um_xyz), options.Conf, ...
+                options.BoxMinPx, options.BoxMaxPx, char(options.OutputDir), options.KeepArtifacts);
 
             progress = Methods.YOLODetect.openProgressDialog();
             cleanup = onCleanup(@() Methods.YOLODetect.closeProgressDialog(progress)); %#ok<NASGU>
@@ -43,8 +50,18 @@ classdef YOLODetect
                 'PythonExecutable', options.PythonExecutable, ...
                 'ProgressFcn', @(message) Methods.YOLODetect.updateProgress(progress, message));
 
+            Methods.YOLODetect.log(options.LogFcn, ...
+                'YOLO wrapper response: fields=[%s], centroids_yxz=%s, raw_boxes=%s, filtered_boxes=%s, summary="%s"', ...
+                strjoin(fieldnames(response), ', '), ...
+                Methods.YOLODetect.responseFieldSummary(response, 'centroids_yxz'), ...
+                Methods.YOLODetect.responseScalarSummary(response, 'raw_boxes'), ...
+                Methods.YOLODetect.responseScalarSummary(response, 'filtered_boxes'), ...
+                Methods.YOLODetect.responseScalarSummary(response, 'summary_path'));
+
             params = Methods.YOLODetect.buildParams(response, 0, options);
             if ~isfield(response, 'centroids_yxz') || isempty(response.centroids_yxz)
+                Methods.YOLODetect.log(options.LogFcn, ...
+                    'YOLO wrapper returned no centroids_yxz; returning empty supervoxels.');
                 supervoxels = [];
                 return
             end
@@ -54,10 +71,19 @@ classdef YOLODetect
                 centroids = reshape(centroids, 1, []);
             end
             centroids = centroids(:, 1:3);
+            Methods.YOLODetect.log(options.LogFcn, ...
+                'YOLO centroids parsed: %d rows, first_rows=%s', ...
+                size(centroids, 1), Methods.YOLODetect.previewRows(centroids, 5));
 
             color_readout_data = Methods.YOLODetect.resolveColorReadoutData(data, options.ColorReadoutData);
+            Methods.YOLODetect.log(options.LogFcn, ...
+                'YOLO color readout resolved: %s', Methods.YOLODetect.arraySummary(color_readout_data));
             supervoxels = Methods.CellposeDetect.centroidsToSupervoxels(centroids, color_readout_data);
             params = Methods.YOLODetect.buildParams(response, size(supervoxels.positions, 1), options);
+            Methods.YOLODetect.log(options.LogFcn, ...
+                'YOLO supervoxels built: positions=%s, first_positions=%s', ...
+                Methods.YOLODetect.arraySummary(supervoxels.positions), ...
+                Methods.YOLODetect.previewRows(supervoxels.positions, 5));
             if ~isfield(params, 'source_title')
                 params.source_title = char(string(titlestr));
             end
@@ -106,6 +132,70 @@ classdef YOLODetect
 
         function closeProgressDialog(progress)
             Methods.MLProgress.close(progress);
+        end
+
+        function log(log_fcn, varargin)
+            if isempty(log_fcn) || ~isa(log_fcn, 'function_handle')
+                return
+            end
+            try
+                log_fcn(sprintf(varargin{:}));
+            catch
+            end
+        end
+
+        function text = arraySummary(value)
+            try
+                dims = size(value);
+                text = sprintf('%s [%s]', class(value), Methods.YOLODetect.numvecSummary(dims));
+            catch
+                text = '<unavailable>';
+            end
+        end
+
+        function text = numvecSummary(value)
+            if isempty(value)
+                text = '';
+                return
+            end
+            text = strjoin(arrayfun(@(v) sprintf('%g', v), double(value(:))', ...
+                'UniformOutput', false), 'x');
+        end
+
+        function text = responseFieldSummary(response, field_name)
+            if ~isfield(response, field_name)
+                text = '<missing>';
+                return
+            end
+            value = response.(field_name);
+            if isempty(value)
+                text = '<empty>';
+                return
+            end
+            text = Methods.YOLODetect.arraySummary(value);
+        end
+
+        function text = responseScalarSummary(response, field_name)
+            if ~isfield(response, field_name)
+                text = '<missing>';
+                return
+            end
+            value = response.(field_name);
+            if isnumeric(value) || islogical(value)
+                text = mat2str(value);
+            else
+                text = char(string(value));
+            end
+        end
+
+        function text = previewRows(values, max_rows)
+            if isempty(values)
+                text = '<empty>';
+                return
+            end
+            n_rows = min(size(values, 1), max_rows);
+            preview = values(1:n_rows, :);
+            text = mat2str(preview, 4);
         end
     end
 end

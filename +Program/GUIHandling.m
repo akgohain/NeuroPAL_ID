@@ -1140,16 +1140,31 @@ classdef GUIHandling
         end
 
         function run_modern_auto_detector(app, backend)
+            Program.GUIHandling.auto_detect_log(app, ...
+                'START backend=%s', char(string(backend)));
             if isempty(app.image_data)
+                Program.GUIHandling.auto_detect_log(app, ...
+                    'ABORT image_data is empty.');
                 return
             end
 
             body = app.BodyDropDown.Value;
             num_neurons = app.neuron_info.numNeurons(body);
+            Program.GUIHandling.auto_detect_log(app, ...
+                'Context: file="%s", body="%s", expected_num_neurons=%s, image_data=%s, scale=[%s]', ...
+                Program.GUIHandling.safe_char(app.image_file), Program.GUIHandling.safe_char(body), ...
+                Program.GUIHandling.safe_mat2str(num_neurons), ...
+                Program.GUIHandling.array_summary(app.image_data), ...
+                Program.GUIHandling.numvec_summary(app.image_um_scale));
             if isempty(num_neurons)
+                Program.GUIHandling.auto_detect_log(app, ...
+                    'ABORT expected neuron count is empty for body="%s".', ...
+                    Program.GUIHandling.safe_char(body));
                 return
             end
             if ~isempty(app.image_neurons) && app.image_neurons.num_neurons() > 0
+                Program.GUIHandling.auto_detect_log(app, ...
+                    'Existing image_neurons count before prompt: %d', app.image_neurons.num_neurons());
                 answer = uiconfirm(app.CELL_ID, ...
                     'Neurons have already been marked, would you like to overwrite them?', ...
                     'Neurons Already Marked', ...
@@ -1158,24 +1173,39 @@ classdef GUIHandling
                     'CancelOption', 2, ...
                     'Icon', 'warning');
                 if strcmpi(answer, 'cancel')
+                    Program.GUIHandling.auto_detect_log(app, ...
+                        'ABORT user canceled overwrite.');
                     return
                 end
+                Program.GUIHandling.auto_detect_log(app, ...
+                    'User confirmed overwrite.');
             end
 
             rgbw = Program.GUIHandling.main_detection_channel_indices(app);
             data_rgbw = app.image_data(:, :, :, rgbw);
             readout_rgbw = Methods.Preprocess.zscore_frame(data_rgbw);
             params = Program.GUIHandling.main_method_params(app, 'detect');
+            Program.GUIHandling.auto_detect_log(app, ...
+                'Input channels: rgbw=[%s], data_rgbw=%s, readout=%s', ...
+                Program.GUIHandling.numvec_summary(rgbw), ...
+                Program.GUIHandling.array_summary(data_rgbw), ...
+                Program.GUIHandling.array_summary(readout_rgbw));
+            Program.GUIHandling.auto_detect_log(app, ...
+                'Detect params: %s', Program.GUIHandling.struct_summary(params));
 
             try
                 switch char(string(backend))
                     case 'cellpose'
+                        Program.GUIHandling.auto_detect_log(app, ...
+                            'Dispatching Cellpose detector.');
                         [sp, app.mp_params] = Methods.CellposeDetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
                             'ColorReadoutData', readout_rgbw, ...
                             'Mode', Program.GUIHandling.param_value(params, 'mode', "cellpose"), ...
                             'ModelPath', Program.GUIHandling.param_value(params, 'model_path', ""), ...
                             'MaskSource', Program.GUIHandling.param_value(params, 'mask_source', "stitched"));
                     case 'yolo'
+                        Program.GUIHandling.auto_detect_log(app, ...
+                            'Dispatching YOLO detector.');
                         [sp, app.mp_params] = Methods.YOLODetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
                             'ColorReadoutData', readout_rgbw, ...
                             'Conf', Program.GUIHandling.param_value(params, 'conf', 0.45), ...
@@ -1183,37 +1213,228 @@ classdef GUIHandling
                             'BoxMaxPx', Program.GUIHandling.param_value(params, 'box_max_px', 80), ...
                             'WeightsPath', Program.GUIHandling.param_value(params, 'weights_path', ""), ...
                             'OutputDir', Program.GUIHandling.yolo_output_dir(app), ...
-                            'KeepArtifacts', true);
+                            'KeepArtifacts', true, ...
+                            'LogFcn', @(message) Program.GUIHandling.auto_detect_log(app, '%s', message));
                     otherwise
+                        Program.GUIHandling.auto_detect_log(app, ...
+                            'ABORT unknown backend="%s".', char(string(backend)));
                         return
                 end
             catch ME
+                Program.GUIHandling.auto_detect_log(app, ...
+                    'ERROR detector threw %s: %s', ME.identifier, ME.message);
                 uialert(app.CELL_ID, Program.GUIHandling.method_error_message(ME), ...
                     'Auto-detect Failed', 'Icon', 'error');
                 return
             end
 
+            Program.GUIHandling.auto_detect_log(app, ...
+                'Detector returned: sp=%s, positions=%s, mp_params=%s', ...
+                Program.GUIHandling.struct_summary(sp), ...
+                Program.GUIHandling.supervoxel_positions_summary(sp), ...
+                Program.GUIHandling.struct_summary(app.mp_params));
             if isempty(sp)
                 detail = Program.GUIHandling.auto_detect_empty_detail(app.mp_params);
+                Program.GUIHandling.auto_detect_log(app, ...
+                    'ABORT detector returned empty sp. detail="%s"', strtrim(detail));
                 uialert(app.CELL_ID, sprintf('Auto-detect failed to find any neurons.%s', detail), ...
                     'Auto-detect Failed', 'Icon', 'error');
                 return
             end
 
+            Program.GUIHandling.auto_detect_log(app, ...
+                'Clearing selected/user ID UI state before neuron import.');
             app.UnselectNeuron();
             app.UserNeuronIDsListBox.Items = {};
             app.UserNeuronIDsListBox.ItemsData = [];
             app.UserNeuronIDsListBox.Value = {};
+            Program.GUIHandling.auto_detect_log(app, ...
+                'Constructing Neurons.Image with %s.', ...
+                Program.GUIHandling.supervoxel_positions_summary(sp));
             app.image_neurons = Neurons.Image(sp, app.worm.body, 'scale', app.image_um_scale');
+            Program.GUIHandling.auto_detect_log(app, ...
+                'Neurons.Image constructed: count=%d.', app.image_neurons.num_neurons());
             Methods.Utils.removeNearbyNeurons(app.image_neurons, 2, 2);
+            Program.GUIHandling.auto_detect_log(app, ...
+                'After removeNearbyNeurons: count=%d.', app.image_neurons.num_neurons());
             Program.GUIHandling.center_main_z_on_neurons(app);
+            Program.GUIHandling.auto_detect_log(app, ...
+                'After z-center: slider=%s.', Program.GUIHandling.safe_mat2str(app.ZSlider.Value));
             app.SaveIDToFile();
+            Program.GUIHandling.auto_detect_log(app, ...
+                'SaveIDToFile complete.');
             app.UpdateNeuronLists();
+            Program.GUIHandling.auto_detect_log(app, ...
+                'UpdateNeuronLists complete: IDd=%d, UnIDd=%d.', ...
+                numel(app.IDdNeuronsListBox.Items), numel(app.UnIDdNeuronsListBox.Items));
             Program.GUIHandling.gui_lock(app, 'enable', 'neuron_gui');
             Program.Routines.ID.render();
             drawnow limitrate;
+            Program.GUIHandling.auto_detect_log(app, ...
+                'Render complete: final count=%d.', app.image_neurons.num_neurons());
             uialert(app.CELL_ID, 'Auto-detect completed successfully.', ...
                 'Auto-detect Complete', 'Icon', 'success');
+        end
+
+        function auto_detect_log(app, varargin)
+            try
+                message = sprintf(varargin{:});
+            catch
+                message = strjoin(string(varargin), ' ');
+            end
+            line = sprintf('[%s] [auto-detect] %s', datestr(now, 'HH:MM:SS.FFF'), message);
+            fprintf('%s\n', line);
+            Program.GUIHandling.cache_auto_detect_log(app, line);
+            Program.GUIHandling.append_auto_detect_log_to_gui(app, line);
+        end
+
+        function cache_auto_detect_log(app, line)
+            try
+                if isempty(app) || ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
+                    return
+                end
+                key = 'autodetect_debug_log';
+                if isappdata(app.CELL_ID, key)
+                    lines = getappdata(app.CELL_ID, key);
+                else
+                    lines = {};
+                end
+                lines{end + 1} = line;
+                if numel(lines) > 1000
+                    lines = lines(end - 999:end);
+                end
+                setappdata(app.CELL_ID, key, lines);
+            catch
+            end
+        end
+
+        function append_auto_detect_log_to_gui(app, line)
+            try
+                prop_names = properties(app);
+            catch
+                return
+            end
+            for i = 1:numel(prop_names)
+                prop_name = prop_names{i};
+                if isempty(regexpi(prop_name, 'log'))
+                    continue
+                end
+                try
+                    control = app.(prop_name);
+                    if isempty(control) || ~isvalid(control)
+                        continue
+                    end
+                    if isa(control, 'matlab.ui.control.TextArea')
+                        value = control.Value;
+                        if ischar(value)
+                            value = cellstr(value);
+                        else
+                            value = cellstr(string(value));
+                        end
+                        value{end + 1} = line;
+                        if numel(value) > 500
+                            value = value(end - 499:end);
+                        end
+                        control.Value = value;
+                    elseif isa(control, 'matlab.ui.control.ListBox')
+                        items = cellstr(string(control.Items));
+                        items{end + 1} = line;
+                        if numel(items) > 500
+                            items = items(end - 499:end);
+                        end
+                        control.Items = items;
+                    end
+                catch
+                end
+            end
+        end
+
+        function text = array_summary(value)
+            try
+                text = sprintf('%s [%s]', class(value), ...
+                    Program.GUIHandling.numvec_summary(size(value)));
+            catch
+                text = '<unavailable>';
+            end
+        end
+
+        function text = numvec_summary(value)
+            if isempty(value)
+                text = '';
+                return
+            end
+            text = strjoin(arrayfun(@(v) sprintf('%g', v), double(value(:))', ...
+                'UniformOutput', false), 'x');
+        end
+
+        function text = safe_mat2str(value)
+            try
+                text = mat2str(value);
+            catch
+                text = char(string(value));
+            end
+        end
+
+        function text = safe_char(value)
+            try
+                text = char(string(value));
+            catch
+                text = '<unavailable>';
+            end
+        end
+
+        function text = struct_summary(value)
+            if isempty(value)
+                text = '<empty>';
+                return
+            end
+            if ~isstruct(value)
+                text = Program.GUIHandling.array_summary(value);
+                return
+            end
+            fields = fieldnames(value);
+            parts = cell(1, numel(fields));
+            for i = 1:numel(fields)
+                field_name = fields{i};
+                try
+                    field_value = value.(field_name);
+                    if isnumeric(field_value) || islogical(field_value)
+                        if isscalar(field_value)
+                            summary = mat2str(field_value);
+                        else
+                            summary = Program.GUIHandling.array_summary(field_value);
+                        end
+                    elseif isstring(field_value) || ischar(field_value)
+                        summary = Program.GUIHandling.safe_char(field_value);
+                    else
+                        summary = Program.GUIHandling.array_summary(field_value);
+                    end
+                catch
+                    summary = '<unavailable>';
+                end
+                parts{i} = sprintf('%s=%s', field_name, summary);
+            end
+            text = strjoin(parts, '; ');
+        end
+
+        function text = supervoxel_positions_summary(sp)
+            if isempty(sp)
+                text = '<empty sp>';
+                return
+            end
+            if ~isstruct(sp) || ~isfield(sp, 'positions')
+                text = '<sp.positions missing>';
+                return
+            end
+            positions = sp.positions;
+            if isempty(positions)
+                text = '<empty positions>';
+                return
+            end
+            n_rows = min(size(positions, 1), 5);
+            text = sprintf('positions=%s first=%s', ...
+                Program.GUIHandling.array_summary(positions), ...
+                mat2str(positions(1:n_rows, :), 4));
         end
 
         function run_transformer_auto_id(app)
