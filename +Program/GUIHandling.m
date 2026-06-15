@@ -1245,8 +1245,10 @@ classdef GUIHandling
             Program.GUIHandling.auto_detect_log(app, ...
                 'Clearing selected/user ID UI state before neuron import.');
             try
-                Program.GUIHandling.try_auto_detect_ui_step(app, 'UnselectNeuron', ...
-                    @() app.UnselectNeuron());
+                Program.GUIHandling.try_auto_detect_ui_step(app, 'Program.Handlers.neurons.unselect_neuron', ...
+                    @() Program.Handlers.neurons.unselect_neuron(false));
+                Program.GUIHandling.try_auto_detect_ui_step(app, 'clear selected_neuron', ...
+                    @() set(app, 'selected_neuron', []));
                 Program.GUIHandling.try_auto_detect_ui_step(app, 'clear UserNeuronIDsListBox.Items', ...
                     @() set(app.UserNeuronIDsListBox, 'Items', {}));
                 Program.GUIHandling.try_auto_detect_ui_step(app, 'clear UserNeuronIDsListBox.ItemsData', ...
@@ -1274,14 +1276,14 @@ classdef GUIHandling
                     'After z-center: slider=%s.', Program.GUIHandling.safe_mat2str(app.ZSlider.Value));
 
                 Program.GUIHandling.auto_detect_log(app, ...
-                    'Calling SaveIDToFile...');
-                app.SaveIDToFile();
+                    'Saving ID state...');
+                Program.GUIHandling.save_auto_detect_id_state(app);
                 Program.GUIHandling.auto_detect_log(app, ...
-                    'SaveIDToFile complete.');
+                    'ID state save complete.');
 
                 Program.GUIHandling.auto_detect_log(app, ...
-                    'Calling UpdateNeuronLists...');
-                app.UpdateNeuronLists();
+                    'Calling Program.Routines.ID.hot_neuron_reset...');
+                Program.Routines.ID.hot_neuron_reset();
                 Program.GUIHandling.auto_detect_log(app, ...
                     'UpdateNeuronLists complete: IDd=%d, UnIDd=%d.', ...
                     numel(app.IDdNeuronsListBox.Items), numel(app.UnIDdNeuronsListBox.Items));
@@ -1392,6 +1394,27 @@ classdef GUIHandling
             end
         end
 
+        function save_auto_detect_id_state(app)
+            if isempty(app.image_neurons)
+                error('Program:GUIHandling:NoImageNeurons', ...
+                    'Cannot save auto-detect results because image_neurons is empty.');
+            end
+            if ~isprop(app, 'id_file') || isempty(app.id_file)
+                error('Program:GUIHandling:NoIDFile', ...
+                    'Cannot save auto-detect results because app.id_file is empty.');
+            end
+
+            id_file = char(string(app.id_file));
+            version = Program.ProgramInfo.version;
+            neurons = app.image_neurons;
+            mp_params = app.mp_params;
+            if isempty(mp_params) || ~isstruct(mp_params)
+                mp_params = struct();
+            end
+            mp_params.k = neurons.num_neurons();
+            save(id_file, 'version', 'neurons', 'mp_params', '-v7.3');
+        end
+
         function text = array_summary(value)
             try
                 text = sprintf('%s [%s]', class(value), ...
@@ -1490,8 +1513,8 @@ classdef GUIHandling
                     'BatchSize', Program.GUIHandling.param_value(params, 'batch_size', 32), ...
                     'CheckpointPath', Program.GUIHandling.param_value(params, 'checkpoint_path', "/Users/adamg/neuroPAL/artifacts/anshita_transformer"), ...
                     'DatasetID', Program.GUIHandling.param_value(params, 'dataset_id', "000981"));
-                app.SaveIDToFile();
-                app.UpdateNeuronLists();
+                Program.GUIHandling.save_auto_detect_id_state(app);
+                Program.Routines.ID.hot_neuron_reset();
                 Program.Routines.ID.render();
                 drawnow limitrate;
                 message = Program.GUIHandling.transformer_match_success_message(app);
