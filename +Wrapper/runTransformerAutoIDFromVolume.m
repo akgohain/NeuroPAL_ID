@@ -1,5 +1,5 @@
 function predictions = runTransformerAutoIDFromVolume(volume_yxzc, positions_yxz, scale_um_xyz, options)
-%RUNTRANSFORMERAUTOIDFROMVOLUME Stage app data as NWB and run transformer auto-ID.
+%RUNTRANSFORMERAUTOIDFROMVOLUME Run transformer auto-ID from app volume arrays.
 
 arguments
     volume_yxzc
@@ -41,16 +41,15 @@ if exist(output_dir, 'dir') ~= 7
 end
 
 cleanup = onCleanup(@() local_cleanup(output_dir, options.KeepArtifacts)); %#ok<NASGU>
-local_progress(options.ProgressFcn, 'Staging app volume for transformer auto-ID...');
+local_progress(options.ProgressFcn, 'Staging app volume request for transformer auto-ID...');
 
 request_path = fullfile(output_dir, 'transformer_stage_request.mat');
-staged_nwb_path = fullfile(output_dir, 'neuropal_app_transformer_stage.nwb');
 request = struct();
 request.volume = volume_yxzc;
 request.positions_yxz = positions_yxz;
 request.scale_um_xyz = scale_um_xyz(:)';
 request.labels = cellstr(string(options.Labels(:)));
-request.output_path = staged_nwb_path;
+request.animal_id = 'neuropal_app_volume';
 save(request_path, '-struct', 'request', '-v7');
 
 python_executable = local_pick_python(char(options.PythonExecutable));
@@ -58,34 +57,56 @@ if isempty(python_executable)
     error('Wrapper:NoPython', 'Could not resolve Python. Set NEUROPAL_TRANSFORMER_PYTHON or pass PythonExecutable.');
 end
 
-script_path = fullfile(fileparts(mfilename('fullpath')), 'stage_transformer_nwb.py');
-command_parts = {python_executable, script_path, '--request', request_path};
-command = local_join_quoted_command(command_parts);
+repo_dir = char(options.RepoDir);
+script_path = fullfile(repo_dir, 'run_app_volume_inference.py');
+if exist(script_path, 'file') ~= 2
+    error('Wrapper:MissingTransformerVolumeScript', 'run_app_volume_inference.py not found: %s', script_path);
+end
+checkpoint_path = char(options.CheckpointPath);
+if exist(checkpoint_path, 'file') ~= 2 && exist(checkpoint_path, 'dir') ~= 7
+    error('Wrapper:MissingTransformerCheckpoint', ...
+        ['Transformer checkpoint path not found: %s\n\n' ...
+         'Set the transformer checkpoint path to a run directory containing best_model.pt, ' ...
+         'or pass CheckpointPath to Wrapper.runTransformerAutoIDFromVolume.'], checkpoint_path);
+end
+
+command_parts = { ...
+    python_executable, script_path, ...
+    '--checkpoint_path', checkpoint_path, ...
+    '--request_mat', request_path, ...
+    '--batch_size', num2str(round(options.BatchSize)), ...
+    '--min_neighbors', num2str(round(options.MinNeighbors)), ...
+    '--mc_samples', num2str(round(options.MCSamples)), ...
+    '--confidence_threshold', num2str(options.ConfidenceThreshold), ...
+    '--uncertainty_threshold', num2str(options.UncertaintyThreshold), ...
+    '--quality_threshold', num2str(options.QualityThreshold), ...
+    '--dataset_id', char(options.DatasetID), ...
+    '--output_name', char(options.OutputName)};
+if strlength(options.Device) > 0
+    command_parts(end+1:end+2) = {'--device', char(options.Device)};
+end
+
+local_prepare_python_environment();
+command = sprintf('cd %s && %s', local_shell_quote(repo_dir), local_join_quoted_command(command_parts));
 [status, output] = system(command);
 local_emit_progress_lines(options.ProgressFcn, output);
 if status ~= 0
-    error('Wrapper:TransformerStageFailed', 'Could not stage transformer NWB (%d):\n%s', status, output);
-end
-if exist(staged_nwb_path, 'file') ~= 2
-    error('Wrapper:TransformerMissingStage', 'Staged transformer NWB missing: %s', staged_nwb_path);
+    friendly_message = local_transformer_failure_message(output, checkpoint_path);
+    if ~isempty(friendly_message)
+        error('Wrapper:TransformerUnavailable', '%s', friendly_message);
+    end
+    error('Wrapper:TransformerCommandFailed', 'Transformer app-volume auto-ID failed (%d):\n%s', status, output);
 end
 
-predictions = Wrapper.runTransformerAutoID(staged_nwb_path, ...
-    'PythonExecutable', python_executable, ...
-    'RepoDir', options.RepoDir, ...
-    'CheckpointPath', options.CheckpointPath, ...
-    'BatchSize', options.BatchSize, ...
-    'NumWorkers', options.NumWorkers, ...
-    'PreprocessWorkers', options.PreprocessWorkers, ...
-    'MinNeighbors', options.MinNeighbors, ...
-    'MCSamples', options.MCSamples, ...
-    'ConfidenceThreshold', options.ConfidenceThreshold, ...
-    'UncertaintyThreshold', options.UncertaintyThreshold, ...
-    'QualityThreshold', options.QualityThreshold, ...
-    'Device', options.Device, ...
-    'DatasetID', options.DatasetID, ...
-    'OutputName', options.OutputName, ...
-    'ProgressFcn', options.ProgressFcn);
+run_dir = checkpoint_path;
+if exist(run_dir, 'file') == 2
+    run_dir = fileparts(run_dir);
+end
+csv_path = fullfile(run_dir, char(options.OutputName));
+if exist(csv_path, 'file') ~= 2
+    error('Wrapper:MissingTransformerPredictions', 'Prediction CSV missing: %s', csv_path);
+end
+predictions = readtable(csv_path, 'TextType', 'string');
 end
 
 function local_cleanup(output_dir, keep_artifacts)
@@ -155,6 +176,41 @@ for n = 1:numel(lines)
     prefix = 'NEUROPAL_PROGRESS:';
     if startsWith(line, prefix)
         local_progress(progress_fcn, strtrim(extractAfter(line, strlength(prefix))));
+    end
+end
+end
+
+function message = local_transformer_failure_message(output, checkpoint_path)
+message = '';
+output_text = lower(char(string(output)));
+if contains(output_text, 'no module named') || contains(output_text, 'modulenotfounderror') || ...
+        contains(output_text, 'torch') || contains(output_text, 'pynwb')
+    message = ['Transformer dependencies are not available in the selected Python environment. ' ...
+        'Set NEUROPAL_TRANSFORMER_PYTHON to the GAT environment or install its requirements.'];
+    return
+end
+if contains(output_text, 'checkpoint') || contains(output_text, 'best_model.pt') || ...
+        contains(output_text, 'no such file') || contains(output_text, 'filenotfounderror')
+    message = sprintf(['Transformer checkpoint could not be loaded from %s. ' ...
+        'Point the method settings to a checkpoint directory containing best_model.pt.'], checkpoint_path);
+end
+end
+
+function local_prepare_python_environment()
+cache_roots = {
+    'MPLCONFIGDIR', fullfile(tempdir, 'neuropal_matplotlib')
+    'XDG_CONFIG_HOME', fullfile(tempdir, 'neuropal_config')
+    };
+for i = 1:size(cache_roots, 1)
+    key = cache_roots{i, 1};
+    value = cache_roots{i, 2};
+    if isempty(strtrim(getenv(key)))
+        setenv(key, value);
+    else
+        value = getenv(key);
+    end
+    if exist(value, 'dir') ~= 7
+        mkdir(value);
     end
 end
 end
