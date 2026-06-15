@@ -80,7 +80,6 @@ if ~isempty(app.image_data)
     Program.Helpers.configure_main_zslider(app, nz, z_value);
     app.ZSlider.Value = z_value;
     if isprop(app, 'ZSliderS') && isvalid(app.ZSliderS)
-        app.ZSliderS.Limits = [1, nz];
         app.ZSliderS.Value = z_value;
     end
 end

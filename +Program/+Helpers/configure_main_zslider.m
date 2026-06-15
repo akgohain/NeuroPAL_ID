@@ -29,4 +29,19 @@ function configure_main_zslider(app, n_slices, current_slice)
     if isprop(app.ZSlider, 'MinorTicks')
         app.ZSlider.MinorTicks = minor_ticks;
     end
+
+    has_secondary_slider = ...
+        (isstruct(app) && isfield(app, 'ZSliderS')) || ...
+        (~isstruct(app) && isprop(app, 'ZSliderS'));
+    if has_secondary_slider && ~isempty(app.ZSliderS) && isvalid(app.ZSliderS)
+        Program.Helpers.configure_slice_zslider( ...
+            app.ZSliderS, n_slices, current_slice, false, []);
+        app.ZSliderS.MajorTicks = major_ticks;
+        if isprop(app.ZSliderS, 'MajorTickLabels')
+            app.ZSliderS.MajorTickLabels = tick_labels;
+        end
+        if isprop(app.ZSliderS, 'MinorTicks')
+            app.ZSliderS.MinorTicks = minor_ticks;
+        end
+    end
 end

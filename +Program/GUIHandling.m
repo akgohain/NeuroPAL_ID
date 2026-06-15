@@ -1572,17 +1572,7 @@ classdef GUIHandling
             Program.Helpers.configure_main_zslider(app, nz, z_value);
             app.ZSlider.Value = z_value;
             if isprop(app, 'ZSliderS') && isvalid(app.ZSliderS)
-                app.ZSliderS.Limits = [1, nz];
                 app.ZSliderS.Value = z_value;
-                if isprop(app.ZSliderS, 'MajorTicks') && isprop(app.ZSlider, 'MajorTicks')
-                    app.ZSliderS.MajorTicks = app.ZSlider.MajorTicks;
-                end
-                if isprop(app.ZSliderS, 'MajorTickLabels') && isprop(app.ZSlider, 'MajorTickLabels')
-                    app.ZSliderS.MajorTickLabels = app.ZSlider.MajorTickLabels;
-                end
-                if isprop(app.ZSliderS, 'MinorTicks')
-                    app.ZSliderS.MinorTicks = [];
-                end
             end
         end
 
@@ -3551,7 +3541,6 @@ classdef GUIHandling
                 Program.Helpers.configure_main_zslider(app, size(app.image_data, 3), current_z);
                 app.ZSlider.Value = current_z;
                 if isprop(app, 'ZSliderS') && isvalid(app.ZSliderS)
-                    app.ZSliderS.Limits = [1, size(app.image_data, 3)];
                     app.ZSliderS.Value = current_z;
                 end
                 if ~is_live && ~isempty(app.image_view)

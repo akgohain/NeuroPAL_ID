@@ -55,7 +55,6 @@ current_z = min(max(round(app.proc_zSlider.Value), 1), render_dims(3));
 Program.Helpers.configure_main_zslider(app, render_dims(3), current_z);
 app.ZSlider.Value = current_z;
 if isprop(app, 'ZSliderS') && isvalid(app.ZSliderS)
-    app.ZSliderS.Limits = [1, render_dims(3)];
     app.ZSliderS.Value = current_z;
 end
 

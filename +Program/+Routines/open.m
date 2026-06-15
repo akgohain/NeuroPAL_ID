@@ -256,7 +256,8 @@ function open(path)
         app.is_opening_file = false;
         return;
     end
-    Program.Helpers.configure_main_zslider(app, num_z_slices);
+    initial_z_slice = round(num_z_slices / 2);
+    Program.Helpers.configure_main_zslider(app, num_z_slices, initial_z_slice);
 
     % Setup the z-axis orientation.
     app.ZCenterEditField.Value = round((prefs.z_center - 1) * info.scale(3), 1);
@@ -311,7 +312,7 @@ function open(path)
     end
 
     % Go to the middle.
-    app.ZSlider.Value = round(num_z_slices / 2);
+    Program.Helpers.configure_main_zslider(app, num_z_slices, initial_z_slice);
 
     % Draw the neurons in this z-slice.
     Program.Routines.ID.get_slice(app.ZSlider, app.image_view, app.XY);

@@ -171,11 +171,11 @@ classdef TransformerAutoId
         end
 
         function refreshAppUI(app)
-            Methods.TransformerAutoId.drawAutoIdList(app);
             try
                 Program.Routines.ID.hot_neuron_reset();
             catch
             end
+            Methods.TransformerAutoId.drawAutoIdList(app);
             try
                 Program.Routines.ID.render();
             catch
@@ -239,6 +239,11 @@ classdef TransformerAutoId
             app.UserNeuronIDsListBox.Items = rows(sort_i);
             app.UserNeuronIDsListBox.ItemsData = ranks(:)';
             app.UserNeuronIDsListBox.Value = {};
+            try
+                app.UserNeuronIDsListBoxLabel.Text = sprintf('Auto-ID Neuron IDs = %d/%d', ...
+                    numel(rows), app.image_neurons.num_neurons());
+            catch
+            end
         end
 
         function clearAutoIdList(app)
@@ -246,6 +251,7 @@ classdef TransformerAutoId
                 app.UserNeuronIDsListBox.Items = {};
                 app.UserNeuronIDsListBox.ItemsData = [];
                 app.UserNeuronIDsListBox.Value = {};
+                app.UserNeuronIDsListBoxLabel.Text = 'User Neuron IDs';
             catch
             end
         end
