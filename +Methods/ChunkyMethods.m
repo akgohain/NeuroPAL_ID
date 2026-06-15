@@ -40,7 +40,7 @@ classdef ChunkyMethods
                     new_dims(1:2) = target_xy;
                     new_dims(3) = numel(target_slices);
 
-                case {'hori', 'vert'}
+                case {'hori', 'vert', 'mirrorz'}
                     new_dims = og_dims;
 
                 case {'cc', 'acc'}
@@ -74,21 +74,24 @@ classdef ChunkyMethods
                     output_slice = Program.crop_rotate_gui.apply_mask(app, slice);
 
                 case 'hori'
-                    output_slice = slice(:,end:-1:1,end:-1:1,:,:);
+                    output_slice = slice(:,end:-1:1,:,:);
 
                 case 'vert'
-                    output_slice = slice(end:-1:1,:,end:-1:1,:,:);
+                    output_slice = slice(end:-1:1,:,:,:);
+
+                case 'mirrorz'
+                    output_slice = slice;
 
                 case 'rotate'
                     output_slice = imrotate(slice, app.proc_rot_spinner.Value);
 
                 case 'cc'
                     temp_slice = permute(slice, [2,1,3,4]);
-                    output_slice = temp_slice(:,end:-1:1,:,:,:);
+                    output_slice = temp_slice(:,end:-1:1,:,:);
 
                 case 'acc'
                     temp_slice = permute(slice, [2,1,3,4]);
-                    output_slice = temp_slice(end:-1:1,:,:,:,:);
+                    output_slice = temp_slice(end:-1:1,:,:,:);
 
                 case 'ds'
                     [target_xy, target_slices] = Methods.ChunkyMethods.proc_downsample_targets(app, ...
@@ -110,6 +113,9 @@ classdef ChunkyMethods
             switch action
                 case 'debleed'
                     processed_vol = Methods.ChunkyMethods.debleed(app, vol);
+
+                case 'mirrorz'
+                    processed_vol = vol(:, :, end:-1:1, :);
 
                 otherwise
                     [new_dims, old_dims] = Methods.ChunkyMethods.calc_pp_size(app, action, vol);
@@ -190,7 +196,7 @@ classdef ChunkyMethods
 
             app.image_data = current_vol;
             Program.Helpers.update_processing_image_scale(app, actions, source_dims);
-            app.image_data_zscored = Methods.Preprocess.zscore_frame(app.image_data);
+            app.image_data_zscored = [];
             setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
             Program.Helpers.write_processing_colormap_to_file(app);
         end

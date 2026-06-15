@@ -72,7 +72,11 @@ classdef ProgramInfo
             % If the reference is empty or invalid, try to find it.
             if  is_uninitialized || is_invalid               
                 window_handle = Program.ProgramInfo.window();
-                app_handle = window_handle.RunningAppInstance;
+                if ~isempty(window_handle) && isprop(window_handle, 'RunningAppInstance')
+                    app_handle = window_handle.RunningAppInstance;
+                else
+                    app_handle = [];
+                end
             end
         
             % Return the persistent variable.

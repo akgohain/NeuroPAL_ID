@@ -41,10 +41,11 @@ classdef neuron_gui
             app = Program.ProgramInfo.app;
 
             % If no id_file was was passed...
-            if nargin ~= 2
+            if nargin < 2 || isempty(id_file)
                 % Set id_file equal to the default id file.
                 id_file = app.id_file;
             end
+            app.id_file = id_file;
 
             % Check whether an ID file has been defined.
             have_known_id_file = ~isempty(id_file);
@@ -52,7 +53,7 @@ classdef neuron_gui
             % If if has...
             if have_known_id_file
                 % Check whether this ID file actually exists.
-                if ~exist(app.id_file, 'file')
+                if ~exist(id_file, 'file')
                     % If it doesn't, create it.
                     obj.create_id_file();
                 end
@@ -62,7 +63,7 @@ classdef neuron_gui
                 mp_params = app.mp_params;
                 mp_params.k = length(obj.neurons);
                 neurons = obj.neurons;
-                save(app.id_file, 'version', 'neurons', 'mp_params');
+                save(id_file, 'version', 'neurons', 'mp_params');
             end
         end
 
@@ -159,4 +160,3 @@ classdef neuron_gui
         end
     end
 end
-

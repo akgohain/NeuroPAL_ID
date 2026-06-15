@@ -14,7 +14,12 @@ classdef worm
             end
 
             if isfield(worm, 'age')
-                app.AgeDropDown.Value = worm.age;
+                if any(strcmp(app.AgeDropDown.Items, worm.age))
+                    app.AgeDropDown.Value = worm.age;
+                else
+                    app.AgeDropDown.Value = 'Adult';
+                    app.worm.age = 'Adult';
+                end
             end
 
             if isfield(worm, 'sex')
@@ -31,4 +36,3 @@ classdef worm
         end
     end
 end
-

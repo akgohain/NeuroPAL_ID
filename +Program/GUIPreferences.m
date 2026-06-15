@@ -29,7 +29,7 @@ classdef GUIPreferences < handle
         is_show_birth_times = false; % show the neuron birth times?
         is_auto_name = true; % auto-complete neuron names?
         is_autoID_updates = true; % auto-update neuron IDs?
-        detection_backend = 'mp'; % one of: mp, nn, cellpose
+        detection_backend = 'mp'; % one of: mp, nn, cellpose, yolo
         is_MP_detect = true; % are we using MP (or NN) to detect neurons?
     end
     
@@ -321,6 +321,8 @@ classdef GUIPreferences < handle
                     backend = 'nn';
                 case {'cellpose', 'cp'}
                     backend = 'cellpose';
+                case {'yolo', 'yolov8'}
+                    backend = 'yolo';
                 otherwise
                     if is_mp_detect
                         backend = 'mp';

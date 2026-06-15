@@ -11,16 +11,12 @@ classdef neurons
                 app.image_neurons = neurons;
                 Program.Routines.GUI.enable_neurons;                        % Program.GUIHandling.gui_lock(app, 'enable', 'neuron_gui');
             else
-                app.image_neurons = Neurons.Image([], worm.body, 'scale', app.image_um_scale');
-
+                body = 'Head';
+                if isfield(app.worm, 'body') && ~isempty(app.worm.body)
+                    body = app.worm.body;
+                end
+                app.image_neurons = Neurons.Image([], body, 'scale', app.image_um_scale');
             end
-                
-            read_nwb_neurons = 0;
-            nwb_data = nwbRead(filename);
-            if any(ismember(nwb_data.processing.keys, 'NeuroPAL')) & (any(ismember(nwb_data.processing.get('NeuroPAL').nwbdatainterface.keys, 'NeuroPALSegmentation')) | any(ismember(nwb_data.processing.get('NeuroPAL').nwbdatainterface.keys, 'ImageSegmentation')) | any(ismember(nwb_data.processing.get('NeuroPAL').dynamictable.keys, 'VolumeSegmentation')) | any(ismember(nwb_data.processing.get('NeuroPAL').dynamictable.keys, 'NeuroPALNeurons')))
-                read_nwb_neurons = 1;
-            end             
-            app.image_neurons = Neurons.Image([], worm.body, 'scale', app.image_um_scale');
         end
 
         function unselect_neuron(varargin)
@@ -75,4 +71,3 @@ classdef neurons
         end
     end
 end
-

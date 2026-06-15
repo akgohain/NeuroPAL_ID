@@ -6,6 +6,9 @@ classdef preprocessing_gui
         canvas = [];            % image_editing_canvas instance.
         sidebar = [];           % preprocessing_sidebar instance.
         histograms = [];        % histograms instance.
+    end
+
+    properties (Constant)
         maximum_bytes = 13e7;   % The maximum size of arrays we allow users to load without triggering our preprocessing routine.
     end
     
@@ -43,7 +46,7 @@ classdef preprocessing_gui
 
                 % Check whether a volume type (i.e. image or video) was
                 % passed to the constructor.
-                if exist('mode', 'var')
+                if exist('type', 'var')
                     % If yes, configure the preprocessing gui accordingly.
                     gui_instance.set_gui_configuration(type);
                 end
@@ -74,15 +77,20 @@ classdef preprocessing_gui
             % Depending on the type, we grab the image/video dimensions
             % from different places. This is fixed in the upcoming
             % agnostic volume reader update.
+            app = Program.ProgramInfo.app;
+
             switch type
                 case 'image'
                     limits = size(app.proc_image, 'data');
+                    if numel(limits) < 5
+                        limits(end+1:5) = 1;
+                    end
                 case 'video'
                     limits = [ ...
-                        app.video_info.nx, 
-                        app.video_info.ny, 
-                        app.video_info.nz, 
-                        app.video_info.nc, 
+                        app.video_info.nx, ...
+                        app.video_info.ny, ...
+                        app.video_info.nz, ...
+                        app.video_info.nc, ...
                         app.video_info.nt]; 
             end
 
@@ -207,6 +215,7 @@ classdef preprocessing_gui
                     % Enable the tracking interface.
                     Program.GUI.tracking_gui().enable_gui;
                     app.visual_composer();
+                    Program.GUI.refresh_zephir_video_tab(app);
             end
         end
     end
@@ -230,6 +239,7 @@ classdef preprocessing_gui
             %           3 -> Could not determine whether file needs to be
             %               preprocessed. This occurs if we are unable to
             %               calculate the data size.
+            code = 0;
 
             % Check whether the given file meets the preprocessing
             % threshold.
@@ -252,6 +262,7 @@ classdef preprocessing_gui
                         % If the user opts to preprocess the file, set code
                         % to 1 and pass it the file path to the
                         % preprocessing load function.
+                        app = Program.ProgramInfo.app;
                         code = 1;
                         app.proc_load(file_path);
                     else
@@ -380,7 +391,7 @@ classdef preprocessing_gui
             % Check whether the total bytes that would be loaded from this
             % file exceed the threshold that triggers our processing
             % routine.
-            exceeds_maximum_bytes = total_size > obj.maximum_bytes;
+            exceeds_maximum_bytes = total_size > Program.GUI.preprocessing_gui.maximum_bytes;
 
             % Set code equal to whether the total bytes exceed either the
             % maximum array size or our preprocessing threshold.
@@ -396,4 +407,3 @@ classdef preprocessing_gui
         end
     end
 end
-

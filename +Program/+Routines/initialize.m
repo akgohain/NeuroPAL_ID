@@ -49,6 +49,9 @@ function initialize()
 
     % Initialize the structured properties.
     Program.GUIHandling.init_click_states(app);
+    Program.GUIHandling.hide_main_click_mode_control(app);
+    Program.GUIHandling.hide_next_neuron_mode_control(app);
+    Program.GUIHandling.configure_main_detect_id_controls(app);
     Program.GUIHandling.remove_redundant_processing_menus(app);
     app.neuron_marker.shape = 'c';
     app.neuron_marker.color.edge = [0,0,0];
@@ -92,6 +95,8 @@ function initialize()
             case 'nn'
                 app.ToggleNeuronDetectionMenu.Text = 'Use Cellpose-Detect Neurons';
             case 'cellpose'
+                app.ToggleNeuronDetectionMenu.Text = 'Use YOLO-Detect Neurons';
+            case 'yolo'
                 app.ToggleNeuronDetectionMenu.Text = 'Use MP-Detect Neurons';
         end
         Program.GUIHandling.install_cellpose_mask_button(app);

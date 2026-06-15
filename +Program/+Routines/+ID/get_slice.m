@@ -240,22 +240,37 @@ if ~isfile(mask_path)
     return
 end
 
-cache_path_key = 'cellpose_mask_cache_path';
+cache_metadata_key = 'cellpose_mask_cache_metadata';
 cache_data_key = 'cellpose_mask_cache_volume';
-if isappdata(app.CELL_ID, cache_path_key) && isappdata(app.CELL_ID, cache_data_key)
-    cached_path = getappdata(app.CELL_ID, cache_path_key);
-    if strcmp(cached_path, mask_path)
+
+try
+    file_info = dir(mask_path);
+catch
+    file_info = struct([]);
+end
+
+if numel(file_info) ~= 1
+    return
+end
+
+cache_metadata = local_build_cellpose_mask_cache_metadata(mask_path, file_info, mp_params);
+
+if isappdata(app.CELL_ID, cache_metadata_key) && isappdata(app.CELL_ID, cache_data_key)
+    cached_metadata = getappdata(app.CELL_ID, cache_metadata_key);
+    if local_is_cellpose_mask_cache_valid(cached_metadata, cache_metadata)
         mask_volume = getappdata(app.CELL_ID, cache_data_key);
-        return
+        if ~isempty(mask_volume)
+            return
+        end
     end
 end
 
-mask_source = "masks_stitched";
-if isfield(mp_params, 'mask_source')
-    source_value = lower(char(string(mp_params.mask_source)));
-    if strcmp(source_value, 'masks_3d')
+mask_source = local_cellpose_mask_source(mp_params);
+switch lower(mask_source)
+    case "masks_3d"
         mask_source = "masks_3D";
-    end
+    otherwise
+        mask_source = "masks_stitched";
 end
 
 try
@@ -264,6 +279,7 @@ catch
     return
 end
 
+raw_mask = [];
 if isfield(payload, char(mask_source))
     raw_mask = payload.(char(mask_source));
 elseif isfield(payload, 'masks_stitched')
@@ -274,13 +290,78 @@ else
     return
 end
 
-mask_volume = local_align_mask_to_image(raw_mask, size(app.image_data, 1:3));
+try
+    mask_volume = local_align_mask_to_image(raw_mask, size(app.image_data, 1:3));
+catch
+    return
+end
+
 if isempty(mask_volume)
     return
 end
 
-setappdata(app.CELL_ID, cache_path_key, mask_path);
+setappdata(app.CELL_ID, cache_metadata_key, cache_metadata);
 setappdata(app.CELL_ID, cache_data_key, mask_volume);
+end
+
+function mask_source = local_cellpose_mask_source(mp_params)
+mask_source = "masks_stitched";
+if isfield(mp_params, 'mask_source')
+    mask_source = lower(char(string(mp_params.mask_source)));
+    if strcmp(mask_source, 'masks_3d')
+        mask_source = "masks_3D";
+    end
+end
+end
+
+function cache_metadata = local_build_cellpose_mask_cache_metadata(mask_path, file_info, mp_params)
+cache_metadata = struct( ...
+    'path', mask_path, ...
+    'mask_source', local_cellpose_mask_source(mp_params) ...
+);
+
+if isstruct(file_info) && ~isempty(file_info)
+    if isfield(file_info, 'bytes')
+        cache_metadata.bytes = file_info.bytes;
+    end
+    if isfield(file_info, 'datenum')
+        cache_metadata.datenum = file_info.datenum;
+    end
+end
+end
+
+function tf = local_is_cellpose_mask_cache_valid(cached_metadata, current_metadata)
+tf = false;
+
+if isempty(cached_metadata) || isempty(current_metadata)
+    return
+end
+
+if ~isfield(cached_metadata, 'path') || ...
+        ~isfield(cached_metadata, 'mask_source') || ...
+        ~isfield(current_metadata, 'path') || ...
+        ~isfield(current_metadata, 'mask_source')
+    return
+end
+
+if ~strcmp(cached_metadata.path, current_metadata.path) || ...
+        ~strcmp(cached_metadata.mask_source, current_metadata.mask_source)
+    return
+end
+
+has_current_metadata = isfield(current_metadata, 'bytes') && isfield(current_metadata, 'datenum');
+has_cached_metadata = isfield(cached_metadata, 'bytes') && isfield(cached_metadata, 'datenum');
+if xor(has_current_metadata, has_cached_metadata)
+    return
+end
+if has_current_metadata && has_cached_metadata
+    if cached_metadata.bytes ~= current_metadata.bytes || ...
+            cached_metadata.datenum ~= current_metadata.datenum
+        return
+    end
+end
+
+tf = true;
 end
 
 function mp_params = local_resolve_mp_params(app)

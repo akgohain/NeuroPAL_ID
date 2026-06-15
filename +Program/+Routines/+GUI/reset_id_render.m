@@ -21,19 +21,10 @@ function reset_id_render(arr)
     app.XY.TitleFontSizeMultiplier = 2;
     app.XY.TitleFontWeight = 'bold';
 
-    x_ticks = linspace(0, nx, 15);
-    y_ticks = linspace(0, ny, 5);
-
-    app.XY.XTick = x_ticks;
-    app.XY.YTick = y_ticks;
-
-    x_labels = arrayfun(@(x) num2str(x, '%.1f'), x_ticks * scale(1), 'UniformOutput', false);
-    y_labels = arrayfun(@(y) num2str(y, '%.1f'), y_ticks * scale(2), 'UniformOutput', false);
-    
-    x_labels{1} = '0';
-    y_labels{1} = '0';
-
-    app.XY.XTickLabel = x_labels;
-    app.XY.YTickLabel = flip(y_labels);
+    Program.Helpers.configure_image_axes_ticks( ...
+        app.XY, [ny, nx], scale(1:2), ...
+        'XLim', [0, nx], ...
+        'YLim', [0, ny], ...
+        'TargetXTicks', 9, ...
+        'TargetYTicks', 6);
 end
-

@@ -147,7 +147,7 @@ else
 end
 toggle_button.Layout.Row = 1;
 toggle_button.Layout.Column = 2;
-toggle_button.Text = '^';
+    toggle_button.Text = 'v';
 toggle_button.FontSize = 13;
 toggle_button.FontWeight = 'bold';
 toggle_button.BackgroundColor = [0.94 0.95 0.96];
@@ -202,11 +202,18 @@ end
 end
 
 function toggle_workflow_panel(app, root, toggle_button)
-is_collapsed = false;
-if isappdata(app.CELL_ID, 'zephir_workflow_collapsed')
-    is_collapsed = getappdata(app.CELL_ID, 'zephir_workflow_collapsed');
+if nargin < 2 || isempty(root) || ~isvalid(root)
+    return
 end
-setappdata(app.CELL_ID, 'zephir_workflow_collapsed', ~is_collapsed);
+if nargin < 3 || isempty(toggle_button) || ~isvalid(toggle_button)
+    return
+end
+if isempty(app) || ~isvalid(app) || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
+    return
+end
+
+is_collapsed = get_zephir_workflow_collapsed(app);
+setappdata(app.CELL_ID, 'zephir_workflow_collapsed', logical(~is_collapsed));
 workflow_panel = findobj(root, 'Tag', 'zephir-right-workflow-panel');
 if isempty(workflow_panel) || ~isvalid(workflow_panel(1))
     return
@@ -215,21 +222,51 @@ apply_workflow_collapse_state(app, root, workflow_panel(1), toggle_button);
 end
 
 function apply_workflow_collapse_state(app, root, workflow_panel, toggle_button)
-is_collapsed = false;
-if isappdata(app.CELL_ID, 'zephir_workflow_collapsed')
-    is_collapsed = getappdata(app.CELL_ID, 'zephir_workflow_collapsed');
+if nargin < 2 || isempty(root) || ~isvalid(root)
+    return
 end
+if nargin < 3 || isempty(workflow_panel) || ~isvalid(workflow_panel)
+    return
+end
+if nargin < 4 || isempty(toggle_button) || ~isvalid(toggle_button)
+    return
+end
+if isempty(app) || ~isvalid(app) || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
+    return
+end
+is_collapsed = get_zephir_workflow_collapsed(app);
 
 if is_collapsed
     root.RowHeight = {'1x', 18, 1};
     workflow_panel.Visible = 'off';
-    toggle_button.Text = 'v';
+toggle_button.Text = '^';
     toggle_button.Tooltip = 'Show workflow/settings.';
 else
     root.RowHeight = {'1x', 18, 350};
     workflow_panel.Visible = 'on';
-    toggle_button.Text = '^';
+    toggle_button.Text = 'v';
     toggle_button.Tooltip = 'Hide workflow/settings.';
+end
+end
+
+function is_collapsed = get_zephir_workflow_collapsed(app)
+is_collapsed = false;
+if isempty(app) || ~isvalid(app) || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
+    return
+end
+if ~isappdata(app.CELL_ID, 'zephir_workflow_collapsed')
+    return
+end
+
+value = getappdata(app.CELL_ID, 'zephir_workflow_collapsed');
+if isempty(value)
+    return
+end
+
+try
+    is_collapsed = logical(value(1));
+catch
+    is_collapsed = false;
 end
 end
 

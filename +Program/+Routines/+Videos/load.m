@@ -51,6 +51,14 @@ function load(file)
             app.load_nd2(app.video_path);
         case {'.tif', '.tiff'}
             app.load_tif(app.video_path);
+        otherwise
+            if isprop(app, 'CELL_ID') && isvalid(app.CELL_ID)
+                uialert(app.CELL_ID, ...
+                    sprintf('Unsupported video format: %s', format), ...
+                    'Unsupported video format');
+            end
+            close(d);
+            return
     end
 
     app.video_frame_cache = [];
@@ -99,5 +107,6 @@ function load(file)
     Program.GUIHandling.gui_lock(app, 'enable', 'processing_tab');
 
     set(app.VideoGridLayout, 'Visible', 'on');
+    Program.GUI.refresh_zephir_video_tab(app);
     close(d);
 end

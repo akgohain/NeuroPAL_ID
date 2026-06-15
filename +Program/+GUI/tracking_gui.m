@@ -62,7 +62,7 @@ classdef tracking_gui
 
             % Switch to the video tab.
             app.TabGroup.SelectedTab = app.VideoTrackingTab;
+            Program.GUI.refresh_zephir_video_tab(app);
         end
     end
 end
-

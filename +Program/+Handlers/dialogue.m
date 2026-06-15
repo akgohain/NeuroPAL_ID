@@ -158,7 +158,7 @@ classdef dialogue
         function handle = create(mode, varargin)            
             p = inputParser;
             addOptional(p, 'Message', '');
-            addOptional(p, 'Title', Program.window().Name);
+            addOptional(p, 'Title', Program.Handlers.dialogue.default_title());
             addOptional(p, 'Indeterminate', 'on');
             addOptional(p, 'Options', ["OK", "Cancel"])
             addOptional(p, 'Cancelable', 'off');
@@ -186,10 +186,21 @@ classdef dialogue
             end
 
             Program.Handlers.dialogue.active(handle);
+            end
         end
-    end
 
     methods (Static, Access = private)
+        function title = default_title()
+            title = 'NeuroPAL ID';
+            try
+                window = Program.window();
+                if isprop(window, 'Name') && ~isempty(window.Name)
+                    title = window.Name;
+                end
+            catch
+            end
+        end
+
         function bool = is_task(str)
             identifiers = Program.Handlers.dialogue.identifiers;
             bool = contains(str, identifiers.task);
@@ -206,11 +217,20 @@ classdef dialogue
 
         function handle = create_progress(options)
             window = Program.window;
-            handle = uiprogressdlg(window, ...
-                "Message", options.Message, ...
-                "Title", options.Title, ...
-                "Indeterminate", options.Indeterminate, ...
-                "Cancelable", options.Cancelable);
+            if isempty(window) || ~isvalid(window)
+                handle = [];
+                return
+            end
+
+            try
+                handle = uiprogressdlg(window, ...
+                    "Message", options.Message, ...
+                    "Title", options.Title, ...
+                    "Indeterminate", options.Indeterminate, ...
+                    "Cancelable", options.Cancelable);
+            catch
+                handle = [];
+            end
         end
 
         function handle = create_choice(options)
@@ -230,4 +250,3 @@ classdef dialogue
         end
     end
 end
-

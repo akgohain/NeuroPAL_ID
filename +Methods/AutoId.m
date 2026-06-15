@@ -74,7 +74,7 @@ classdef AutoId < handle
             
             % Open the image file.
             try
-                [~, ~, ~, ~, ~, neurons, ~, id_file] = ...
+                [~, ~, ~, ~, mp, neurons, ~, id_file] = ...
                     DataHandling.NeuroPALImage.open(file);
             catch
                 % For now, don't throw exceptions from threads.
@@ -84,6 +84,13 @@ classdef AutoId < handle
             
             % Save the auto ID'd neurons.
             Methods.AutoId.instance().id(file, neurons, worm);
+            if isstruct(mp) && ~isempty(neurons)
+                mp_params = mp;
+                if isfield(neurons, 'neurons')
+                    mp_params.k = length(neurons.neurons);
+                end
+                save(id_file, 'mp_params', '-append');
+            end
             save(id_file, 'neurons', '-append');
         end
         

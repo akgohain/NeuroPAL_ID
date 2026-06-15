@@ -82,7 +82,6 @@ classdef GUIHandling
 
         id_components = {
             'ImageMenu', ...
-            'PreprocessingMenu', ...
             'BodyDropDown', ...
             'AgeDropDown', ...
             'SexDropDown', ...
@@ -110,7 +109,6 @@ classdef GUIHandling
         neuron_components = {
             'AnalysisMenu', ...
             'RotateImageMenu', ...
-            'RotateNeuronsMenu', ...
             'DeleteUserIDsMenu', ...
             'DeleteModelIDsMenu', ...
             'SaveIDImageMenu', ...
@@ -143,6 +141,1617 @@ classdef GUIHandling
             Program.GUIHandling.install_main_processing_sync_callbacks(app);
             Program.GUIHandling.install_cellpose_mask_button(app);
             Program.GUIHandling.apply_processing_responsive_layout(app);
+            Program.GUIHandling.hide_main_click_mode_control(app);
+            Program.GUIHandling.hide_next_neuron_mode_control(app);
+            Program.GUIHandling.configure_main_detect_id_controls(app);
+        end
+
+        function configure_main_detect_id_controls(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'AutoDetectButton') || isempty(app.AutoDetectButton) || ...
+                    ~isvalid(app.AutoDetectButton)
+                return
+            end
+
+            parent = app.AutoDetectButton.Parent;
+            if isempty(parent) || ~isvalid(parent)
+                return
+            end
+
+            if isappdata(parent, 'main_detect_id_controls_configured')
+                Program.GUIHandling.sync_main_detect_id_controls(app);
+                return
+            end
+
+            if Program.GUIHandling.configure_sidebar_detect_id_controls(app)
+                return
+            end
+
+            neurons_label = Program.GUIHandling.find_label_near_control(parent, app.AutoDetectButton, 'Neurons:');
+            if ~isempty(neurons_label)
+                neurons_label.Text = 'Auto-detect:';
+            end
+
+            detect_pos = Program.GUIHandling.component_bounds(app.AutoDetectButton);
+            if isempty(detect_pos)
+                return
+            end
+            label_spacing = 6;
+            group_spacing = 14;
+            detect_layout = Program.GUIHandling.component_layout(app.AutoDetectButton);
+            detect_run_layout = [];
+            if isprop(app, 'AutoIDAllButton') && ~isempty(app.AutoIDAllButton) && isvalid(app.AutoIDAllButton)
+                detect_run_layout = Program.GUIHandling.component_layout(app.AutoIDAllButton);
+            end
+            if ~isempty(neurons_label)
+                label_pos = Program.GUIHandling.component_bounds(neurons_label);
+                if ~isempty(label_pos)
+                    detect_pos(1) = label_pos(1) + label_pos(3) + label_spacing;
+                end
+            end
+            detect_dropdown = uidropdown(parent, ...
+                'Tag', 'MainDetectMethodDropDown', ...
+                'Items', {'Matching Pursuit', 'Neural Network', 'Cellpose', 'YOLO'}, ...
+                'ItemsData', {'mp', 'nn', 'cellpose', 'yolo'}, ...
+                'Tooltip', 'Neuron detection backend.', ...
+                'ValueChangedFcn', @(src, event) ...
+                    Program.GUIHandling.handle_main_detect_method_changed(app, src.Value));
+            detect_dropdown_width = 150;
+            detect_run_width = 54;
+            header_spacing = 6;
+            detect_dropdown.Position = [detect_pos(1), detect_pos(2), detect_dropdown_width, detect_pos(4)];
+            Program.GUIHandling.apply_component_layout(detect_dropdown, detect_layout);
+            Program.GUIHandling.normalize_main_header_control_height(detect_dropdown, detect_pos);
+            app.AutoDetectButton.Text = char(9654);
+            app.AutoDetectButton.Position = [detect_pos(1) + detect_dropdown_width + header_spacing, ...
+                detect_pos(2), detect_run_width, detect_pos(4)];
+            Program.GUIHandling.apply_component_layout(app.AutoDetectButton, detect_run_layout);
+            Program.GUIHandling.normalize_main_header_control_height(app.AutoDetectButton, detect_pos);
+            app.AutoDetectButton.Visible = 'on';
+
+            auto_label = Program.GUIHandling.find_label_near_control(parent, app.AutoIDDropDown, 'Auto:');
+            if ~isempty(auto_label)
+                auto_label.Text = 'Auto-ID:';
+            end
+
+            id_anchor = app.AutoIDDropDown;
+            if isempty(id_anchor) || ~isvalid(id_anchor)
+                id_anchor = app.AutoIDButton;
+            end
+            id_pos = Program.GUIHandling.component_bounds(id_anchor);
+            detect_row_mid = detect_pos(2) + detect_pos(4) / 2;
+            if ~isempty(id_pos) && abs((id_pos(2) + id_pos(4) / 2) - detect_row_mid) > detect_pos(4)
+                id_pos = [];
+            end
+            if isempty(id_pos)
+                id_pos = detect_pos + [180, 0, 0, 0];
+            end
+            id_pos(2) = detect_pos(2);
+            id_pos(4) = detect_pos(4);
+            detect_right = detect_pos(1) + detect_dropdown_width + header_spacing + detect_run_width;
+            if ~isempty(auto_label)
+                auto_label_pos = Program.GUIHandling.component_bounds(auto_label);
+                if isempty(auto_label_pos)
+                    auto_label_pos = [detect_right + group_spacing, detect_pos(2), 22, detect_pos(4)];
+                end
+                auto_label_pos(1) = detect_right + group_spacing;
+                auto_label_pos(2) = detect_pos(2);
+                auto_label_pos(4) = detect_pos(4);
+                auto_label.Position = auto_label_pos;
+                id_pos(1) = auto_label_pos(1) + auto_label_pos(3) + label_spacing;
+            else
+                id_pos(1) = detect_right + group_spacing;
+            end
+
+            if isprop(app, 'AutoIDDropDown') && ~isempty(app.AutoIDDropDown) && isvalid(app.AutoIDDropDown)
+                id_dropdown_layout = Program.GUIHandling.component_layout(app.AutoIDDropDown);
+                app.AutoIDDropDown.Visible = 'off';
+            else
+                id_dropdown_layout = [];
+            end
+            if isprop(app, 'AutoIDButton') && ~isempty(app.AutoIDButton) && isvalid(app.AutoIDButton)
+                id_run_layout = Program.GUIHandling.component_layout(app.AutoIDButton);
+                app.AutoIDButton.Text = char(9654);
+                app.AutoIDButton.Position(3) = max(app.AutoIDButton.Position(3), 62);
+            else
+                id_run_layout = [];
+            end
+            if isprop(app, 'AutoIDAllButton') && ~isempty(app.AutoIDAllButton) && isvalid(app.AutoIDAllButton)
+                app.AutoIDAllButton.Visible = 'off';
+            end
+
+            id_items = Program.GUIHandling.main_auto_id_method_items(app);
+            id_dropdown = uidropdown(parent, ...
+                'Tag', 'MainIDMethodDropDown', ...
+                'Items', id_items, ...
+                'Tooltip', 'Auto-ID method.', ...
+                'Value', id_items{1}, ...
+                'ValueChangedFcn', @(src, event) ...
+                    Program.GUIHandling.handle_main_id_method_changed(app, src.Value));
+            if ~any(strcmp(id_dropdown.Items, id_dropdown.Value))
+                id_dropdown.Value = id_dropdown.Items{1};
+            end
+            id_dropdown_width = 128;
+            all_checkbox_width = 52;
+            id_dropdown.Position = [id_pos(1), id_pos(2), id_dropdown_width, id_pos(4)];
+            Program.GUIHandling.apply_component_layout(id_dropdown, id_dropdown_layout);
+            Program.GUIHandling.normalize_main_header_control_height(id_dropdown, id_pos);
+
+            all_checkbox = uicheckbox(parent, ...
+                'Tag', 'MainIDAllCheckBox', ...
+                'Text', 'All', ...
+                'Value', false, ...
+                'Tooltip', 'Apply ID action to all neurons instead of the current/selected neuron.');
+            all_checkbox.Position = [id_pos(1) + id_dropdown_width + header_spacing, id_pos(2), ...
+                all_checkbox_width, id_pos(4)];
+            all_layout = Program.GUIHandling.next_component_layout(id_dropdown_layout, 1);
+            Program.GUIHandling.apply_component_layout(all_checkbox, all_layout);
+            Program.GUIHandling.normalize_main_header_control_height(all_checkbox, id_pos);
+
+            if isprop(app, 'AutoIDButton') && ~isempty(app.AutoIDButton) && isvalid(app.AutoIDButton)
+                app.AutoIDButton.Position = [id_pos(1) + id_dropdown_width + 2 * header_spacing + ...
+                    all_checkbox_width, id_pos(2), max(64, app.AutoIDButton.Position(3)), id_pos(4)];
+                run_layout = Program.GUIHandling.next_component_layout(id_dropdown_layout, 2);
+                if isempty(run_layout)
+                    run_layout = id_run_layout;
+                end
+                Program.GUIHandling.apply_component_layout(app.AutoIDButton, run_layout);
+                Program.GUIHandling.normalize_main_header_control_height(app.AutoIDButton, id_pos);
+                app.AutoIDButton.Visible = 'on';
+                Program.GUIHandling.position_main_user_id_controls_after(app, ...
+                    id_pos(1) + id_dropdown_width + 2 * header_spacing + ...
+                    all_checkbox_width + max(64, app.AutoIDButton.Position(3)) + group_spacing);
+            end
+
+            controls = struct( ...
+                'detect_dropdown', detect_dropdown, ...
+                'id_dropdown', id_dropdown, ...
+                'all_checkbox', all_checkbox);
+            setappdata(parent, 'main_detect_id_controls', controls);
+            Program.GUIHandling.install_main_detect_run_dispatcher(app);
+            Program.GUIHandling.install_main_id_run_dispatcher(app);
+            setappdata(parent, 'main_detect_id_controls_configured', true);
+            Program.GUIHandling.sync_main_detect_id_controls(app);
+        end
+
+        function sync_main_detect_id_controls(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'AutoDetectButton') || isempty(app.AutoDetectButton) || ...
+                    ~isvalid(app.AutoDetectButton)
+                return
+            end
+
+            parent = app.AutoDetectButton.Parent;
+            if isempty(parent) || ~isvalid(parent) || ~isappdata(parent, 'main_detect_id_controls')
+                return
+            end
+
+            controls = getappdata(parent, 'main_detect_id_controls');
+            if isfield(controls, 'detect_dropdown') && isvalid(controls.detect_dropdown)
+                backend = Program.GUIPreferences.get_detection_backend();
+                valid_values = string(controls.detect_dropdown.ItemsData);
+                if any(valid_values == string(backend))
+                    controls.detect_dropdown.Value = backend;
+                end
+            end
+            if isfield(controls, 'id_dropdown') && isvalid(controls.id_dropdown)
+                id_items = Program.GUIHandling.main_auto_id_method_items(app);
+                current_value = char(string(controls.id_dropdown.Value));
+                controls.id_dropdown.Items = id_items;
+                if any(strcmp(id_items, current_value))
+                    controls.id_dropdown.Value = current_value;
+                else
+                    controls.id_dropdown.Value = id_items{1};
+                end
+            end
+        end
+
+        function did_configure = configure_sidebar_detect_id_controls(app)
+            did_configure = false;
+            required_props = {'GridLayout22', 'UserNeuronIDsListBox', ...
+                'UserNeuronIDsListBoxLabel', 'NeuronRankedConfidenceLabel', ...
+                'AutoDetectButton', 'AutoIDButton', 'AutoIDDropDown', ...
+                'AutoIDAllButton', 'UserIDButton'};
+            for i = 1:numel(required_props)
+                prop = required_props{i};
+                if ~isprop(app, prop) || isempty(app.(prop)) || ~isvalid(app.(prop))
+                    return
+                end
+            end
+
+            sidebar_grid = app.GridLayout22;
+            try
+                old_params_grid = findobj(sidebar_grid, 'Tag', 'MainMethodParamsGrid');
+                delete(old_params_grid);
+                sidebar_grid.RowHeight = {62, 62, 20, 20, 170, '1x', '1x'};
+                sidebar_grid.RowSpacing = 3;
+                app.UserNeuronIDsListBoxLabel.Layout.Row = 3;
+                app.UserNeuronIDsListBoxLabel.Layout.Column = 1;
+                app.NeuronRankedConfidenceLabel.Layout.Row = 4;
+                app.NeuronRankedConfidenceLabel.Layout.Column = 1;
+                app.UserNeuronIDsListBox.Layout.Row = 5;
+                app.UserNeuronIDsListBox.Layout.Column = 1;
+            catch
+                return
+            end
+
+            detect_row = Program.GUIHandling.ensure_sidebar_control_row( ...
+                sidebar_grid, 'MainDetectControlRow', 1);
+            id_row = Program.GUIHandling.ensure_sidebar_control_row( ...
+                sidebar_grid, 'MainIDControlRow', 2);
+            if isempty(detect_row) || isempty(id_row)
+                return
+            end
+
+            parent = app.AutoDetectButton.Parent;
+            if isempty(parent) || ~isvalid(parent)
+                return
+            end
+
+            Program.GUIHandling.move_label_to_grid(app, 'NeuronsLabel', ...
+                detect_row, 1, 'Auto-detect:');
+            app.NeuronsLabel.Layout.Row = [1 2];
+
+            detect_dropdown = uidropdown(detect_row, ...
+                'Tag', 'MainDetectMethodDropDown', ...
+                'Items', {'Matching Pursuit', 'Neural Network', 'Cellpose', 'YOLO'}, ...
+                'ItemsData', {'mp', 'nn', 'cellpose', 'yolo'}, ...
+                'Tooltip', 'Neuron detection backend.', ...
+                'ValueChangedFcn', @(src, event) ...
+                    Program.GUIHandling.handle_main_detect_method_changed(app, src.Value));
+            detect_dropdown.Layout.Row = 1;
+            detect_dropdown.Layout.Column = [2 4];
+
+            app.AutoDetectButton.Parent = detect_row;
+            app.AutoDetectButton.Layout.Row = 2;
+            app.AutoDetectButton.Layout.Column = 2;
+            app.AutoDetectButton.Text = char(9654);
+            app.AutoDetectButton.FontSize = 14;
+            app.AutoDetectButton.Visible = 'on';
+
+            detect_crop_checkbox = uicheckbox(detect_row, ...
+                'Tag', 'MainDetectCropCheckBox', ...
+                'Text', 'Crop', ...
+                'Value', false, ...
+                'Tooltip', 'Select an image crop before running detection.');
+            detect_crop_checkbox.FontSize = 12;
+            detect_crop_checkbox.Layout.Row = 2;
+            detect_crop_checkbox.Layout.Column = 3;
+
+            detect_settings_button = uibutton(detect_row, 'push', ...
+                'Tag', 'MainDetectSettingsButton', ...
+                'Text', char(9881), ...
+                'Tooltip', 'Edit auto-detect method parameters.', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.show_main_method_params_dialog(app, 'detect'));
+            detect_settings_button.FontSize = 14;
+            detect_settings_button.Layout.Row = 2;
+            detect_settings_button.Layout.Column = 4;
+
+            Program.GUIHandling.move_label_to_grid(app, 'AutoLabel', id_row, 1, 'Auto-ID:');
+            app.AutoLabel.Layout.Row = [1 2];
+            app.AutoIDDropDown.Visible = 'off';
+
+            id_items = Program.GUIHandling.main_auto_id_method_items(app);
+            id_dropdown = uidropdown(id_row, ...
+                'Tag', 'MainIDMethodDropDown', ...
+                'Items', id_items, ...
+                'Tooltip', 'Auto-ID method.', ...
+                'Value', id_items{1}, ...
+                'ValueChangedFcn', @(src, event) ...
+                    Program.GUIHandling.handle_main_id_method_changed(app, src.Value));
+            id_dropdown.Layout.Row = 1;
+            id_dropdown.Layout.Column = [2 4];
+            if ~any(strcmp(id_dropdown.Items, id_dropdown.Value))
+                id_dropdown.Value = id_dropdown.Items{1};
+            end
+
+            app.AutoIDButton.Parent = id_row;
+            app.AutoIDButton.Layout.Row = 2;
+            app.AutoIDButton.Layout.Column = 2;
+            app.AutoIDButton.Text = char(9654);
+            app.AutoIDButton.FontSize = 14;
+            app.AutoIDButton.Visible = 'on';
+
+            id_crop_checkbox = uicheckbox(id_row, ...
+                'Tag', 'MainIDCropCheckBox', ...
+                'Text', 'Crop', ...
+                'Value', false, ...
+                'Tooltip', 'Select an image crop before running auto-ID.');
+            id_crop_checkbox.FontSize = 12;
+            id_crop_checkbox.Layout.Row = 2;
+            id_crop_checkbox.Layout.Column = 3;
+
+            id_settings_button = uibutton(id_row, 'push', ...
+                'Tag', 'MainIDSettingsButton', ...
+                'Text', char(9881), ...
+                'Tooltip', 'Edit auto-ID method parameters.', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.show_main_method_params_dialog(app, 'id'));
+            id_settings_button.FontSize = 14;
+            id_settings_button.Layout.Row = 2;
+            id_settings_button.Layout.Column = 4;
+
+            app.AutoIDAllButton.Visible = 'off';
+            Program.GUIHandling.position_main_user_id_controls_after(app, []);
+
+            controls = struct( ...
+                'detect_dropdown', detect_dropdown, ...
+                'id_dropdown', id_dropdown, ...
+                'detect_crop_checkbox', detect_crop_checkbox, ...
+                'id_crop_checkbox', id_crop_checkbox, ...
+                'detect_settings_button', detect_settings_button, ...
+                'id_settings_button', id_settings_button);
+            controls_parent = app.AutoDetectButton.Parent;
+            setappdata(controls_parent, 'main_detect_id_controls', controls);
+            Program.GUIHandling.install_main_detect_run_dispatcher(app);
+            Program.GUIHandling.install_main_id_run_dispatcher(app);
+            setappdata(controls_parent, 'main_detect_id_controls_configured', true);
+            Program.GUIHandling.sync_main_detect_id_controls(app);
+            did_configure = true;
+        end
+
+        function row = ensure_sidebar_control_row(parent_grid, tag, row_index, column_width)
+            row = [];
+            if isempty(parent_grid) || ~isvalid(parent_grid)
+                return
+            end
+            if nargin < 4 || isempty(column_width)
+                column_width = {'fit', 34, '1x', 30};
+            end
+
+            existing = findobj(parent_grid, 'Tag', tag);
+            if ~isempty(existing) && isvalid(existing(1))
+                row = existing(1);
+            else
+                row = uigridlayout(parent_grid);
+                row.Tag = tag;
+                row.RowHeight = {26, 30};
+                row.RowSpacing = 2;
+                row.ColumnSpacing = 4;
+                row.Padding = [0 0 0 0];
+            end
+            row.ColumnWidth = column_width;
+            row.Layout.Row = row_index;
+            row.Layout.Column = 1;
+        end
+
+        function grid = ensure_sidebar_params_grid(parent_grid, row_index)
+            grid = [];
+            if isempty(parent_grid) || ~isvalid(parent_grid)
+                return
+            end
+
+            existing = findobj(parent_grid, 'Tag', 'MainMethodParamsGrid');
+            if ~isempty(existing) && isvalid(existing(1))
+                grid = existing(1);
+            else
+                grid = uigridlayout(parent_grid);
+                grid.Tag = 'MainMethodParamsGrid';
+                grid.RowHeight = {24, 24, 24, 24, 24};
+                grid.ColumnWidth = {70, '1x', 64, '1x'};
+                grid.ColumnSpacing = 4;
+                grid.RowSpacing = 2;
+                grid.Padding = [0 0 0 0];
+            end
+            grid.Layout.Row = row_index;
+            grid.Layout.Column = 1;
+        end
+
+        function refresh_main_method_params(app, controls)
+            if nargin < 2 || isempty(controls) || ~isfield(controls, 'params_grid') || ...
+                    isempty(controls.params_grid) || ~isvalid(controls.params_grid)
+                controls = Program.GUIHandling.main_detect_id_controls(app);
+                if isempty(controls) || ~isfield(controls, 'params_grid') || ...
+                        isempty(controls.params_grid) || ~isvalid(controls.params_grid)
+                    return
+                end
+            end
+
+            grid = controls.params_grid;
+            delete(grid.Children);
+
+            detect_backend = "mp";
+            if isfield(controls, 'detect_dropdown') && ~isempty(controls.detect_dropdown) && isvalid(controls.detect_dropdown)
+                detect_backend = string(controls.detect_dropdown.Value);
+            end
+            id_method = "Nearest";
+            if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
+                id_method = string(controls.id_dropdown.Value);
+            end
+
+            detect_params = Program.GUIHandling.main_detect_param_specs(app, detect_backend);
+            id_params = Program.GUIHandling.main_id_param_specs(id_method);
+
+            Program.GUIHandling.add_sidebar_param_header(grid, 1, 1, 'Detect Params');
+            Program.GUIHandling.add_sidebar_param_header(grid, 1, 3, 'ID Params');
+            Program.GUIHandling.add_sidebar_param_controls(app, grid, detect_params, 'detect', 2, 1);
+            Program.GUIHandling.add_sidebar_param_controls(app, grid, id_params, 'id', 2, 3);
+        end
+
+        function show_main_method_params_dialog(app, group)
+            controls = Program.GUIHandling.main_detect_id_controls(app);
+            if isempty(controls)
+                return
+            end
+
+            group = char(string(group));
+            switch group
+                case 'detect'
+                    method = "mp";
+                    if isfield(controls, 'detect_dropdown') && ~isempty(controls.detect_dropdown) && isvalid(controls.detect_dropdown)
+                        method = string(controls.detect_dropdown.Value);
+                    end
+                    specs = Program.GUIHandling.main_detect_param_specs(app, method);
+                    title = sprintf('Auto-detect Parameters: %s', char(string(method)));
+                otherwise
+                    method = "Nearest";
+                    if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
+                        method = string(controls.id_dropdown.Value);
+                    end
+                    specs = Program.GUIHandling.main_id_param_specs(method);
+                    title = sprintf('Auto-ID Parameters: %s', char(string(method)));
+            end
+
+            fig = Program.GUIHandling.create_params_dialog_figure(app, title, numel(specs));
+            grid = uigridlayout(fig, ...
+                'RowHeight', {'1x', 32}, ...
+                'ColumnWidth', {'1x'}, ...
+                'Padding', [10 10 10 10], ...
+                'RowSpacing', 8);
+
+            table = uitable(grid, ...
+                'Data', Program.GUIHandling.params_table_data(app, group, specs), ...
+                'ColumnName', {'Parameter', 'Value', 'Allowed'}, ...
+                'ColumnEditable', [false true false], ...
+                'RowName', {}, ...
+                'Tooltip', 'Edit method parameters. Values are validated when applied.');
+            table.Layout.Row = 1;
+            table.Layout.Column = 1;
+
+            button_grid = uigridlayout(grid, ...
+                'RowHeight', {'1x'}, ...
+                'ColumnWidth', {78, '1x', 78, 78}, ...
+                'ColumnSpacing', 6, ...
+                'Padding', [0 0 0 0]);
+            button_grid.Layout.Row = 2;
+            button_grid.Layout.Column = 1;
+
+            reset_button = uibutton(button_grid, 'push', ...
+                'Text', 'Reset', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.reset_main_method_params_table(app, group, specs, table));
+            reset_button.Layout.Row = 1;
+            reset_button.Layout.Column = 1;
+
+            apply_button = uibutton(button_grid, 'push', ...
+                'Text', 'Apply', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.apply_main_method_params_table(app, group, specs, table, fig));
+            apply_button.Layout.Row = 1;
+            apply_button.Layout.Column = 3;
+
+            close_button = uibutton(button_grid, 'push', ...
+                'Text', 'Close', ...
+                'ButtonPushedFcn', @(src, event) close(fig));
+            close_button.Layout.Row = 1;
+            close_button.Layout.Column = 4;
+        end
+
+        function fig = create_params_dialog_figure(app, title, num_specs)
+            width = 430;
+            height = min(560, max(230, 130 + 30 * max(1, num_specs)));
+            position = [100 100 width height];
+            try
+                app_pos = app.CELL_ID.Position;
+                position(1) = app_pos(1) + max(20, (app_pos(3) - width) / 2);
+                position(2) = app_pos(2) + max(20, (app_pos(4) - height) / 2);
+            catch
+            end
+
+            fig = uifigure( ...
+                'Name', title, ...
+                'Position', position, ...
+                'WindowStyle', 'modal', ...
+                'Resize', 'on');
+        end
+
+        function data = params_table_data(app, group, specs)
+            params = Program.GUIHandling.main_method_params(app, group);
+            data = cell(numel(specs), 3);
+            for i = 1:numel(specs)
+                spec = specs{i};
+                value = Program.GUIHandling.param_value(params, spec.key, spec.value);
+                data{i, 1} = spec.label;
+                data{i, 2} = Program.GUIHandling.param_table_value(value);
+                data{i, 3} = Program.GUIHandling.param_allowed_text(spec);
+            end
+        end
+
+        function reset_main_method_params_table(app, group, specs, table)
+            if isempty(table) || ~isvalid(table)
+                return
+            end
+            data = cell(numel(specs), 3);
+            for i = 1:numel(specs)
+                spec = specs{i};
+                data{i, 1} = spec.label;
+                data{i, 2} = Program.GUIHandling.param_table_value(spec.value);
+                data{i, 3} = Program.GUIHandling.param_allowed_text(spec);
+            end
+            table.Data = data;
+            Program.GUIHandling.apply_main_method_params_table(app, group, specs, table, []);
+        end
+
+        function apply_main_method_params_table(app, group, specs, table, fig)
+            if isempty(table) || ~isvalid(table)
+                return
+            end
+
+            data = table.Data;
+            params = struct();
+            for i = 1:min(numel(specs), size(data, 1))
+                spec = specs{i};
+                value = Program.GUIHandling.coerce_param_table_value(data{i, 2}, spec);
+                data{i, 2} = Program.GUIHandling.param_table_value(value);
+                params.(spec.key) = value;
+            end
+            table.Data = data;
+            setappdata(app.CELL_ID, sprintf('main_%s_params', char(string(group))), params);
+
+            if nargin >= 5 && ~isempty(fig) && isvalid(fig)
+                close(fig);
+            end
+        end
+
+        function value = coerce_param_table_value(raw_value, spec)
+            if isfield(spec, 'enabled') && ~spec.enabled
+                value = spec.value;
+                return
+            end
+
+            if isnumeric(spec.value)
+                value = str2double(char(string(raw_value)));
+                if isnan(value)
+                    value = double(spec.value);
+                end
+                if ~isempty(spec.limits)
+                    value = min(max(value, spec.limits(1)), spec.limits(2));
+                end
+                if spec.integer
+                    value = round(value);
+                end
+                return
+            end
+
+            value = strtrim(char(string(raw_value)));
+            if isfield(spec, 'allowed') && ~isempty(spec.allowed)
+                allowed = string(spec.allowed);
+                match = find(strcmpi(value, allowed), 1);
+                if isempty(match)
+                    value = char(allowed(1));
+                else
+                    value = char(allowed(match));
+                end
+            end
+        end
+
+        function text = param_table_value(value)
+            if isnumeric(value)
+                text = sprintf('%g', double(value));
+            else
+                text = char(string(value));
+            end
+        end
+
+        function text = param_allowed_text(spec)
+            if isnumeric(spec.value) && ~isempty(spec.limits)
+                text = sprintf('[%g, %g]', spec.limits(1), spec.limits(2));
+            elseif isfield(spec, 'allowed') && ~isempty(spec.allowed)
+                text = char(strjoin(string(spec.allowed), ', '));
+            elseif ~spec.enabled
+                text = 'reference only';
+            else
+                text = '';
+            end
+        end
+
+        function specs = main_detect_param_specs(app, backend)
+            backend = lower(string(backend));
+            switch backend
+                case "mp"
+                    default_k = Program.GUIHandling.default_neuron_count(app);
+                    default_min_eig = Program.GUIHandling.struct_or_default(app, 'mp_params', 'min_eig_thresh', 1.0);
+                    default_exclusion = Program.GUIHandling.struct_or_default(app, 'mp_params', 'exclusion_radius', 2.0);
+                    specs = { ...
+                        struct('key', 'k', 'label', 'Count', 'value', default_k, 'limits', [1 1000], 'integer', true, 'enabled', true), ...
+                        struct('key', 'min_eig_thresh', 'label', 'Min eig', 'value', default_min_eig, 'limits', [0 50], 'integer', false, 'enabled', true), ...
+                        struct('key', 'exclusion_radius', 'label', 'Excl um', 'value', default_exclusion, 'limits', [0 100], 'integer', false, 'enabled', true)};
+                case "cellpose"
+                    specs = { ...
+                        struct('key', 'model_path', 'label', 'Model', 'value', '', 'limits', [], 'integer', false, 'enabled', true), ...
+                        struct('key', 'mask_source', 'label', 'Masks', 'value', 'stitched', 'limits', [], 'integer', false, 'enabled', true, 'allowed', {{'stitched', '3d', 'auto'}}), ...
+                        struct('key', 'mode', 'label', 'Mode', 'value', 'cellpose', 'limits', [], 'integer', false, 'enabled', true, 'allowed', {{'cellpose', 'stub'}})};
+                case "yolo"
+                    specs = { ...
+                        struct('key', 'weights_path', 'label', 'Weights', 'value', '/Users/adamg/neuroPAL/artifacts/swetha_yolo_inf/YOLO INF/best.pt', 'limits', [], 'integer', false, 'enabled', true), ...
+                        struct('key', 'conf', 'label', 'Score', 'value', 0.45, 'limits', [0 1], 'integer', false, 'enabled', true), ...
+                        struct('key', 'box_min_px', 'label', 'Box min', 'value', 2, 'limits', [0 512], 'integer', false, 'enabled', true), ...
+                        struct('key', 'box_max_px', 'label', 'Box max', 'value', 80, 'limits', [1 2048], 'integer', false, 'enabled', true)};
+                otherwise
+                    specs = { ...
+                        struct('key', 'stride', 'label', 'Stride', 'value', Methods.NNDetect.stride, 'limits', [16 512], 'integer', true, 'enabled', false), ...
+                        struct('key', 'crop_size', 'label', 'Patch', 'value', Methods.NNDetect.crop_size, 'limits', [16 512], 'integer', true, 'enabled', false), ...
+                        struct('key', 'max_count', 'label', 'Max N', 'value', Program.GUIHandling.default_neuron_count(app), 'limits', [1 1000], 'integer', true, 'enabled', true)};
+            end
+        end
+
+        function specs = main_id_param_specs(method)
+            method = lower(string(method));
+            switch method
+                case {"gat/transformer", "transformer", "anshita"}
+                    specs = { ...
+                        struct('key', 'confidence_threshold', 'label', 'Min conf', 'value', 0.5, 'limits', [0 1], 'integer', false, 'enabled', true), ...
+                        struct('key', 'checkpoint_path', 'label', 'Checkpoint', 'value', '/Users/adamg/neuroPAL/artifacts/anshita_transformer', 'limits', [], 'integer', false, 'enabled', true), ...
+                        struct('key', 'dataset_id', 'label', 'DANDI ID', 'value', '000981', 'limits', [], 'integer', false, 'enabled', true), ...
+                        struct('key', 'mc_samples', 'label', 'MC', 'value', 20, 'limits', [1 100], 'integer', true, 'enabled', true), ...
+                        struct('key', 'min_neighbors', 'label', 'Min nbr', 'value', 2, 'limits', [0 20], 'integer', true, 'enabled', true), ...
+                        struct('key', 'batch_size', 'label', 'Batch', 'value', 32, 'limits', [1 512], 'integer', true, 'enabled', true)};
+                otherwise
+                    specs = { ...
+                        struct('key', 'top_k', 'label', 'Top K', 'value', 5, 'limits', [1 20], 'integer', true, 'enabled', true), ...
+                        struct('key', 'max_distance_um', 'label', 'Max um', 'value', 25, 'limits', [0 500], 'integer', false, 'enabled', true)};
+            end
+        end
+
+        function add_sidebar_param_header(grid, row, column, text)
+            label = uilabel(grid);
+            label.Text = text;
+            label.FontWeight = 'bold';
+            label.FontSize = 11;
+            label.Layout.Row = row;
+            label.Layout.Column = [column, column + 1];
+        end
+
+        function add_sidebar_param_controls(app, grid, specs, group, start_row, start_col)
+            for i = 1:min(numel(specs), 4)
+                spec = specs{i};
+                row = start_row + i - 1;
+                label = uilabel(grid);
+                label.Text = spec.label;
+                label.FontSize = 10;
+                label.Layout.Row = row;
+                label.Layout.Column = start_col;
+
+                if isnumeric(spec.value)
+                    field = uieditfield(grid, 'numeric');
+                    field.Value = double(spec.value);
+                    if ~isempty(spec.limits)
+                        field.Limits = spec.limits;
+                    end
+                    if spec.integer
+                        if isprop(field, 'RoundFractionalValues')
+                            field.RoundFractionalValues = 'on';
+                        end
+                    end
+                else
+                    field = uieditfield(grid, 'text');
+                    field.Value = char(string(spec.value));
+                end
+                group_char = char(string(group));
+                field.Tag = sprintf('Main%sParam_%s', upper(group_char(1)), spec.key);
+                field.FontSize = 10;
+                field.Enable = Program.GUIHandling.on_off(spec.enabled);
+                field.Tooltip = Program.GUIHandling.param_tooltip(spec);
+                field.ValueChangedFcn = @(src, event) ...
+                    Program.GUIHandling.store_main_method_param(app, group, spec, src);
+                field.Layout.Row = row;
+                field.Layout.Column = start_col + 1;
+                Program.GUIHandling.store_main_method_param(app, group, spec, field);
+            end
+        end
+
+        function store_main_method_param(app, group, spec, field)
+            key = sprintf('main_%s_params', char(string(group)));
+            params = struct();
+            if isappdata(app.CELL_ID, key)
+                params = getappdata(app.CELL_ID, key);
+            end
+
+            if isnumeric(field.Value)
+                value = double(field.Value);
+                if ~isempty(spec.limits)
+                    value = min(max(value, spec.limits(1)), spec.limits(2));
+                end
+                if spec.integer
+                    value = round(value);
+                end
+                field.Value = value;
+            else
+                value = strtrim(char(string(field.Value)));
+                if isfield(spec, 'allowed') && ~isempty(spec.allowed)
+                    allowed = string(spec.allowed);
+                    if ~any(strcmpi(value, allowed))
+                        value = char(allowed(1));
+                    end
+                end
+                field.Value = value;
+            end
+            params.(spec.key) = value;
+            setappdata(app.CELL_ID, key, params);
+        end
+
+        function text = param_tooltip(spec)
+            if isnumeric(spec.value) && ~isempty(spec.limits)
+                text = sprintf('%s; allowed range [%g, %g].', spec.label, spec.limits(1), spec.limits(2));
+            elseif isfield(spec, 'allowed') && ~isempty(spec.allowed)
+                text = sprintf('%s; allowed values: %s.', spec.label, char(strjoin(string(spec.allowed), ', ')));
+            elseif ~spec.enabled
+                text = sprintf('%s is shown for reference; this backend does not expose it at runtime yet.', spec.label);
+            else
+                text = spec.label;
+            end
+        end
+
+        function value = default_neuron_count(app)
+            value = 100;
+            try
+                body = app.BodyDropDown.Value;
+                candidate = app.neuron_info.numNeurons(body);
+                if ~isempty(candidate) && isfinite(double(candidate))
+                    value = double(candidate);
+                end
+            catch
+            end
+        end
+
+        function value = struct_or_default(app, prop_name, field_name, default_value)
+            value = default_value;
+            try
+                payload = app.(prop_name);
+                if isstruct(payload) && isfield(payload, field_name) && ...
+                        ~isempty(payload.(field_name)) && isfinite(double(payload.(field_name)))
+                    value = double(payload.(field_name));
+                end
+            catch
+            end
+        end
+
+        function value = on_off(tf)
+            if tf
+                value = 'on';
+            else
+                value = 'off';
+            end
+        end
+
+        function move_label_to_grid(app, prop_name, target_grid, column, text)
+            if ~isprop(app, prop_name) || isempty(app.(prop_name)) || ...
+                    ~isvalid(app.(prop_name)) || isempty(target_grid) || ~isvalid(target_grid)
+                return
+            end
+
+            label = app.(prop_name);
+            label.Parent = target_grid;
+            label.Layout.Row = 1;
+            label.Layout.Column = column;
+            label.Text = text;
+            label.FontWeight = 'bold';
+            label.FontSize = 12;
+            label.HorizontalAlignment = 'right';
+            try
+                label.VerticalAlignment = 'center';
+            catch
+            end
+        end
+
+        function install_main_id_run_dispatcher(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'AutoIDButton') || isempty(app.AutoIDButton) || ~isvalid(app.AutoIDButton)
+                return
+            end
+
+            parent = app.AutoIDButton.Parent;
+            if isempty(parent) || ~isvalid(parent)
+                return
+            end
+
+            if ~isappdata(parent, 'main_id_legacy_callbacks')
+                callbacks = struct();
+                callbacks.auto = app.AutoIDButton.ButtonPushedFcn;
+                if isprop(app, 'AutoIDAllButton') && ~isempty(app.AutoIDAllButton) && isvalid(app.AutoIDAllButton)
+                    callbacks.auto_all = app.AutoIDAllButton.ButtonPushedFcn;
+                else
+                    callbacks.auto_all = [];
+                end
+                if isprop(app, 'UserIDButton') && ~isempty(app.UserIDButton) && isvalid(app.UserIDButton)
+                    callbacks.user = app.UserIDButton.ButtonPushedFcn;
+                else
+                    callbacks.user = [];
+                end
+                setappdata(parent, 'main_id_legacy_callbacks', callbacks);
+            end
+
+            app.AutoIDButton.ButtonPushedFcn = @(src, event) ...
+                Program.GUIHandling.handle_main_id_run(app, src, event);
+        end
+
+        function install_main_detect_run_dispatcher(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'AutoDetectButton') || isempty(app.AutoDetectButton) || ~isvalid(app.AutoDetectButton)
+                return
+            end
+
+            parent = app.AutoDetectButton.Parent;
+            if isempty(parent) || ~isvalid(parent)
+                return
+            end
+
+            if ~isappdata(parent, 'main_detect_legacy_callback')
+                setappdata(parent, 'main_detect_legacy_callback', app.AutoDetectButton.ButtonPushedFcn);
+            end
+
+            app.AutoDetectButton.ButtonPushedFcn = @(src, event) ...
+                Program.GUIHandling.handle_main_detect_run(app, src, event);
+        end
+
+        function handle_main_id_method_changed(app, mode)
+            if isprop(app, 'AutoIDDropDown') && ~isempty(app.AutoIDDropDown) && isvalid(app.AutoIDDropDown)
+                try
+                    if any(strcmp(app.AutoIDDropDown.Items, char(string(mode))))
+                        app.AutoIDDropDown.Value = char(string(mode));
+                    end
+                catch
+                end
+            end
+
+            controls = Program.GUIHandling.main_detect_id_controls(app);
+            Program.GUIHandling.refresh_main_method_params(app, controls);
+        end
+
+        function handle_main_id_run(app, src, event)
+            controls = Program.GUIHandling.main_detect_id_controls(app);
+            callbacks = [];
+            if isprop(app, 'AutoIDButton') && ~isempty(app.AutoIDButton) && isvalid(app.AutoIDButton) && ...
+                    isappdata(app.AutoIDButton.Parent, 'main_id_legacy_callbacks')
+                callbacks = getappdata(app.AutoIDButton.Parent, 'main_id_legacy_callbacks');
+            end
+            if isempty(controls) || isempty(callbacks)
+                return
+            end
+
+            if Program.GUIHandling.main_crop_checkbox_value(controls, 'id_crop_checkbox')
+                Program.GUIHandling.handle_main_crop_requested(app, 'auto-ID');
+                return
+            end
+
+            id_method = "";
+            if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
+                id_method = string(controls.id_dropdown.Value);
+                Program.GUIHandling.handle_main_id_method_changed(app, id_method);
+            end
+
+            if any(strcmpi(char(id_method), {'GAT/Transformer', 'Transformer', 'Anshita'}))
+                Program.GUIHandling.run_transformer_auto_id(app);
+                return
+            end
+
+            Program.GUIHandling.invoke_gui_callback(callbacks.auto, src, event);
+        end
+
+        function handle_main_detect_run(app, src, event)
+            controls = Program.GUIHandling.main_detect_id_controls(app);
+            callback = [];
+            if isprop(app, 'AutoDetectButton') && ~isempty(app.AutoDetectButton) && isvalid(app.AutoDetectButton) && ...
+                    isappdata(app.AutoDetectButton.Parent, 'main_detect_legacy_callback')
+                callback = getappdata(app.AutoDetectButton.Parent, 'main_detect_legacy_callback');
+            end
+            if isempty(callback)
+                return
+            end
+
+            if Program.GUIHandling.main_crop_checkbox_value(controls, 'detect_crop_checkbox')
+                Program.GUIHandling.handle_main_crop_requested(app, 'detection');
+                return
+            end
+
+            backend = Program.GUIPreferences.get_detection_backend();
+            if any(strcmp(backend, {'cellpose', 'yolo'}))
+                Program.GUIHandling.run_modern_auto_detector(app, backend);
+                return
+            end
+
+            Program.GUIHandling.invoke_gui_callback(callback, src, event);
+        end
+
+        function run_modern_auto_detector(app, backend)
+            if isempty(app.image_data)
+                return
+            end
+
+            body = app.BodyDropDown.Value;
+            num_neurons = app.neuron_info.numNeurons(body);
+            if isempty(num_neurons)
+                return
+            end
+            if ~isempty(app.image_neurons) && app.image_neurons.num_neurons() > 0
+                answer = uiconfirm(app.CELL_ID, ...
+                    'Neurons have already been marked, would you like to overwrite them?', ...
+                    'Neurons Already Marked', ...
+                    'Options', {'Overwrite', 'Cancel'}, ...
+                    'DefaultOption', 2, ...
+                    'CancelOption', 2, ...
+                    'Icon', 'warning');
+                if strcmpi(answer, 'cancel')
+                    return
+                end
+            end
+
+            rgbw = Program.GUIHandling.main_detection_channel_indices(app);
+            data_rgbw = app.image_data(:, :, :, rgbw);
+            readout_rgbw = Methods.Preprocess.zscore_frame(data_rgbw);
+            params = Program.GUIHandling.main_method_params(app, 'detect');
+
+            try
+                switch char(string(backend))
+                    case 'cellpose'
+                        [sp, app.mp_params] = Methods.CellposeDetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                            'ColorReadoutData', readout_rgbw, ...
+                            'Mode', Program.GUIHandling.param_value(params, 'mode', "cellpose"), ...
+                            'ModelPath', Program.GUIHandling.param_value(params, 'model_path', ""), ...
+                            'MaskSource', Program.GUIHandling.param_value(params, 'mask_source', "stitched"));
+                    case 'yolo'
+                        [sp, app.mp_params] = Methods.YOLODetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                            'ColorReadoutData', readout_rgbw, ...
+                            'Conf', Program.GUIHandling.param_value(params, 'conf', 0.45), ...
+                            'BoxMinPx', Program.GUIHandling.param_value(params, 'box_min_px', 2), ...
+                            'BoxMaxPx', Program.GUIHandling.param_value(params, 'box_max_px', 80), ...
+                            'WeightsPath', Program.GUIHandling.param_value(params, 'weights_path', ""), ...
+                            'OutputDir', Program.GUIHandling.yolo_output_dir(app), ...
+                            'KeepArtifacts', true);
+                    otherwise
+                        return
+                end
+            catch ME
+                uialert(app.CELL_ID, Program.GUIHandling.method_error_message(ME), ...
+                    'Auto-detect Failed', 'Icon', 'error');
+                return
+            end
+
+            if isempty(sp)
+                detail = Program.GUIHandling.auto_detect_empty_detail(app.mp_params);
+                uialert(app.CELL_ID, sprintf('Auto-detect failed to find any neurons.%s', detail), ...
+                    'Auto-detect Failed', 'Icon', 'error');
+                return
+            end
+
+            app.UnselectNeuron();
+            app.UserNeuronIDsListBox.Items = {};
+            app.UserNeuronIDsListBox.ItemsData = [];
+            app.UserNeuronIDsListBox.Value = {};
+            app.image_neurons = Neurons.Image(sp, app.worm.body, 'scale', app.image_um_scale');
+            Methods.Utils.removeNearbyNeurons(app.image_neurons, 2, 2);
+            app.SaveIDToFile();
+            app.UpdateNeuronLists();
+            Program.GUIHandling.gui_lock(app, 'enable', 'neuron_gui');
+            app.DrawImageData();
+            uialert(app.CELL_ID, 'Auto-detect completed successfully.', ...
+                'Auto-detect Complete', 'Icon', 'success');
+        end
+
+        function run_transformer_auto_id(app)
+            params = Program.GUIHandling.main_method_params(app, 'id');
+            try
+                Methods.TransformerAutoId.run(app, ...
+                    'ConfidenceThreshold', Program.GUIHandling.param_value(params, 'confidence_threshold', 0.5), ...
+                    'MCSamples', Program.GUIHandling.param_value(params, 'mc_samples', 20), ...
+                    'MinNeighbors', Program.GUIHandling.param_value(params, 'min_neighbors', 2), ...
+                    'BatchSize', Program.GUIHandling.param_value(params, 'batch_size', 32), ...
+                    'CheckpointPath', Program.GUIHandling.param_value(params, 'checkpoint_path', "/Users/adamg/neuroPAL/artifacts/anshita_transformer"), ...
+                    'DatasetID', Program.GUIHandling.param_value(params, 'dataset_id', "000981"));
+                app.SaveIDToFile();
+                app.UpdateNeuronLists();
+                app.DrawImageData();
+                uialert(app.CELL_ID, 'Auto-ID completed successfully.', ...
+                    'Auto-ID Complete', 'Icon', 'success');
+            catch ME
+                uialert(app.CELL_ID, Program.GUIHandling.method_error_message(ME), ...
+                    'Auto-ID Failed', 'Icon', 'error');
+            end
+        end
+
+        function message = method_error_message(ME)
+            message = char(string(ME.message));
+            switch char(string(ME.identifier))
+                case 'Wrapper:MissingCellposeModel'
+                    message = sprintf(['Cellpose model weights are not configured.\n\n%s\n\n' ...
+                        'For now, use YOLO for detection or set a local Cellpose model path in the method settings.'], ...
+                        ME.message);
+                case 'Wrapper:CellposeUnavailable'
+                    message = sprintf(['Cellpose could not start cleanly.\n\n%s\n\n' ...
+                        'Use YOLO for detection, or configure NEUROPAL_CELLPOSE_PYTHON and NEUROPAL_CELLPOSE_MODEL.'], ...
+                        ME.message);
+                case 'Wrapper:MissingYoloWeights'
+                    message = sprintf(['YOLO model weights are missing.\n\n%s\n\n' ...
+                        'Expected a local best.pt weights file.'], ME.message);
+                case 'Wrapper:YoloUnavailable'
+                    message = sprintf(['YOLO could not start cleanly.\n\n%s\n\n' ...
+                        'Check NEUROPAL_YOLO_PYTHON and the YOLO weights path.'], ME.message);
+                case {'Wrapper:MissingTransformerCheckpoint', 'Wrapper:MissingTransformerWeights'}
+                    message = sprintf(['Transformer checkpoint weights are missing.\n\n%s\n\n' ...
+                        'Choose a checkpoint directory containing best_model.pt before running Transformer auto-ID.'], ...
+                        ME.message);
+                case 'Wrapper:TransformerUnavailable'
+                    message = sprintf(['Transformer auto-ID could not start cleanly.\n\n%s\n\n' ...
+                        'Check NEUROPAL_TRANSFORMER_PYTHON and the checkpoint path.'], ME.message);
+                otherwise
+                    report = getReport(ME, 'basic', 'hyperlinks', 'off');
+                    if ~isempty(report)
+                        message = report;
+                    end
+            end
+        end
+
+        function indices = main_detection_channel_indices(app)
+            nc = size(app.image_data, 4);
+            indices = [];
+            try
+                state = Program.Handlers.channels.main_state(app);
+                candidates = [state.r.idx, state.g.idx, state.b.idx, state.white.idx];
+                enabled = [state.r.bool, state.g.bool, state.b.bool, state.white.bool];
+                indices = candidates(enabled & candidates >= 1 & candidates <= nc);
+            catch
+                indices = [];
+            end
+
+            if isempty(indices)
+                try
+                    prefs_indices = app.image_prefs.RGBW(~isnan(app.image_prefs.RGBW));
+                    indices = prefs_indices(prefs_indices >= 1 & prefs_indices <= nc);
+                catch
+                    indices = [];
+                end
+            end
+
+            if isempty(indices)
+                indices = 1:min(nc, 3);
+            end
+            indices = unique(round(double(indices)), 'stable');
+        end
+
+        function detail = auto_detect_empty_detail(params)
+            detail = "";
+            if ~isstruct(params) || isempty(params)
+                return
+            end
+
+            parts = {};
+            fields = {'raw_boxes', 'filtered_boxes', 'conf', 'iou_min', 'color_dot_min', ...
+                'summary_path', 'fused_csv', 'fused_png', 'volume_npy'};
+            for i = 1:numel(fields)
+                field_name = fields{i};
+                if isfield(params, field_name)
+                    value = params.(field_name);
+                    if isnumeric(value) || islogical(value)
+                        value_text = mat2str(value);
+                    else
+                        value_text = char(string(value));
+                    end
+                    parts{end + 1} = sprintf('%s: %s', field_name, value_text); %#ok<AGROW>
+                end
+            end
+
+            if ~isempty(parts)
+                detail = sprintf('\n\nDetector details:\n%s', strjoin(parts, newline));
+            end
+        end
+
+        function output_dir = yolo_output_dir(app)
+            root_dir = fullfile(fileparts(fileparts(mfilename('fullpath'))), '..', 'artifacts', 'gui_yolo');
+            try
+                source_name = string(app.image_file);
+                [~, source_name] = fileparts(source_name);
+            catch
+                source_name = "image";
+            end
+            safe_name = regexprep(char(source_name), '[^A-Za-z0-9_.-]', '_');
+            stamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
+            output_dir = string(fullfile(root_dir, sprintf('%s_%s', safe_name, stamp)));
+        end
+
+        function params = main_method_params(app, group)
+            key = sprintf('main_%s_params', char(string(group)));
+            params = struct();
+            if isappdata(app.CELL_ID, key)
+                params = getappdata(app.CELL_ID, key);
+            end
+        end
+
+        function value = param_value(params, field_name, default_value)
+            if isstruct(params) && isfield(params, field_name) && ~isempty(params.(field_name))
+                value = params.(field_name);
+            else
+                value = default_value;
+            end
+        end
+
+        function tf = main_crop_checkbox_value(controls, field_name)
+            tf = false;
+            if isempty(controls) || ~isfield(controls, field_name)
+                return
+            end
+            checkbox = controls.(field_name);
+            if isempty(checkbox) || ~isvalid(checkbox)
+                return
+            end
+            tf = logical(checkbox.Value);
+        end
+
+        function handle_main_crop_requested(app, routine_name)
+            if isempty(app) || ~isvalid(app) || ~isprop(app, 'XY') || isempty(app.XY) || ~isvalid(app.XY)
+                return
+            end
+
+            try
+                check = uiconfirm(app.CELL_ID, ...
+                    sprintf('Draw a crop box on the image for %s.', routine_name), ...
+                    'Select Crop', ...
+                    'Options', {'OK', 'Cancel'}, ...
+                    'DefaultOption', 1, ...
+                    'CancelOption', 2);
+                if strcmp(check, 'Cancel')
+                    return
+                end
+                roi = drawrectangle(app.XY, 'Color', 'black', 'StripeColor', 'm');
+                roi_bounds = round(double(roi.Position));
+                delete(roi);
+                setappdata(app.CELL_ID, 'main_crop_roi_bounds', roi_bounds);
+            catch
+                return
+            end
+
+            uialert(app.CELL_ID, ...
+                sprintf(['Crop selection is captured for %s, but crop-scoped execution still needs ' ...
+                'the detection/ID remapping step before it is safe to run. Uncheck Crop to run on the full image.'], routine_name), ...
+                'Crop Run Not Yet Wired', ...
+                'Icon', 'warning');
+        end
+
+        function items = main_auto_id_method_items(app)
+            primary_method = 'Nearest';
+            if nargin >= 1 && ~isempty(app) && isvalid(app) && ...
+                    isprop(app, 'AutoIDDropDown') && ~isempty(app.AutoIDDropDown) && ...
+                    isvalid(app.AutoIDDropDown)
+                try
+                    legacy_value = char(string(app.AutoIDDropDown.Value));
+                    if ~isempty(strtrim(legacy_value))
+                        primary_method = legacy_value;
+                    end
+                catch
+                end
+            end
+            if any(strcmpi(primary_method, {'GAT/Transformer', 'Anshita'}))
+                primary_method = 'Transformer';
+            end
+            allowed_primary_methods = {'Nearest', 'Transformer'};
+            if ~any(strcmpi(primary_method, allowed_primary_methods))
+                primary_method = 'Nearest';
+            end
+            items = unique({primary_method, 'Transformer'}, 'stable');
+        end
+
+        function layout = component_layout(component)
+            layout = [];
+            if isempty(component) || ~isvalid(component) || ~isprop(component, 'Layout')
+                return
+            end
+            try
+                layout = struct( ...
+                    'Row', component.Layout.Row, ...
+                    'Column', component.Layout.Column);
+            catch
+                layout = [];
+            end
+        end
+
+        function apply_component_layout(component, layout)
+            if isempty(component) || ~isvalid(component) || isempty(layout) || ~isprop(component, 'Layout')
+                return
+            end
+            try
+                component.Layout.Row = layout.Row;
+                component.Layout.Column = layout.Column;
+            catch
+            end
+        end
+
+        function normalize_main_header_control_height(component, anchor_bounds)
+            if isempty(component) || ~isvalid(component) || isempty(anchor_bounds) || ...
+                    ~isprop(component, 'Position')
+                return
+            end
+
+            try
+                pos = double(component.Position);
+                target_height = min(pos(4), double(anchor_bounds(4)));
+                pos(2) = double(anchor_bounds(2)) + max(0, double(anchor_bounds(4)) - target_height) / 2;
+                pos(4) = target_height;
+                component.Position = pos;
+            catch
+            end
+        end
+
+        function layout = next_component_layout(layout, offset)
+            if nargin < 2
+                offset = 1;
+            end
+            if isempty(layout) || ~isfield(layout, 'Column')
+                layout = [];
+                return
+            end
+            column = layout.Column;
+            if numel(column) > 1
+                column = column(end);
+            end
+            layout.Column = column + offset;
+        end
+
+        function position_main_user_id_controls_after(app, x_start)
+            if nargin < 2 || isempty(x_start) || ...
+                    ~isprop(app, 'UserIDButton') || isempty(app.UserIDButton) || ...
+                    ~isvalid(app.UserIDButton)
+                return
+            end
+
+            button = app.UserIDButton;
+            parent = button.Parent;
+            label = Program.GUIHandling.find_label_near_control(parent, button, 'User:');
+            if isempty(label)
+                button.Visible = 'on';
+                return
+            end
+
+            label_pos = Program.GUIHandling.component_bounds(label);
+            button_pos = Program.GUIHandling.component_bounds(button);
+            field = Program.GUIHandling.find_control_between_bounds(parent, label_pos, button_pos);
+
+            run_layout = [];
+            if isprop(app, 'AutoIDButton') && ~isempty(app.AutoIDButton) && isvalid(app.AutoIDButton)
+                run_layout = Program.GUIHandling.component_layout(app.AutoIDButton);
+            end
+            if ~isempty(run_layout)
+                label_layout = Program.GUIHandling.next_component_layout(run_layout, 1);
+                field_layout = Program.GUIHandling.next_component_layout(run_layout, 2);
+                button_layout = Program.GUIHandling.next_component_layout(run_layout, 3);
+                Program.GUIHandling.apply_component_layout(label, label_layout);
+                Program.GUIHandling.apply_component_layout(field, field_layout);
+                Program.GUIHandling.apply_component_layout(button, button_layout);
+            end
+
+            label.Position(1) = x_start;
+            next_x = x_start + label.Position(3) + 6;
+            if ~isempty(field)
+                field.Position(1) = next_x;
+                next_x = field.Position(1) + field.Position(3) + 6;
+            end
+            button.Position(1) = next_x;
+            button.Visible = 'on';
+        end
+
+        function control = find_control_between_bounds(parent, left_bounds, right_bounds)
+            control = [];
+            if isempty(parent) || ~isvalid(parent) || isempty(left_bounds) || isempty(right_bounds)
+                return
+            end
+
+            left_edge = left_bounds(1) + left_bounds(3);
+            right_edge = right_bounds(1);
+            mid_y = right_bounds(2) + right_bounds(4) / 2;
+            children = parent.Children;
+            best_distance = inf;
+            for n = 1:numel(children)
+                child = children(n);
+                if isempty(child) || ~isvalid(child) || ~isprop(child, 'Position')
+                    continue
+                end
+                if isprop(child, 'Text') && strcmp(char(string(child.Text)), 'User:')
+                    continue
+                end
+                try
+                    pos = double(child.Position);
+                catch
+                    continue
+                end
+
+                child_mid_y = pos(2) + pos(4) / 2;
+                between_x = pos(1) >= left_edge - 2 && pos(1) + pos(3) <= right_edge + 2;
+                same_row = abs(child_mid_y - mid_y) <= max(right_bounds(4), pos(4));
+                if between_x && same_row
+                    distance = abs(pos(1) - left_edge);
+                    if distance < best_distance
+                        best_distance = distance;
+                        control = child;
+                    end
+                end
+            end
+        end
+
+        function controls = main_detect_id_controls(app)
+            controls = [];
+            if nargin < 1 || isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'AutoDetectButton') || isempty(app.AutoDetectButton) || ...
+                    ~isvalid(app.AutoDetectButton)
+                return
+            end
+            parent = app.AutoDetectButton.Parent;
+            if isempty(parent) || ~isvalid(parent) || ~isappdata(parent, 'main_detect_id_controls')
+                return
+            end
+            controls = getappdata(parent, 'main_detect_id_controls');
+        end
+
+        function handle_main_detect_method_changed(app, backend)
+            Program.GUIPreferences.set_detection_backend(backend);
+            Program.GUIPreferences.save();
+            Program.GUIHandling.update_detection_menu_text(app, backend);
+            Program.GUIHandling.refresh_main_method_params(app);
+        end
+
+        function update_detection_menu_text(app, backend)
+            if nargin < 2 || isempty(backend)
+                backend = Program.GUIPreferences.get_detection_backend();
+            end
+            if nargin < 1 || isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'ToggleNeuronDetectionMenu') || isempty(app.ToggleNeuronDetectionMenu) || ...
+                    ~isvalid(app.ToggleNeuronDetectionMenu)
+                return
+            end
+
+            switch char(string(backend))
+                case 'mp'
+                    app.ToggleNeuronDetectionMenu.Text = 'Use NN-Detect Neurons';
+                case 'nn'
+                    app.ToggleNeuronDetectionMenu.Text = 'Use Cellpose-Detect Neurons';
+                case 'cellpose'
+                    app.ToggleNeuronDetectionMenu.Text = 'Use YOLO-Detect Neurons';
+                case 'yolo'
+                    app.ToggleNeuronDetectionMenu.Text = 'Use MP-Detect Neurons';
+            end
+        end
+
+        function hide_main_click_mode_control(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'MouseClickDropDown') || isempty(app.MouseClickDropDown) || ...
+                    ~isvalid(app.MouseClickDropDown)
+                return
+            end
+
+            dropdown = app.MouseClickDropDown;
+            try
+                if isprop(dropdown, 'Items') && ~any(strcmp(dropdown.Items, 'Add Neuron'))
+                    dropdown.Items{end + 1} = 'Add Neuron';
+                end
+                dropdown.Value = 'Add Neuron';
+                if isprop(dropdown, 'Enable')
+                    dropdown.Enable = 'off';
+                end
+            catch
+            end
+
+            parent = dropdown.Parent;
+            if isempty(parent) || ~isvalid(parent)
+                dropdown.Visible = 'off';
+                return
+            end
+
+            if isappdata(parent, 'main_click_mode_control_hidden')
+                dropdown.Visible = 'off';
+                return
+            end
+
+            label = Program.GUIHandling.find_clicks_label(parent, dropdown);
+            removed_bounds = Program.GUIHandling.component_bounds(dropdown);
+            if ~isempty(label)
+                label_bounds = Program.GUIHandling.component_bounds(label);
+                removed_bounds = Program.GUIHandling.merge_bounds(removed_bounds, label_bounds);
+            end
+
+            if ~isempty(label)
+                label.Visible = 'off';
+            end
+            dropdown.Visible = 'off';
+
+            if ~isempty(removed_bounds)
+                Program.GUIHandling.shift_header_row_after_removed_bounds(parent, removed_bounds);
+            end
+            setappdata(parent, 'main_click_mode_control_hidden', true);
+        end
+
+        function hide_next_neuron_mode_control(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'NextNeuronDropDown') || isempty(app.NextNeuronDropDown) || ...
+                    ~isvalid(app.NextNeuronDropDown)
+                return
+            end
+
+            dropdown = app.NextNeuronDropDown;
+            try
+                if isprop(dropdown, 'Items') && ~any(strcmp(dropdown.Items, 'Nearest'))
+                    dropdown.Items{end + 1} = 'Nearest';
+                end
+                dropdown.Value = 'Nearest';
+                if isprop(dropdown, 'Enable')
+                    dropdown.Enable = 'off';
+                end
+            catch
+            end
+
+            parent = dropdown.Parent;
+            if isempty(parent) || ~isvalid(parent)
+                dropdown.Visible = 'off';
+                return
+            end
+
+            if isappdata(parent, 'next_neuron_mode_control_hidden')
+                dropdown.Visible = 'off';
+                return
+            end
+
+            label = Program.GUIHandling.find_label_near_control(parent, dropdown, 'Next Neuron:');
+            removed_bounds = Program.GUIHandling.component_bounds(dropdown);
+            if ~isempty(label)
+                label_bounds = Program.GUIHandling.component_bounds(label);
+                removed_bounds = Program.GUIHandling.merge_bounds(removed_bounds, label_bounds);
+            end
+
+            if ~isempty(label)
+                label.Visible = 'off';
+            end
+            dropdown.Visible = 'off';
+
+            if ~isempty(removed_bounds)
+                Program.GUIHandling.shift_controls_below_removed_bounds(parent, removed_bounds);
+            end
+            setappdata(parent, 'next_neuron_mode_control_hidden', true);
+        end
+
+        function label = find_clicks_label(parent, dropdown)
+            label = Program.GUIHandling.find_label_near_control(parent, dropdown, 'Clicks:');
+        end
+
+        function label = find_label_near_control(parent, control, label_text)
+            label = [];
+            if isempty(parent) || ~isvalid(parent)
+                return
+            end
+
+            labels = findall(parent, 'Type', 'uilabel');
+            if isempty(labels)
+                return
+            end
+
+            control_bounds = Program.GUIHandling.component_bounds(control);
+            best_score = inf;
+            for n = 1:numel(labels)
+                candidate = labels(n);
+                if isempty(candidate) || ~isvalid(candidate) || ~isprop(candidate, 'Text')
+                    continue
+                end
+                text = char(string(candidate.Text));
+                if ~strcmp(strtrim(text), label_text)
+                    continue
+                end
+
+                candidate_bounds = Program.GUIHandling.component_bounds(candidate);
+                score = 0;
+                if ~isempty(control_bounds) && ~isempty(candidate_bounds)
+                    score = abs(candidate_bounds(2) - control_bounds(2)) + ...
+                        abs((candidate_bounds(1) + candidate_bounds(3)) - control_bounds(1));
+                end
+                if score < best_score
+                    best_score = score;
+                    label = candidate;
+                end
+            end
+        end
+
+        function bounds = component_bounds(component)
+            bounds = [];
+            if isempty(component) || ~isvalid(component) || ~isprop(component, 'Position')
+                return
+            end
+            try
+                bounds = double(component.Position);
+            catch
+                bounds = [];
+            end
+        end
+
+        function bounds = merge_bounds(bounds_a, bounds_b)
+            if isempty(bounds_a)
+                bounds = bounds_b;
+                return
+            end
+            if isempty(bounds_b)
+                bounds = bounds_a;
+                return
+            end
+
+            left = min(bounds_a(1), bounds_b(1));
+            bottom = min(bounds_a(2), bounds_b(2));
+            right = max(bounds_a(1) + bounds_a(3), bounds_b(1) + bounds_b(3));
+            top = max(bounds_a(2) + bounds_a(4), bounds_b(2) + bounds_b(4));
+            bounds = [left, bottom, right - left, top - bottom];
+        end
+
+        function shift_header_row_after_removed_bounds(parent, removed_bounds)
+            if isempty(parent) || ~isvalid(parent) || isempty(removed_bounds)
+                return
+            end
+
+            shift = removed_bounds(3) + 8;
+            removed_right = removed_bounds(1) + removed_bounds(3);
+            removed_mid_y = removed_bounds(2) + removed_bounds(4) / 2;
+
+            children = parent.Children;
+            for n = 1:numel(children)
+                child = children(n);
+                if isempty(child) || ~isvalid(child) || ~isprop(child, 'Position') || ...
+                        ~isprop(child, 'Visible') || strcmp(child.Visible, 'off')
+                    continue
+                end
+                try
+                    pos = double(child.Position);
+                catch
+                    continue
+                end
+
+                child_mid_y = pos(2) + pos(4) / 2;
+                same_row = abs(child_mid_y - removed_mid_y) <= max(removed_bounds(4), pos(4));
+                is_right_of_removed_control = pos(1) > removed_right;
+                if same_row && is_right_of_removed_control
+                    pos(1) = max(0, pos(1) - shift);
+                    try
+                        child.Position = pos;
+                    catch
+                    end
+                end
+            end
+        end
+
+        function shift_controls_below_removed_bounds(parent, removed_bounds)
+            if isempty(parent) || ~isvalid(parent) || isempty(removed_bounds)
+                return
+            end
+
+            shift = removed_bounds(4) + 8;
+            removed_bottom = removed_bounds(2);
+            removed_mid_x = removed_bounds(1) + removed_bounds(3) / 2;
+
+            children = parent.Children;
+            for n = 1:numel(children)
+                child = children(n);
+                if isempty(child) || ~isvalid(child) || ~isprop(child, 'Position') || ...
+                        ~isprop(child, 'Visible') || strcmp(child.Visible, 'off')
+                    continue
+                end
+                try
+                    pos = double(child.Position);
+                catch
+                    continue
+                end
+
+                child_mid_x = pos(1) + pos(3) / 2;
+                same_column = abs(child_mid_x - removed_mid_x) <= max(removed_bounds(3), pos(3));
+                is_below_removed_control = pos(2) + pos(4) < removed_bottom;
+                if same_column && is_below_removed_control
+                    pos(2) = pos(2) + shift;
+                    try
+                        child.Position = pos;
+                    catch
+                    end
+                end
+            end
         end
 
         function install_cellpose_mask_button(app)
@@ -1769,6 +3378,7 @@ classdef GUIHandling
                 app.ProcCropImageButton.ButtonPushedFcn = @(src, event) ...
                     Program.Routines.Processing.crop();
             end
+            Program.GUIHandling.ensure_processing_mirror_z_controls(app);
             if isprop(app, 'ProcSaveButton') && isvalid(app.ProcSaveButton)
                 app.ProcSaveButton.ButtonPushedFcn = @(src, event) ...
                     Program.Routines.Processing.save();
@@ -1806,15 +3416,20 @@ classdef GUIHandling
             end
 
             if strcmp(controls.panel.Visible, 'on')
-                if ~Program.GUIHandling.store_normalize_colors_editor_values(app)
-                    return
-                end
                 Program.GUIHandling.hide_normalize_colors_editor(app);
-                Program.GUIHandling.apply_processing_runtime_action(app, 'zscore');
                 return
             end
 
             Program.GUIHandling.show_normalize_colors_editor(app);
+        end
+
+        function commit_processing_normalize_colors(app)
+            if ~Program.GUIHandling.store_normalize_colors_editor_values(app)
+                return
+            end
+
+            Program.GUIHandling.hide_normalize_colors_editor(app);
+            Program.GUIHandling.apply_processing_runtime_action(app, 'zscore');
         end
 
         function controls = ensure_normalize_colors_editor(app)
@@ -1828,10 +3443,10 @@ classdef GUIHandling
                 'Visible', 'off', ...
                 'Units', 'pixels', ...
                 'AutoResizeChildren', 'off');
-            panel.Position(3:4) = [238, 98];
+            panel.Position(3:4) = [238, 136];
 
             grid = uigridlayout(panel, ...
-                'RowHeight', {28, 28}, ...
+                'RowHeight', {28, 28, 30}, ...
                 'ColumnWidth', {'1x', 72}, ...
                 'ColumnSpacing', 6, ...
                 'RowSpacing', 6, ...
@@ -1867,13 +3482,38 @@ classdef GUIHandling
             max_field.Layout.Row = 2;
             max_field.Layout.Column = 2;
 
+            button_grid = uigridlayout(grid, ...
+                'RowHeight', {'1x'}, ...
+                'ColumnWidth', {'1x', '1x'}, ...
+                'ColumnSpacing', 6, ...
+                'Padding', [0 0 0 0]);
+            button_grid.Layout.Row = 3;
+            button_grid.Layout.Column = [1 2];
+
+            cancel_button = uibutton(button_grid, 'push', ...
+                'Text', 'Cancel', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.hide_normalize_colors_editor(app));
+            cancel_button.Layout.Row = 1;
+            cancel_button.Layout.Column = 1;
+
+            apply_button = uibutton(button_grid, 'push', ...
+                'Text', 'Apply', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.commit_processing_normalize_colors(app));
+            apply_button.Layout.Row = 1;
+            apply_button.Layout.Column = 2;
+
             controls = struct( ...
                 'panel', panel, ...
                 'grid', grid, ...
+                'button_grid', button_grid, ...
                 'bg_label', bg_label, ...
                 'bg_field', bg_field, ...
                 'max_label', max_label, ...
-                'max_field', max_field);
+                'max_field', max_field, ...
+                'cancel_button', cancel_button, ...
+                'apply_button', apply_button);
             setappdata(app.CELL_ID, 'proc_normalize_colors_editor', controls);
         end
 
@@ -1885,7 +3525,7 @@ classdef GUIHandling
 
             controls = getappdata(app.CELL_ID, 'proc_normalize_colors_editor');
             required = {'panel', 'grid', 'bg_label', 'bg_field', 'max_label', ...
-                'max_field'};
+                'max_field', 'button_grid', 'cancel_button', 'apply_button'};
             for n = 1:numel(required)
                 name = required{n};
                 if ~isfield(controls, name) || isempty(controls.(name)) || ~isvalid(controls.(name))
@@ -1940,7 +3580,7 @@ classdef GUIHandling
             drawnow limitrate nocallbacks;
             button_pos = getpixelposition(app.ProcNormalizeColorsButton, true);
             figure_pos = app.CELL_ID.Position;
-            panel_size = [238, 98];
+            panel_size = [238, 136];
 
             x = button_pos(1) - panel_size(1) - 8;
             if x < 10
@@ -2085,6 +3725,25 @@ classdef GUIHandling
             if isprop(app, 'DropperRadiusEditFieldLabel') && isvalid(app.DropperRadiusEditFieldLabel)
                 app.DropperRadiusEditFieldLabel.Tooltip = tooltip;
             end
+
+            if isprop(app, 'SpectralUnmixingGrid') && isvalid(app.SpectralUnmixingGrid)
+                components = findall(app.SpectralUnmixingGrid);
+                for comp = 1:numel(components)
+                    component = components(comp);
+                    if ~isprop(component, 'Text')
+                        continue
+                    end
+                    try
+                        text_value = char(string(component.Text));
+                    catch
+                        continue
+                    end
+                    cleaned_text = regexprep(text_value, '[^\x00-\x7F]', '');
+                    if ~strcmp(cleaned_text, text_value)
+                        component.Text = strtrim(cleaned_text);
+                    end
+                end
+            end
         end
 
         function set_processing_spectral_unmixing_state(app, enabled)
@@ -2166,6 +3825,18 @@ classdef GUIHandling
 
         function confirm_processing_rotation(app)
             rotate_actions = {};
+            rotate_angle = 0;
+            should_rotate_neurons = false;
+
+            try
+                rotate_angle = Program.GUIHandling.canonical_rotation_angle(app.proc_rot_spinner.Value);
+            catch
+                rotate_angle = 0;
+            end
+
+            if isprop(app, 'ProcRotateNeuronsCheckBox') && isvalid(app.ProcRotateNeuronsCheckBox)
+                should_rotate_neurons = logical(app.ProcRotateNeuronsCheckBox.Value);
+            end
 
             if app.flip_lr.Value
                 rotate_actions{end+1} = 'hori'; %#ok<AGROW>
@@ -2184,12 +3855,264 @@ classdef GUIHandling
                 return
             end
 
+            if should_rotate_neurons && any(strcmpi(rotate_actions, 'rotate')) ...
+                    && ~ismember(rotate_angle, [90, 180, 270])
+                uialert(app.CELL_ID, ...
+                    'Neuron geometry rotation is limited to 90, 180, and 270 degrees in processing. Choose one of those angles, or disable Rotate Neurons before applying.', ...
+                    'Unsupported Neuron Rotation', 'Icon', 'warning');
+                return
+            end
+
+            context = Program.Helpers.processing_colormap_context(app);
+            if should_rotate_neurons
+                [neurons_rotatable, neurons_msg] = Program.Helpers.apply_processing_rotation_to_neurons( ...
+                    app, rotate_actions, rotate_angle, context.dims, true);
+                if ~neurons_rotatable
+                    if isempty(neurons_msg)
+                        neurons_msg = 'Neuron geometry could not be validated for the requested processing rotation.';
+                    end
+                    uialert(app.CELL_ID, neurons_msg, 'Neuron Rotation Not Possible', 'Icon', 'error');
+                    return
+                end
+            end
             applied = Program.Helpers.apply_processing_preview_action(app, rotate_actions);
             if ~applied
                 return
             end
 
+            if should_rotate_neurons
+                neurons_rotated = Program.Helpers.apply_processing_rotation_to_neurons( ...
+                    app, rotate_actions, rotate_angle, context.dims);
+                if ~neurons_rotated
+                    uialert(app.CELL_ID, ...
+                        'Neuron geometry rotation did not complete correctly. Rotation was not applied.', ...
+                        'Neuron Rotation Failed', 'Icon', 'error');
+                    return
+                end
+            end
+
             Program.Routines.GUI.set_manipulation_panel('closed');
+        end
+
+        function controls = ensure_processing_mirror_z_controls(app)
+            controls = Program.GUIHandling.processing_mirror_z_controls(app);
+            if ~isempty(controls)
+                return
+            end
+            if ~isprop(app, 'GridLayout83') || isempty(app.GridLayout83) || ~isvalid(app.GridLayout83)
+                controls = [];
+                return
+            end
+
+            app.GridLayout83.ColumnWidth = {'1x', '1x'};
+            app.GridLayout83.RowHeight = {30, 30, '1x'};
+            app.GridLayout83.RowSpacing = 4;
+            app.GridLayout83.ColumnSpacing = 6;
+            app.GridLayout83.Padding = [6 6 6 6];
+            Program.GUIHandling.ensure_processing_manipulation_panel_height(app, 150);
+
+            app.ProcCropImageButton.Layout.Row = 1;
+            app.ProcCropImageButton.Layout.Column = 1;
+            app.RotateButton.Layout.Row = 1;
+            app.RotateButton.Layout.Column = 2;
+            app.DownsampleButton.Layout.Row = 2;
+            app.DownsampleButton.Layout.Column = 1;
+
+            Program.GUIHandling.span_processing_manipulation_panel(app, 'proc_ds_panel');
+            Program.GUIHandling.span_processing_manipulation_panel(app, 'proc_rot_panel');
+            Program.GUIHandling.span_processing_manipulation_panel(app, 'proc_crop_panel');
+
+            button = uibutton(app.GridLayout83, 'push', ...
+                'Text', 'Mirror Z Axis', ...
+                'Tooltip', 'Mirror the volume across the Z/depth axis.', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.show_processing_mirror_z_panel(app));
+            button.Layout.Row = 2;
+            button.Layout.Column = 2;
+
+            panel = uipanel(app.GridLayout83, ...
+                'BorderType', 'none', ...
+                'Visible', 'off');
+            panel.Layout.Row = 3;
+            panel.Layout.Column = [1 2];
+
+            grid = uigridlayout(panel, ...
+                'ColumnWidth', {'1x', 80, 80}, ...
+                'RowHeight', {'1x'}, ...
+                'ColumnSpacing', 6, ...
+                'Padding', [0 0 0 0]);
+
+            include_neurons = uicheckbox(grid, ...
+                'Text', 'Include neurons', ...
+                'Tooltip', 'Mirror neuron Z coordinates along with the image volume.');
+            include_neurons.Layout.Row = 1;
+            include_neurons.Layout.Column = 1;
+
+            cancel_button = uibutton(grid, 'push', ...
+                'Text', 'Cancel', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.Routines.GUI.set_manipulation_panel('closed'));
+            cancel_button.Layout.Row = 1;
+            cancel_button.Layout.Column = 2;
+
+            apply_button = uibutton(grid, 'push', ...
+                'Text', 'Apply', ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.apply_processing_mirror_z(app));
+            apply_button.Layout.Row = 1;
+            apply_button.Layout.Column = 3;
+
+            controls = struct( ...
+                'button', button, ...
+                'panel', panel, ...
+                'grid', grid, ...
+                'include_neurons', include_neurons, ...
+                'cancel_button', cancel_button, ...
+                'apply_button', apply_button);
+            setappdata(app.CELL_ID, 'proc_mirror_z_controls', controls);
+        end
+
+        function controls = processing_mirror_z_controls(app)
+            controls = [];
+            if isempty(app) || ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID) || ...
+                    ~isvalid(app.CELL_ID) || ~isappdata(app.CELL_ID, 'proc_mirror_z_controls')
+                return
+            end
+
+            controls = getappdata(app.CELL_ID, 'proc_mirror_z_controls');
+            required = {'button', 'panel', 'grid', 'include_neurons', ...
+                'cancel_button', 'apply_button'};
+            for n = 1:numel(required)
+                name = required{n};
+                if ~isfield(controls, name) || isempty(controls.(name)) || ~isvalid(controls.(name))
+                    controls = [];
+                    rmappdata(app.CELL_ID, 'proc_mirror_z_controls');
+                    return
+                end
+            end
+        end
+
+        function show_processing_mirror_z_panel(app)
+            controls = Program.GUIHandling.ensure_processing_mirror_z_controls(app);
+            if isempty(controls)
+                return
+            end
+
+            Program.Routines.GUI.set_manipulation_panel('mirrorz');
+        end
+
+        function hide_processing_mirror_z_panel(app)
+            controls = Program.GUIHandling.processing_mirror_z_controls(app);
+            if isempty(controls)
+                return
+            end
+
+            controls.panel.Visible = 'off';
+        end
+
+        function set_processing_mirror_z_enabled(app, enabled)
+            controls = Program.GUIHandling.ensure_processing_mirror_z_controls(app);
+            if isempty(controls)
+                return
+            end
+
+            if logical(enabled)
+                controls.button.Visible = 'on';
+                controls.button.Enable = 'on';
+            else
+                controls.button.Enable = 'off';
+            end
+        end
+
+        function apply_processing_mirror_z(app)
+            controls = Program.GUIHandling.processing_mirror_z_controls(app);
+            include_neurons = false;
+            if ~isempty(controls)
+                include_neurons = logical(controls.include_neurons.Value);
+            end
+
+            if ~strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap')
+                uialert(app.CELL_ID, ...
+                    'Mirror Z is currently available for NeuroPAL image volumes only.', ...
+                    'Mirror Z Not Available', 'Icon', 'warning');
+                return
+            end
+
+            context = Program.Helpers.processing_colormap_context(app);
+            if include_neurons && ~Program.GUIHandling.can_mirror_processing_neurons(app)
+                uialert(app.CELL_ID, ...
+                    'Neuron geometry is not available for Z mirroring.', ...
+                    'Mirror Z Not Possible', 'Icon', 'warning');
+                return
+            end
+
+            applied = Program.Helpers.apply_processing_preview_action(app, {'mirrorz'});
+            if ~applied
+                return
+            end
+
+            if include_neurons
+                dims = double(context.dims(:).');
+                if numel(dims) < 3
+                    dims(end+1:3) = 1;
+                end
+                mirror_proxy = zeros(round(dims(1)), round(dims(2)), round(dims(3)));
+                try
+                    app.image_neurons.mirror_neurons_Z(mirror_proxy);
+                    Program.Routines.ID.render();
+                catch
+                    uialert(app.CELL_ID, ...
+                        'The image was mirrored, but neuron Z mirroring failed.', ...
+                        'Neuron Mirror Failed', 'Icon', 'warning');
+                end
+            end
+
+            Program.Routines.GUI.set_manipulation_panel('closed');
+        end
+
+        function tf = can_mirror_processing_neurons(app)
+            tf = false;
+            if isempty(app) || ~isprop(app, 'image_neurons') || isempty(app.image_neurons)
+                return
+            end
+            try
+                tf = ismethod(app.image_neurons, 'mirror_neurons_Z') && ...
+                    isprop(app.image_neurons, 'neurons');
+            catch
+                tf = false;
+            end
+        end
+
+        function span_processing_manipulation_panel(app, panel_name)
+            if isprop(app, panel_name) && ~isempty(app.(panel_name)) && isvalid(app.(panel_name))
+                app.(panel_name).Layout.Row = 3;
+                app.(panel_name).Layout.Column = [1 2];
+            end
+        end
+
+        function ensure_processing_manipulation_panel_height(app, minimum_height)
+            if nargin < 2 || isempty(minimum_height)
+                minimum_height = 150;
+            end
+            if isempty(app) || ~isprop(app, 'ImageManipulationPanel') || ...
+                    isempty(app.ImageManipulationPanel) || ~isvalid(app.ImageManipulationPanel) || ...
+                    ~isprop(app, 'ProcSideGrid') || isempty(app.ProcSideGrid) || ...
+                    ~isvalid(app.ProcSideGrid)
+                return
+            end
+
+            try
+                row_index = app.ImageManipulationPanel.Layout.Row;
+                row_heights = app.ProcSideGrid.RowHeight;
+                if row_index >= 1 && row_index <= numel(row_heights)
+                    current_height = row_heights{row_index};
+                    if ~isnumeric(current_height) || current_height < minimum_height
+                        row_heights{row_index} = minimum_height;
+                        app.ProcSideGrid.RowHeight = row_heights;
+                    end
+                end
+            catch
+            end
         end
 
         function configure_processing_histogram_slider(slider)
@@ -2924,8 +4847,8 @@ classdef GUIHandling
             end
 
             row_heights = app.ProcAxGrid.RowHeight;
-            if numel(row_heights) >= 4 && ~isequal(row_heights{4}, 30)
-                row_heights{4} = 30;
+            if numel(row_heights) >= 4 && ~isequal(row_heights{4}, 48)
+                row_heights{4} = 48;
                 app.ProcAxGrid.RowHeight = row_heights;
             end
         end

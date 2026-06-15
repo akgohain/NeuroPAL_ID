@@ -44,7 +44,19 @@ function open(path)
 
         filename = [path, name];
         close(d)
-        proc_code = app.proc_check("image", filename);
+        try
+            proc_code = app.proc_check("image", filename);
+        catch ME
+            [~, ~, ext] = fileparts(filename);
+            if strcmpi(ext, '.nwb')
+                Program.Helpers.debug_event('OpenFile', ...
+                    'Skipping proc_check for "%s" because nwbRead failed during size probing: %s', ...
+                    filename, ME.message);
+                proc_code = filename;
+            else
+                rethrow(ME);
+            end
+        end
         d = uiprogressdlg(app.CELL_ID,'Title','Loading file...',...
     'Indeterminate','on');
         if proc_code == 1
@@ -120,7 +132,7 @@ function open(path)
     end
 
     % Z-score the image.
-    app.image_data_zscored = Methods.Preprocess.zscore_frame(app.image_data);
+    app.image_data_zscored = [];
 
     % Load and update the gamma.
     gamma_size = length(app.gamma_RGBW_DIC_GFP_index);
@@ -186,7 +198,12 @@ function open(path)
     % Setup the worm info.
     app.worm = worm;
     app.BodyDropDown.Value = worm.body;
-    app.AgeDropDown.Value = worm.age;
+    if any(strcmp(app.AgeDropDown.Items, worm.age))
+        app.AgeDropDown.Value = worm.age;
+    else
+        app.AgeDropDown.Value = 'Adult';
+        app.worm.age = 'Adult';
+    end
     app.SexDropDown.Value = worm.sex;
     app.StrainEditField.Value = worm.strain;
     app.SubjectNotesTextArea.Value = worm.notes;
@@ -205,6 +222,7 @@ function open(path)
     app.id_file = id_file;
     app.mp_params = mp;
     read_nwb_neurons = 0;
+    nwb_data = [];
     if ~isempty(neurons)
         app.image_neurons = neurons;
         Program.GUIHandling.gui_lock(app, 'enable', 'neuron_gui');
@@ -214,15 +232,15 @@ function open(path)
         % The loadNP function should have already tried to load from NWB
         Program.Helpers.debug_log('DEBUG: NWB file detected but no neurons loaded\n');
         
-        % Check for legacy NWB neuron data format for backwards compatibility
-        nwb_data = nwbRead(filename);
-        if any(ismember(nwb_data.processing.keys, 'NeuroPAL')) && ...
-            (any(ismember(nwb_data.processing.get('NeuroPAL').nwbdatainterface.keys, 'NeuroPALSegmentation')) ||  ...
-            any(ismember(nwb_data.processing.get('NeuroPAL').nwbdatainterface.keys, 'ImageSegmentation')) ||  ...
-            any(ismember(nwb_data.processing.get('NeuroPAL').dynamictable.keys, 'VolumeSegmentation')) ||  ...
-            any(ismember(nwb_data.processing.get('NeuroPAL').dynamictable.keys, 'NeuroPALNeurons')))
-            read_nwb_neurons = 1;
-        end             
+        % Check for legacy NWB neuron data format for backwards
+        % compatibility. Use HDF5 first so broken ExternalLinks in unrelated
+        % NWB objects do not block image opening.
+        if DataHandling.Helpers.nwb.has_neuropal_segmentation(filename)
+            Program.Helpers.debug_event('NWB', ...
+                ['NWB segmentation metadata found in "%s", but automatic ' ...
+                 'MatNWB neuron import is skipped during image open.'], ...
+                filename);
+        end
 
         app.image_neurons = Neurons.Image([], worm.body, 'scale', app.image_um_scale');
     else

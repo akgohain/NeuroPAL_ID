@@ -64,27 +64,33 @@ classdef identification_gui
 
             % Initialize code as 0.
             code = 0;
+            file_name = '';
+            file_path = '';
 
             % Check whether we're actively opening a file. If so, return.
             if obj.is_opening_file
                 return
             end
 
-            % If no path was passed...
-            if ~exist('path', 'var')
+            % If a path was passed...
+            if nargin > 1 && ~isempty(path)
+                file_path = path;
+                [~, file_name, file_ext] = fileparts(file_path);
+                file_name = [file_name, file_ext];
+            else
                 % Prompt a file selection dialogue.
                 [file_name, parent_path] = obj.prompt_file_selection();
 
                 % Check whether returned path is empty.
-                if ~isempty(parent_path)
-                    % If not, construct the file path by joining the
-                    % parent_path and the file_name.
-                    file_path = [parent_path, file_name];
-                else
+                if isempty(parent_path) || isempty(file_name)
                     % If the resulting path is empty, the user canceled
                     % the file selection dialogue, so return.
                     return
                 end
+
+                % Construct the file path by joining the parent_path and
+                % the file_name.
+                file_path = fullfile(parent_path, file_name);
             end           
 
             % Get the handle of our dialogues class.
@@ -125,7 +131,7 @@ classdef identification_gui
             catch ME
                 msg = getReport(ME, 'extended', 'hyperlinks', 'off');
                 uialert(window, ...
-                    {['Cannot read "' filename '"!'], ['Error:' msg]}, ...
+                    {['Cannot read "' file_name '"!'], ['Error:' msg]}, ...
                     'Image File Failure', 'Icon', 'error');
                 return;
             end
@@ -133,7 +139,7 @@ classdef identification_gui
             % Validate the biological properties (age, sex, body part) of
             % the given worm by checking whether each property's value is
             % present in its respective dropdown's item list.
-            is_valid_worm = obj.validate_worm_properties(worm);
+            is_valid_worm = obj.validate_worm_properties(worm, app, file_name);
             if ~is_valid_worm
                 % If it isn't, return.
                 return
@@ -148,16 +154,16 @@ classdef identification_gui
 
             % Setup the file.
             app.image_file = np_file;
-            app.id_file = [];
+            app.id_file = id_file;
+            app.mp_params = mp;
             app.image_prefs = prefs;
 
             % Setup the image.
-            app.image_name = name; %strrep(name, '_', '\_');
+            app.image_name = file_name; %strrep(file_name, '_', '\_');
             app.image_data = data;
 
             % Z-score the image.
-            app.image_data_zscored = Methods.Preprocess.zscore_frame( ...
-                app.image_data);
+            app.image_data_zscored = [];
 
 
             % Load and update the gamma.
@@ -225,7 +231,12 @@ classdef identification_gui
             % Setup the worm info.
             app.worm = worm;
             app.BodyDropDown.Value = worm.body;
-            app.AgeDropDown.Value = worm.age;
+            if any(strcmp(app.AgeDropDown.Items, worm.age))
+                app.AgeDropDown.Value = worm.age;
+            else
+                app.AgeDropDown.Value = 'Adult';
+                app.worm.age = 'Adult';
+            end
             app.SexDropDown.Value = worm.sex;
             app.StrainEditField.Value = worm.strain;
             app.SubjectNotesTextArea.Value = worm.notes;
@@ -241,6 +252,8 @@ classdef identification_gui
             if ~isempty(info.scale)
                 scale = info.scale;
             end
+
+            code = 1;
         end
     end
 
@@ -266,12 +279,20 @@ classdef identification_gui
             app.TabGroup.SelectedTab = app.NeuroPALIDTab;
         end
 
-        function is_valid_worm = validate_worm_properties(worm_struct)
+        function is_valid_worm = validate_worm_properties(worm_struct, app, file_name)
             % Initialize is_valid_worm.
             is_valid_worm = 0;
 
             % Define all biological worm properties.
-            worm_properties = {"Age", "Sex", "Body"};
+            worm_properties = ["age", "sex", "body"];
+
+            if nargin < 2 || isempty(app)
+                app = Program.ProgramInfo.app;
+            end
+
+            if nargin < 3 || isempty(file_name)
+                file_name = 'selected file';
+            end
 
             % For each biological property...
             for wp=1:length(worm_properties)
@@ -282,7 +303,14 @@ classdef identification_gui
                 bio_value = worm_struct.(lower(bio_property));
 
                 % Construct the string corresponding to its dropdown handle.
-                dropdown_handle = sprintf("%sDropDown");
+                switch char(bio_property)
+                    case 'age'
+                        dropdown_handle = 'AgeDropDown';
+                    case 'sex'
+                        dropdown_handle = 'SexDropDown';
+                    case 'body'
+                        dropdown_handle = 'BodyDropDown';
+                end
 
                 % Turn this string into a handle.
                 dropdown = app.(dropdown_handle);
@@ -292,8 +320,8 @@ classdef identification_gui
                 % worm?)
                 if ~ismember(bio_value, dropdown.Items)
                     % If not, raise an error.
-                    error("Unrecognized worm %s %s in %s", ...
-                        lower(bio_property), bio_value, file_path);
+                    error("Unrecognized worm %s \"%s\" in %s", ...
+                        lower(bio_property), bio_value, file_name);
                 end
             end           
 
@@ -345,8 +373,8 @@ classdef identification_gui
             % Render the active window visible again.
             window.Visible = 'on';
 
-            % Check whether name is false.
-            if name ~= 0
+            % Check whether the dialogue was canceled.
+            if isequal(name, 0)
                 % Should that be the case, the file selection dialogue
                 % was canceled and no file was selected. We thus return
                 % an empty parent path.
@@ -375,4 +403,3 @@ classdef identification_gui
         end
     end
 end
-
