@@ -72,6 +72,8 @@ end
 if exist(output_dir, 'dir') ~= 7
     mkdir(output_dir);
 end
+volume_bytes = local_volume_file_bytes(volume);
+local_assert_free_space(output_dir, volume_bytes);
 
 volume_path = fullfile(output_dir, 'request_volume.mat');
 request_path = fullfile(output_dir, 'request.json');
@@ -145,6 +147,12 @@ end
 function message = local_yolo_failure_message(output, weights_path)
 message = '';
 output_text = lower(char(string(output)));
+if contains(output_text, 'no space left') || contains(output_text, 'requested and 0 written') || ...
+        (contains(output_text, 'oserror') && contains(output_text, 'written'))
+    message = ['YOLO could not write its temporary volume files because the disk is full. ' ...
+        'Clear old files in artifacts/gui_yolo or choose an output directory with more free space.'];
+    return
+end
 if contains(output_text, 'no module named') || contains(output_text, 'modulenotfounderror') || ...
         contains(output_text, 'ultralytics') || contains(output_text, 'torch')
     message = ['YOLO dependencies are not available in the selected Python environment. ' ...
@@ -154,6 +162,42 @@ end
 if contains(output_text, 'no such file') || contains(output_text, 'filenotfounderror') || ...
         contains(output_text, 'best.pt')
     message = sprintf('YOLO could not load weights: %s', char(string(weights_path)));
+end
+end
+
+function bytes = local_volume_file_bytes(volume)
+volume_info = whos('volume');
+bytes = double(volume_info.bytes);
+% The Python bridge writes one .mat request plus one .npy copy and downstream
+% artifacts. Budget for both copies with headroom.
+bytes = max(bytes * 3, 256 * 1024 * 1024);
+end
+
+function local_assert_free_space(output_dir, required_bytes)
+free_bytes = local_free_bytes(output_dir);
+if isnan(free_bytes)
+    return
+end
+if free_bytes < required_bytes
+    error('Wrapper:YoloInsufficientDisk', ...
+        ['YOLO needs about %.1f MiB free in %s for temporary volume files, ' ...
+         'but only %.1f MiB is available. Clear old artifacts or select a different output directory.'], ...
+        required_bytes / 1024 / 1024, output_dir, free_bytes / 1024 / 1024);
+end
+end
+
+function free_bytes = local_free_bytes(path_value)
+free_bytes = NaN;
+if ispc
+    return
+end
+[status, output] = system(sprintf('df -k %s | tail -1 | awk ''{print $4}''', local_shell_quote(path_value)));
+if status ~= 0
+    return
+end
+free_kb = str2double(strtrim(output));
+if isfinite(free_kb)
+    free_bytes = free_kb * 1024;
 end
 end
 

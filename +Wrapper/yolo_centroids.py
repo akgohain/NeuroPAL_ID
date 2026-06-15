@@ -94,7 +94,17 @@ def main() -> None:
         raise ValueError(f"Expected 4D volume, got {volume.shape}")
 
     volume_npy = out_dir / "neuropal_yolo_volume.npy"
-    np.save(volume_npy, volume)
+    try:
+        np.save(volume_npy, volume)
+    except OSError as exc:
+        try:
+            volume_npy.unlink(missing_ok=True)
+        except Exception:
+            pass
+        raise OSError(
+            f"Could not write YOLO temporary volume {volume_npy}. "
+            "The output disk is likely full; clear old artifacts or choose a different output directory."
+        ) from exc
 
     infer_script = Path(req["infer_script"]).resolve()
     fuse_script = Path(req["fuse_script"]).resolve()
