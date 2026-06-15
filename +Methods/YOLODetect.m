@@ -7,10 +7,10 @@ classdef YOLODetect
                 titlestr
                 data
                 scale_um_xyz double
-                options.Conf (1,1) double = 0.25
+                options.Conf (1,1) double = 0.60
                 options.ImgSize (1,1) double = 640
-                options.BoxMinPx (1,1) double = 2
-                options.BoxMaxPx (1,1) double = 80
+                options.BoxMinPx (1,1) double = 6
+                options.BoxMaxPx (1,1) double = 120
                 options.FuseMaxDz (1,1) double = 1
                 options.IoUMin (1,1) double = 0.5
                 options.ColorDotMin (1,1) double = 0.8

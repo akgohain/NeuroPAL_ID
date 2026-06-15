@@ -10,10 +10,10 @@ arguments
     options.FuseScript (1,1) string = "/Users/adamg/neuroPAL/neuroPAL-detection/yolov8-cell/mip_centroids_iou_color_fuse.py"
     options.OutputDir (1,1) string = ""
     options.KeepArtifacts (1,1) logical = false
-    options.Conf (1,1) double = 0.25
+    options.Conf (1,1) double = 0.60
     options.ImgSize (1,1) double = 640
-    options.BoxMinPx (1,1) double = 2
-    options.BoxMaxPx (1,1) double = 80
+    options.BoxMinPx (1,1) double = 6
+    options.BoxMaxPx (1,1) double = 120
     options.Device (1,1) string = ""
     options.StretchSlices (1,1) logical = true
     options.StretchMIP (1,1) logical = true
