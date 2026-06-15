@@ -25,18 +25,37 @@ classdef CellposeDetect
                 prefix = Methods.CellposeDetect.sanitizePrefix(titlestr);
             end
 
+            mode = lower(strtrim(string(options.Mode)));
+            if numel(mode) > 1
+                mode = mode(1);
+            end
+            if strlength(mode) == 0
+                mode = "cellpose";
+            end
+
+            Methods.CellposeDetect.confirmInteractiveRun(mode);
+            progress = Methods.CellposeDetect.openProgressDialog(mode);
+            progress_cleanup = onCleanup(@() Methods.CellposeDetect.closeProgressDialog(progress)); %#ok<NASGU>
+            Methods.CellposeDetect.updateProgress(progress, 0.05, ...
+                'Preparing Cellpose input volume...');
+
             response = Wrapper.runCellposeCentroids(data, scale_um_xyz, ...
-                'Mode', options.Mode, ...
+                'Mode', mode, ...
                 'PythonExecutable', options.PythonExecutable, ...
                 'ModelPath', options.ModelPath, ...
                 'Prefix', prefix, ...
                 'MaskSource', options.MaskSource, ...
                 'OutputDir', options.OutputDir, ...
                 'KeepArtifacts', options.KeepArtifacts, ...
-                'SaveMasksMat', options.SaveMasksMat);
+                'SaveMasksMat', options.SaveMasksMat, ...
+                'ProgressFcn', @(message) Methods.CellposeDetect.updateProgress(progress, [], message));
 
+            Methods.CellposeDetect.updateProgress(progress, 0.82, ...
+                'Importing Cellpose centroids...');
             params = Methods.CellposeDetect.buildParams(response, 0);
             if ~isfield(response, 'centroids_xyz') || isempty(response.centroids_xyz)
+                Methods.CellposeDetect.updateProgress(progress, 1.0, ...
+                    'Cellpose finished with no centroids.');
                 supervoxels = [];
                 return;
             end
@@ -48,9 +67,13 @@ classdef CellposeDetect
 
             color_readout_data = Methods.CellposeDetect.resolveColorReadoutData( ...
                 data, options.ColorReadoutData);
+            Methods.CellposeDetect.updateProgress(progress, 0.9, ...
+                sprintf('Converting %d Cellpose centroids to neurons...', size(centroids, 1)));
             supervoxels = Methods.CellposeDetect.centroidsToSupervoxels( ...
                 centroids, color_readout_data);
             params = Methods.CellposeDetect.buildParams(response, size(supervoxels.positions, 1));
+            Methods.CellposeDetect.updateProgress(progress, 1.0, ...
+                sprintf('Cellpose finished: %d centroids imported.', size(supervoxels.positions, 1)));
         end
 
         function BatchDetect(file, worm, ~)
@@ -162,6 +185,99 @@ classdef CellposeDetect
             prefix = regexprep(prefix, '^_+|_+$', '');
             if isempty(prefix)
                 prefix = 'cellpose_volume';
+            end
+        end
+
+        function confirmInteractiveRun(mode)
+            if ~Methods.CellposeDetect.isCellposeMode(mode)
+                return
+            end
+
+            app = Methods.CellposeDetect.currentApp();
+            if isempty(app)
+                return
+            end
+
+            response = uiconfirm(app.CELL_ID, ...
+                {'Cellpose detection can take several minutes, especially without a GPU.', ...
+                 '', ...
+                 'The app may appear busy while Python/Cellpose runs.', ...
+                 'Continue with Cellpose detection?'}, ...
+                'Run Cellpose Detection?', ...
+                'Options', {'Continue', 'Cancel'}, ...
+                'DefaultOption', 1, ...
+                'CancelOption', 2, ...
+                'Icon', 'warning');
+            if ~strcmp(response, 'Continue')
+                error('Methods:CellposeDetect:Canceled', ...
+                    'Cellpose detection was canceled before launch.');
+            end
+        end
+
+        function progress = openProgressDialog(mode)
+            progress = [];
+            if ~Methods.CellposeDetect.isCellposeMode(mode)
+                return
+            end
+
+            app = Methods.CellposeDetect.currentApp();
+            if isempty(app)
+                return
+            end
+
+            progress = uiprogressdlg(app.CELL_ID, ...
+                'Title', 'Cellpose Detection', ...
+                'Message', 'Preparing Cellpose detection...', ...
+                'Indeterminate', 'on', ...
+                'Cancelable', 'off');
+            drawnow limitrate;
+        end
+
+        function updateProgress(progress, value, message)
+            if isempty(progress) || ~isvalid(progress)
+                return
+            end
+
+            if nargin >= 3 && ~isempty(message)
+                progress.Message = char(string(message));
+            end
+            if nargin >= 2 && ~isempty(value) && isfinite(double(value))
+                progress.Indeterminate = 'off';
+                progress.Value = min(max(double(value), 0), 1);
+            end
+            drawnow limitrate;
+        end
+
+        function closeProgressDialog(progress)
+            if isempty(progress) || ~isvalid(progress)
+                return
+            end
+
+            try
+                close(progress);
+            catch
+            end
+        end
+
+        function tf = isCellposeMode(mode)
+            mode = lower(strtrim(string(mode)));
+            tf = false;
+            if numel(mode) == 1 && strlength(mode) > 0
+                tf = (mode == "cellpose");
+            end
+        end
+
+        function app = currentApp()
+            app = [];
+            try
+                app = Program.app;
+                if isempty(app) || ~isvalid(app) || ...
+                        ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID) || ...
+                        ~isvalid(app.CELL_ID)
+                    app = [];
+                end
+            catch
+                app = [];
             end
         end
 

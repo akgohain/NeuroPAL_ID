@@ -5,12 +5,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from itertools import permutations
 from pathlib import Path
 from typing import Iterable
 
+os.environ.setdefault("CELLPOSE_LOCAL_MODELS_PATH", "/private/tmp/neuropal_cellpose_models")
+os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/neuropal_matplotlib")
+
 import numpy as np
 from scipy.io import loadmat, savemat
+
+
+def progress(message: str) -> None:
+    print(f"NEUROPAL_PROGRESS: {message}", flush=True)
 
 
 def parse_args() -> argparse.Namespace:
@@ -22,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--mode",
         default="cellpose",
+        type=str.lower,
         choices=("cellpose", "stub"),
         help="Detection mode.",
     )
@@ -134,6 +143,8 @@ def run_cellpose(
     except Exception:
         use_gpu = False
 
+    model_path = str(model_path or "cpsam")
+    progress(f"Loading Cellpose model: {model_path}")
     model = models.CellposeModel(pretrained_model=model_path, gpu=use_gpu)
     eval_kwargs = dict(
         z_axis=2,
@@ -289,16 +300,22 @@ def build_stub_response(request: dict) -> dict:
 
 
 def build_cellpose_response(request: dict) -> dict:
+    progress("Loading Cellpose input volume...")
     volume = load_volume_from_request(request)
+    progress("Normalizing Cellpose input volume...")
     volume_xyzc = to_uint8_volume(volume)
     volume_shape_xyz = tuple(int(v) for v in volume_xyzc.shape[:3])
     requested_mask_source = str(request.get("mask_source", "stitched")).strip().lower()
 
+    progress("Running Cellpose model inference...")
     masks_3d, masks_stitched = run_cellpose(
         volume_xyzc, request["model_path"], requested_mask_source
     )
+    progress("Selecting Cellpose mask source...")
     mask_source_used, selected_masks = choose_mask_source(request, masks_3d, masks_stitched)
+    progress("Extracting Cellpose centroids...")
     segments = extract_mask_centroids(selected_masks, volume_shape_xyz)
+    progress("Writing Cellpose mask artifacts...")
     masks_mat_path = maybe_write_masks_mat(request, volume_xyzc, masks_3d, masks_stitched)
 
     return {
@@ -324,13 +341,16 @@ def build_cellpose_response(request: dict) -> dict:
 
 def main() -> None:
     args = parse_args()
+    progress("Reading Cellpose request manifest...")
     request = load_request(Path(args.input))
 
     if args.mode == "stub":
+        progress("Building deterministic Cellpose stub response...")
         response = build_stub_response(request)
     else:
         response = build_cellpose_response(request)
 
+    progress("Writing Cellpose response...")
     output_path = Path(args.output)
     output_path.write_text(json.dumps(response, indent=2), encoding="utf-8")
 

@@ -12,7 +12,23 @@ arguments
     options.OutputDir (1,1) string = ""
     options.KeepArtifacts (1,1) logical = false
     options.SaveMasksMat (1,1) logical = false
+    options.ProgressFcn = []
 end
+
+mode = lower(strtrim(string(options.Mode)));
+if numel(mode) > 1
+    mode = mode(1);
+end
+if strlength(mode) == 0
+    mode = "cellpose";
+end
+if ~ismember(mode, ["cellpose", "stub"])
+    error('Wrapper:InvalidMode', ...
+        'Mode must be "cellpose" or "stub", got "%s".', mode);
+end
+
+progress_fcn = options.ProgressFcn;
+local_progress(progress_fcn, 'Resolving Cellpose Python environment...');
 
 scale_um_xyz = double(scale_um_xyz(:)');
 if numel(scale_um_xyz) ~= 3
@@ -38,12 +54,22 @@ if isempty(python_executable)
 end
 
 model_path = local_pick_model(repo_root, char(options.ModelPath));
-if options.Mode ~= "stub" && isempty(model_path)
-    error('Wrapper:NoCellposeModel', ...
-        ['Could not resolve a Cellpose model file. Set NEUROPAL_CELLPOSE_MODEL, ' ...
-         'pass the ModelPath option, or place the model at +CellPose/models/cellpose_000715.']);
+if ~strcmp(mode, "stub") && isempty(model_path)
+    error('Wrapper:MissingCellposeModel', ...
+        ['Cellpose model weights were not found. Set NEUROPAL_CELLPOSE_MODEL, ' ...
+         'enter a Cellpose model path in the method settings, or switch the mode to stub. ' ...
+         'Checked the built-in app model path and ~/Downloads/cellpose_000715.']);
+end
+if ~strcmp(mode, "stub") && local_is_builtin_cellpose_model(model_path) && ...
+        ~local_env_truthy('NEUROPAL_CELLPOSE_ALLOW_DOWNLOAD')
+    error('Wrapper:MissingCellposeModel', ...
+        ['Cellpose model "%s" is a download-backed model name, not a local weights file. ' ...
+         'Set NEUROPAL_CELLPOSE_MODEL or the GUI model path to a local model file. ' ...
+         'If you intentionally want Cellpose to download/use a built-in model, set ' ...
+         'NEUROPAL_CELLPOSE_ALLOW_DOWNLOAD=1 before launching MATLAB.'], model_path);
 end
 
+local_progress(progress_fcn, 'Writing Cellpose request volume...');
 output_dir = char(options.OutputDir);
 cleanup_output_dir = false;
 if isempty(strtrim(output_dir))
@@ -69,7 +95,7 @@ save(volume_path, '-struct', 'request', '-v7');
 
 request_manifest = struct();
 request_manifest.version = 2;
-request_manifest.mode = char(options.Mode);
+request_manifest.mode = mode;
 request_manifest.scale_um_xyz = scale_um_xyz;
 request_manifest.model_path = model_path;
 request_manifest.prefix = char(options.Prefix);
@@ -92,25 +118,83 @@ fwrite(request_fid, jsonencode(request_manifest), 'char');
 fclose(request_fid);
 
 script_path = fullfile(wrapper_dir, 'cellpose_centroids.py');
+local_prepare_python_environment();
 
 command = local_join_quoted_command({ ...
     python_executable, script_path, ...
     '--input', request_path, ...
     '--output', response_path, ...
-    '--mode', char(options.Mode)});
+    '--mode', mode});
+local_progress(progress_fcn, 'Running Cellpose inference. This can take several minutes without a GPU...');
 [status, output] = system(command);
+local_emit_progress_lines(progress_fcn, output);
 if status ~= 0
+    friendly_message = local_cellpose_failure_message(output, model_path);
+    if ~isempty(friendly_message)
+        error('Wrapper:CellposeUnavailable', '%s', friendly_message);
+    end
     error('Wrapper:CellposeCommandFailed', ...
         'Cellpose wrapper command failed (%d).\nCommand:\n%s\n\nOutput:\n%s', ...
         status, command, strtrim(output));
 end
 
+local_progress(progress_fcn, 'Reading Cellpose response...');
 if ~exist(response_path, 'file')
     error('Wrapper:MissingResponse', ...
         'Cellpose wrapper did not create a response file: %s', response_path);
 end
 
 response = jsondecode(fileread(response_path));
+end
+
+function message = local_cellpose_failure_message(output, model_path)
+message = '';
+output_text = lower(char(string(output)));
+if contains(output_text, 'cellpose dependencies are unavailable') || ...
+        contains(output_text, 'no module named') || contains(output_text, 'importerror')
+    message = ['Cellpose is not available in the selected Python environment. ' ...
+        'Install Cellpose/torch there or set NEUROPAL_CELLPOSE_PYTHON to an environment that has them.'];
+    return
+end
+if contains(output_text, 'urlopen') || contains(output_text, 'download') || ...
+        contains(output_text, 'connection') || contains(output_text, 'no such file')
+    message = sprintf(['Cellpose could not load model "%s". Provide a local model file via ' ...
+        'NEUROPAL_CELLPOSE_MODEL or the Cellpose method settings.'], char(string(model_path)));
+end
+end
+
+function local_progress(progress_fcn, message)
+if isempty(progress_fcn) || ~isa(progress_fcn, 'function_handle')
+    return
+end
+try
+    progress_fcn(char(string(message)));
+catch
+end
+end
+
+function tf = local_is_builtin_cellpose_model(model_path)
+tf = any(strcmpi(char(string(model_path)), {'cpsam', 'cyto', 'cyto2', 'nuclei'}));
+end
+
+function tf = local_env_truthy(name)
+value = lower(strtrim(getenv(name)));
+tf = any(strcmp(value, {'1', 'true', 'yes', 'on'}));
+end
+
+function local_emit_progress_lines(progress_fcn, output)
+if isempty(progress_fcn) || ~isa(progress_fcn, 'function_handle') || isempty(output)
+    return
+end
+
+lines = regexp(char(output), '\r\n|\n|\r', 'split');
+for n = 1:numel(lines)
+    line = strtrim(lines{n});
+    prefix = 'NEUROPAL_PROGRESS:';
+    if startsWith(line, prefix)
+        local_progress(progress_fcn, strtrim(extractAfter(line, strlength(prefix))));
+    end
+end
 end
 
 function cleanup_temp_files(paths, output_dir, cleanup_output_dir)
@@ -154,6 +238,9 @@ function model_path = local_pick_model(repo_root, model_candidate)
 model_path = strtrim(char(string(model_candidate)));
 if isempty(model_path)
     model_path = strtrim(getenv('NEUROPAL_CELLPOSE_MODEL'));
+end
+if any(strcmpi(model_path, {'cpsam', 'cyto', 'cyto2', 'nuclei'}))
+    return
 end
 candidate_paths = {
     model_path
@@ -217,4 +304,23 @@ function command = local_join_quoted_command(parts)
 quote_part = @(value) ['"' strrep(char(value), '"', '\"') '"'];
 pieces = cellfun(@(value) [quote_part(value) ' '], parts, 'UniformOutput', false);
 command = strtrim([pieces{:}]);
+end
+
+function local_prepare_python_environment()
+cache_roots = {
+    'CELLPOSE_LOCAL_MODELS_PATH', fullfile(tempdir, 'neuropal_cellpose_models')
+    'MPLCONFIGDIR', fullfile(tempdir, 'neuropal_matplotlib')
+    };
+for i = 1:size(cache_roots, 1)
+    key = cache_roots{i, 1};
+    value = cache_roots{i, 2};
+    if isempty(strtrim(getenv(key)))
+        setenv(key, value);
+    else
+        value = getenv(key);
+    end
+    if exist(value, 'dir') ~= 7
+        mkdir(value);
+    end
+end
 end
