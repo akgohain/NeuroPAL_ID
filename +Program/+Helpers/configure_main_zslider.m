@@ -1,5 +1,5 @@
 function configure_main_zslider(app, n_slices, current_slice)
-    % Configure the main z slider with sparse physical z labels.
+    % Configure the main z slider in integer slice coordinates.
 
     if nargin < 2 || isempty(n_slices)
         n_slices = size(app.image_data, 3);
@@ -8,36 +8,25 @@ function configure_main_zslider(app, n_slices, current_slice)
         current_slice = round((n_slices + 1) / 2);
     end
 
-    label_values = [];
-    try
-        z_scale = double(app.image_um_scale(3));
-        if isfinite(z_scale) && z_scale > 0
-            label_values = ((1:n_slices) - 1) * z_scale;
-        end
-    catch
-    end
-
     n_slices = max(1, round(double(n_slices)));
     current_slice = min(max(round(double(current_slice)), 1), n_slices);
-    if n_slices <= 2
+
+    if n_slices == 1
         major_ticks = 1:n_slices;
+        minor_ticks = [];
     else
-        major_ticks = unique([1, round((n_slices + 1) / 2), n_slices], 'stable');
+        major_ticks = unique(round(linspace(1, n_slices, 6)), 'stable');
+        minor_ticks = setdiff(1:n_slices, major_ticks);
     end
-    if isempty(label_values)
-        tick_labels = arrayfun(@(z) sprintf('%d', z), major_ticks, 'UniformOutput', false);
-    else
-        tick_labels = arrayfun(@(z) sprintf('%.1f', double(label_values(z))), ...
-            major_ticks, 'UniformOutput', false);
-    end
+    tick_labels = arrayfun(@(z) sprintf('%d', z), major_ticks, 'UniformOutput', false);
 
     Program.Helpers.configure_slice_zslider( ...
-        app.ZSlider, n_slices, current_slice, false, label_values);
+        app.ZSlider, n_slices, current_slice, false, []);
     app.ZSlider.MajorTicks = major_ticks;
     if isprop(app.ZSlider, 'MajorTickLabels')
         app.ZSlider.MajorTickLabels = tick_labels;
     end
     if isprop(app.ZSlider, 'MinorTicks')
-        app.ZSlider.MinorTicks = [];
+        app.ZSlider.MinorTicks = minor_ticks;
     end
 end
