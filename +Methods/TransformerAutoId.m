@@ -61,6 +61,7 @@ classdef TransformerAutoId
             end
 
             Methods.TransformerAutoId.applyPredictions(app, predictions);
+            Methods.TransformerAutoId.refreshAppUI(app);
         end
 
         function nwb_path = resolveNWBPath(app, explicit_path)
@@ -101,26 +102,162 @@ classdef TransformerAutoId
 
             n = app.image_neurons.num_neurons();
             [prediction_to_neuron, match_stats] = Methods.TransformerAutoId.matchPredictionRows(app, predictions);
+            app.image_neurons.delete_model_IDs();
+            top_k = 5;
+            for i = 1:n
+                app.image_neurons.neurons(i).deterministic_id = '';
+                app.image_neurons.neurons(i).probabilistic_ids = repmat({'Artifact'}, 1, top_k);
+                app.image_neurons.neurons(i).probabilistic_probs = zeros(1, top_k);
+                app.image_neurons.neurons(i).rank = 0;
+            end
+            matched_neuron_indices = [];
+            matched_confidences = [];
             for r = 1:height(predictions)
                 idx = prediction_to_neuron(r);
                 if idx < 1 || idx > n
                     continue
                 end
                 neuron = app.image_neurons.neurons(round(idx));
-                neuron.deterministic_id = char(string(predictions.predicted_class(r)));
-                neuron.rank = r;
-                if ismember('top5_classes', predictions.Properties.VariableNames)
-                    names = strsplit(char(string(predictions.top5_classes(r))), ',');
-                    neuron.probabilistic_ids = names;
+                predicted_class = char(string(predictions.predicted_class(r)));
+                if isempty(strtrim(predicted_class)) || strcmpi(predicted_class, 'nan')
+                    predicted_class = 'Artifact';
                 end
-                if ismember('top5_probs', predictions.Properties.VariableNames)
-                    probs = str2double(strsplit(char(string(predictions.top5_probs(r))), ','));
-                    neuron.probabilistic_probs = probs;
+                neuron.deterministic_id = predicted_class;
+                if ismember('top5_classes', predictions.Properties.VariableNames)
+                    names = Methods.TransformerAutoId.parseTopList(predictions.top5_classes(r));
                 else
-                    neuron.probabilistic_probs = double(predictions.confidence(r));
+                    names = {predicted_class};
+                end
+                if isempty(names)
+                    names = {predicted_class};
+                end
+                if ~strcmp(char(names{1}), predicted_class)
+                    names = [{predicted_class}, names(:)'];
+                end
+                names = names(:)';
+                if numel(names) < top_k
+                    names(end+1:top_k) = {'Artifact'};
+                elseif numel(names) > top_k
+                    names = names(1:top_k);
+                end
+                neuron.probabilistic_ids = names(:)';
+                if ismember('top5_probs', predictions.Properties.VariableNames)
+                    probs = str2double(Methods.TransformerAutoId.parseTopList(predictions.top5_probs(r)));
+                else
+                    probs = double(predictions.confidence(r));
+                end
+                probs = double(probs(:)');
+                probs(~isfinite(probs)) = 0;
+                if isempty(probs)
+                    probs = double(predictions.confidence(r));
+                end
+                if numel(probs) < top_k
+                    probs(end+1:top_k) = 0;
+                elseif numel(probs) > top_k
+                    probs = probs(1:top_k);
+                end
+                neuron.probabilistic_probs = probs;
+                matched_neuron_indices(end + 1, 1) = round(idx); %#ok<AGROW>
+                matched_confidences(end + 1, 1) = double(predictions.confidence(r)); %#ok<AGROW>
+            end
+
+            if ~isempty(matched_neuron_indices)
+                [~, order] = sort(matched_confidences, 'ascend', 'MissingPlacement', 'last');
+                for rank_i = 1:numel(order)
+                    app.image_neurons.neurons(matched_neuron_indices(order(rank_i))).rank = rank_i;
                 end
             end
             Methods.TransformerAutoId.storeMatchStats(app, match_stats);
+        end
+
+        function refreshAppUI(app)
+            Methods.TransformerAutoId.drawAutoIdList(app);
+            try
+                Program.Routines.ID.hot_neuron_reset();
+            catch
+            end
+            try
+                Program.Routines.ID.render();
+            catch
+            end
+            drawnow limitrate;
+        end
+
+        function drawAutoIdList(app)
+            if isempty(app.image_neurons) || isempty(app.image_neurons.neurons)
+                Methods.TransformerAutoId.clearAutoIdList(app);
+                return
+            end
+
+            rows = {};
+            ranks = [];
+            neurons = app.image_neurons.neurons;
+            for i = 1:numel(neurons)
+                neuron = neurons(i);
+                if isempty(neuron.rank) || ~isfinite(double(neuron.rank)) || double(neuron.rank) <= 0
+                    continue
+                end
+                ids = neuron.probabilistic_ids;
+                probs = neuron.probabilistic_probs;
+                if isempty(ids)
+                    ids = {neuron.deterministic_id};
+                end
+                if isempty(probs)
+                    probs = 0;
+                end
+                ids = cellstr(string(ids));
+                probs = double(probs(:)');
+                if numel(probs) < numel(ids)
+                    probs(end+1:numel(ids)) = 0;
+                elseif numel(probs) > numel(ids)
+                    probs = probs(1:numel(ids));
+                end
+                probs(~isfinite(probs)) = 0;
+                probs = round(probs * 100);
+
+                row = sprintf('%s=%d%%', ids{1}, probs(1));
+                alt_i = find(probs(2:end) > 0) + 1;
+                if ~isempty(alt_i)
+                    row = [row, '   or  ']; %#ok<AGROW>
+                end
+                for j = 1:numel(alt_i)
+                    k = alt_i(j);
+                    if j > 1
+                        row = [row, ',']; %#ok<AGROW>
+                    end
+                    row = [row, sprintf(' %s=%d%%', ids{k}, probs(k))]; %#ok<AGROW>
+                end
+                rows{end + 1, 1} = row; %#ok<AGROW>
+                ranks(end + 1, 1) = double(neuron.rank); %#ok<AGROW>
+            end
+
+            if isempty(rows)
+                Methods.TransformerAutoId.clearAutoIdList(app);
+                return
+            end
+            [ranks, sort_i] = sort(ranks);
+            app.UserNeuronIDsListBox.Items = rows(sort_i);
+            app.UserNeuronIDsListBox.ItemsData = ranks(:)';
+            app.UserNeuronIDsListBox.Value = {};
+        end
+
+        function clearAutoIdList(app)
+            try
+                app.UserNeuronIDsListBox.Items = {};
+                app.UserNeuronIDsListBox.ItemsData = [];
+                app.UserNeuronIDsListBox.Value = {};
+            catch
+            end
+        end
+
+        function values = parseTopList(value)
+            text = strtrim(char(string(value)));
+            if isempty(text) || strcmpi(text, 'nan') || strcmpi(text, '<missing>')
+                values = {};
+                return
+            end
+            values = strtrim(strsplit(text, ','));
+            values = values(~cellfun('isempty', values));
         end
 
         function [volume_rgbw, labels] = appTransformerVolume(app)
