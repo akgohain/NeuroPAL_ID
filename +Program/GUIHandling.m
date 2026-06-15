@@ -555,7 +555,7 @@ classdef GUIHandling
             if isfield(controls, 'detect_dropdown') && ~isempty(controls.detect_dropdown) && isvalid(controls.detect_dropdown)
                 detect_backend = string(controls.detect_dropdown.Value);
             end
-            id_method = "Nearest";
+            id_method = "Transformer";
             if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
                 id_method = string(controls.id_dropdown.Value);
             end
@@ -585,7 +585,7 @@ classdef GUIHandling
                     specs = Program.GUIHandling.main_detect_param_specs(app, method);
                     title = sprintf('Auto-detect Parameters: %s', char(string(method)));
                 otherwise
-                    method = "Nearest";
+                    method = "Transformer";
                     if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
                         method = string(controls.id_dropdown.Value);
                     end
@@ -1782,33 +1782,8 @@ classdef GUIHandling
                 'Icon', 'warning');
         end
 
-        function items = main_auto_id_method_items(app)
-            primary_method = 'Nearest';
-            has_transformer_source = false;
-            if nargin >= 1 && ~isempty(app) && isvalid(app) && ...
-                    Program.GUIHandling.is_nwb_backed_image(app)
-                has_transformer_source = true;
-                primary_method = 'Transformer';
-            end
-            if ~has_transformer_source && nargin >= 1 && ~isempty(app) && isvalid(app) && ...
-                    isprop(app, 'AutoIDDropDown') && ~isempty(app.AutoIDDropDown) && ...
-                    isvalid(app.AutoIDDropDown)
-                try
-                    legacy_value = char(string(app.AutoIDDropDown.Value));
-                    if ~isempty(strtrim(legacy_value))
-                        primary_method = legacy_value;
-                    end
-                catch
-                end
-            end
-            if any(strcmpi(primary_method, {'GAT/Transformer', 'Anshita'}))
-                primary_method = 'Transformer';
-            end
-            allowed_primary_methods = {'Nearest', 'Transformer'};
-            if ~any(strcmpi(primary_method, allowed_primary_methods))
-                primary_method = 'Nearest';
-            end
-            items = unique({primary_method, 'Transformer'}, 'stable');
+        function items = main_auto_id_method_items(~)
+            items = {'Transformer'};
         end
 
         function layout = component_layout(component)
