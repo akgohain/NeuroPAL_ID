@@ -10,6 +10,8 @@ function render()
 
     app.logEvent('Main','Drawing image...', 1);
     Program.GUIHandling.install_cellpose_mask_button(app);
+    Program.GUIHandling.install_yolo_boxes_button(app);
+    Program.Helpers.ensure_main_image_axes(app);
 
     state = Program.Handlers.channels.main_state(app);
     Program.Helpers.debug_event('IDRender', ...
@@ -29,7 +31,9 @@ function render()
     % Redraw the max projection.
     % Note: the image only shows RGB. We added the other channels
     % (W, DIC, GFP) to the RGB in order to show these as well.
+    Program.Helpers.fill_axes_parent(app.MaxProjection);
     image(app.MaxProjection, squeeze(view_cache.max_projection));
+    Program.Helpers.fill_axes_parent(app.MaxProjection);
 
     % Redraw the Z-slice.
     Program.Routines.ID.get_slice(app.ZSlider, view_cache, app.XY);

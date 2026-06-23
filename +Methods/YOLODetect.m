@@ -8,13 +8,16 @@ classdef YOLODetect
                 data
                 scale_um_xyz double
                 options.Conf (1,1) double = 0.60
-                options.ImgSize (1,1) double = 640
+                options.ImgSize (1,1) double = 512
                 options.BoxMinPx (1,1) double = 6
                 options.BoxMaxPx (1,1) double = 120
                 options.FuseMaxDz (1,1) double = 1
                 options.IoUMin (1,1) double = 0.5
+                options.PLo (1,1) double = 0.5
+                options.PHi (1,1) double = 99.5
+                options.ColorMatch (1,1) logical = false
                 options.ColorDotMin (1,1) double = 0.8
-                options.DepthSanityRatioCap (1,1) double = 1.5
+                options.DepthSanityRatioCap (1,1) double = 2.0
                 options.Device (1,1) string = ""
                 options.OutputDir (1,1) string = ""
                 options.KeepArtifacts (1,1) logical = false
@@ -41,6 +44,9 @@ classdef YOLODetect
                 'BoxMaxPx', options.BoxMaxPx, ...
                 'FuseMaxDz', options.FuseMaxDz, ...
                 'IoUMin', options.IoUMin, ...
+                'PLo', options.PLo, ...
+                'PHi', options.PHi, ...
+                'ColorMatch', options.ColorMatch, ...
                 'ColorDotMin', options.ColorDotMin, ...
                 'DepthSanityRatioCap', options.DepthSanityRatioCap, ...
                 'Device', options.Device, ...
@@ -103,8 +109,11 @@ classdef YOLODetect
             params.box_max_px = options.BoxMaxPx;
             params.fuse_max_dz = options.FuseMaxDz;
             params.iou_min = options.IoUMin;
+            params.p_lo = options.PLo;
+            params.p_hi = options.PHi;
             params.color_dot_min = options.ColorDotMin;
             params.depth_sanity_ratio_cap = options.DepthSanityRatioCap;
+            params.color_match = options.ColorMatch;
             fields = {'weights', 'summary_path', 'fused_csv', 'fused_png', 'volume_npy', ...
                 'raw_boxes', 'filtered_boxes', 'num_centroids'};
             for i = 1:numel(fields)

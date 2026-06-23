@@ -202,7 +202,7 @@ classdef GUIHandling
             detect_dropdown.Position = [detect_pos(1), detect_pos(2), detect_dropdown_width, detect_pos(4)];
             Program.GUIHandling.apply_component_layout(detect_dropdown, detect_layout);
             Program.GUIHandling.normalize_main_header_control_height(detect_dropdown, detect_pos);
-            app.AutoDetectButton.Text = char(9654);
+            app.AutoDetectButton.Text = 'Run';
             app.AutoDetectButton.Position = [detect_pos(1) + detect_dropdown_width + header_spacing, ...
                 detect_pos(2), detect_run_width, detect_pos(4)];
             Program.GUIHandling.apply_component_layout(app.AutoDetectButton, detect_run_layout);
@@ -251,7 +251,7 @@ classdef GUIHandling
             end
             if isprop(app, 'AutoIDButton') && ~isempty(app.AutoIDButton) && isvalid(app.AutoIDButton)
                 id_run_layout = Program.GUIHandling.component_layout(app.AutoIDButton);
-                app.AutoIDButton.Text = char(9654);
+                app.AutoIDButton.Text = 'Run';
                 app.AutoIDButton.Position(3) = max(app.AutoIDButton.Position(3), 62);
             else
                 id_run_layout = [];
@@ -363,7 +363,7 @@ classdef GUIHandling
             try
                 old_params_grid = findobj(sidebar_grid, 'Tag', 'MainMethodParamsGrid');
                 delete(old_params_grid);
-                sidebar_grid.RowHeight = {62, 62, 20, 20, 170, '1x', '1x'};
+                sidebar_grid.RowHeight = {88, 88, 20, 20, 125, '1x', '1x'};
                 sidebar_grid.RowSpacing = 3;
                 app.UserNeuronIDsListBoxLabel.Layout.Row = 3;
                 app.UserNeuronIDsListBoxLabel.Layout.Column = 1;
@@ -390,7 +390,7 @@ classdef GUIHandling
 
             Program.GUIHandling.move_label_to_grid(app, 'NeuronsLabel', ...
                 detect_row, 1, 'Auto-detect:');
-            app.NeuronsLabel.Layout.Row = [1 2];
+            app.NeuronsLabel.Layout.Row = [1 3];
 
             detect_dropdown = uidropdown(detect_row, ...
                 'Tag', 'MainDetectMethodDropDown', ...
@@ -405,7 +405,7 @@ classdef GUIHandling
             app.AutoDetectButton.Parent = detect_row;
             app.AutoDetectButton.Layout.Row = 2;
             app.AutoDetectButton.Layout.Column = 2;
-            app.AutoDetectButton.Text = char(9654);
+            app.AutoDetectButton.Text = 'Run';
             app.AutoDetectButton.FontSize = 14;
             app.AutoDetectButton.Visible = 'on';
 
@@ -416,20 +416,20 @@ classdef GUIHandling
                 'Tooltip', 'Select an image crop before running detection.');
             detect_crop_checkbox.FontSize = 12;
             detect_crop_checkbox.Layout.Row = 2;
-            detect_crop_checkbox.Layout.Column = 3;
+            detect_crop_checkbox.Layout.Column = [3 4];
 
             detect_settings_button = uibutton(detect_row, 'push', ...
                 'Tag', 'MainDetectSettingsButton', ...
-                'Text', char(9881), ...
-                'Tooltip', 'Edit auto-detect method parameters.', ...
+                'Text', 'Hyperparams', ...
+                'Tooltip', 'Edit auto-detect hyperparameters.', ...
                 'ButtonPushedFcn', @(src, event) ...
                     Program.GUIHandling.show_main_method_params_dialog(app, 'detect'));
-            detect_settings_button.FontSize = 14;
-            detect_settings_button.Layout.Row = 2;
-            detect_settings_button.Layout.Column = 4;
+            detect_settings_button.FontSize = 12;
+            detect_settings_button.Layout.Row = 3;
+            detect_settings_button.Layout.Column = [2 4];
 
             Program.GUIHandling.move_label_to_grid(app, 'AutoLabel', id_row, 1, 'Auto-ID:');
-            app.AutoLabel.Layout.Row = [1 2];
+            app.AutoLabel.Layout.Row = [1 3];
             app.AutoIDDropDown.Visible = 'off';
 
             id_items = Program.GUIHandling.main_auto_id_method_items(app);
@@ -449,7 +449,7 @@ classdef GUIHandling
             app.AutoIDButton.Parent = id_row;
             app.AutoIDButton.Layout.Row = 2;
             app.AutoIDButton.Layout.Column = 2;
-            app.AutoIDButton.Text = char(9654);
+            app.AutoIDButton.Text = 'Run';
             app.AutoIDButton.FontSize = 14;
             app.AutoIDButton.Visible = 'on';
 
@@ -460,17 +460,17 @@ classdef GUIHandling
                 'Tooltip', 'Select an image crop before running auto-ID.');
             id_crop_checkbox.FontSize = 12;
             id_crop_checkbox.Layout.Row = 2;
-            id_crop_checkbox.Layout.Column = 3;
+            id_crop_checkbox.Layout.Column = [3 4];
 
             id_settings_button = uibutton(id_row, 'push', ...
                 'Tag', 'MainIDSettingsButton', ...
-                'Text', char(9881), ...
-                'Tooltip', 'Edit auto-ID method parameters.', ...
+                'Text', 'Hyperparams', ...
+                'Tooltip', 'Edit auto-ID hyperparameters.', ...
                 'ButtonPushedFcn', @(src, event) ...
                     Program.GUIHandling.show_main_method_params_dialog(app, 'id'));
-            id_settings_button.FontSize = 14;
-            id_settings_button.Layout.Row = 2;
-            id_settings_button.Layout.Column = 4;
+            id_settings_button.FontSize = 12;
+            id_settings_button.Layout.Row = 3;
+            id_settings_button.Layout.Column = [2 4];
 
             app.AutoIDAllButton.Visible = 'off';
             Program.GUIHandling.position_main_user_id_controls_after(app, []);
@@ -497,7 +497,7 @@ classdef GUIHandling
                 return
             end
             if nargin < 4 || isempty(column_width)
-                column_width = {'fit', 34, '1x', 30};
+                column_width = {96, 64, 58, '1x'};
             end
 
             existing = findobj(parent_grid, 'Tag', tag);
@@ -506,11 +506,11 @@ classdef GUIHandling
             else
                 row = uigridlayout(parent_grid);
                 row.Tag = tag;
-                row.RowHeight = {26, 30};
-                row.RowSpacing = 2;
                 row.ColumnSpacing = 4;
                 row.Padding = [0 0 0 0];
             end
+            row.RowHeight = {26, 30, 28};
+            row.RowSpacing = 2;
             row.ColumnWidth = column_width;
             row.Layout.Row = row_index;
             row.Layout.Column = 1;
@@ -555,7 +555,7 @@ classdef GUIHandling
             if isfield(controls, 'detect_dropdown') && ~isempty(controls.detect_dropdown) && isvalid(controls.detect_dropdown)
                 detect_backend = string(controls.detect_dropdown.Value);
             end
-            id_method = "Transformer";
+            id_method = "Anshita GAT";
             if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
                 id_method = string(controls.id_dropdown.Value);
             end
@@ -585,7 +585,7 @@ classdef GUIHandling
                     specs = Program.GUIHandling.main_detect_param_specs(app, method);
                     title = sprintf('Auto-detect Parameters: %s', char(string(method)));
                 otherwise
-                    method = "Transformer";
+                    method = "Anshita GAT";
                     if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
                         method = string(controls.id_dropdown.Value);
                     end
@@ -849,10 +849,14 @@ classdef GUIHandling
                         struct('key', 'mode', 'label', 'Mode', 'value', 'cellpose', 'limits', [], 'integer', false, 'enabled', true, 'allowed', {{'cellpose', 'stub'}})};
                 case "yolo"
                     specs = { ...
-                        struct('key', 'weights_path', 'label', 'Weights', 'value', '/Users/adamg/neuroPAL/artifacts/swetha_yolo_inf/YOLO INF/best.pt', 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'file'), ...
+                        struct('key', 'weights_path', 'label', 'Weights', 'value', Program.GUIHandling.default_yolo_weights_path(), 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'file'), ...
                         struct('key', 'conf', 'label', 'Score', 'value', 0.60, 'limits', [0 1], 'integer', false, 'enabled', true), ...
+                        struct('key', 'imgsz', 'label', 'Image px', 'value', 512, 'limits', [64 4096], 'integer', true, 'enabled', true), ...
                         struct('key', 'box_min_px', 'label', 'Box min', 'value', 6, 'limits', [0 512], 'integer', false, 'enabled', true), ...
-                        struct('key', 'box_max_px', 'label', 'Box max', 'value', 120, 'limits', [1 2048], 'integer', false, 'enabled', true)};
+                        struct('key', 'box_max_px', 'label', 'Box max', 'value', 120, 'limits', [1 2048], 'integer', false, 'enabled', true), ...
+                        struct('key', 'p_lo', 'label', 'Stretch lo', 'value', 0.5, 'limits', [0 100], 'integer', false, 'enabled', true), ...
+                        struct('key', 'p_hi', 'label', 'Stretch hi', 'value', 99.5, 'limits', [0 100], 'integer', false, 'enabled', true), ...
+                        struct('key', 'depth_sanity_ratio_cap', 'label', 'Depth cap', 'value', 2.0, 'limits', [0.1 20], 'integer', false, 'enabled', true)};
                 otherwise
                     specs = { ...
                         struct('key', 'stride', 'label', 'Stride', 'value', Methods.NNDetect.stride, 'limits', [16 512], 'integer', true, 'enabled', false), ...
@@ -864,7 +868,7 @@ classdef GUIHandling
         function specs = main_id_param_specs(method)
             method = lower(string(method));
             switch method
-                case {"gat/transformer", "transformer", "anshita"}
+                case {"gat/transformer", "transformer", "anshita", "anshita gat", "gat"}
                     specs = { ...
                         struct('key', 'confidence_threshold', 'label', 'Min conf', 'value', 0.5, 'limits', [0 1], 'integer', false, 'enabled', true), ...
                         struct('key', 'checkpoint_path', 'label', 'Checkpoint', 'value', '/Users/adamg/neuroPAL/artifacts/anshita_transformer', 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'folder'), ...
@@ -1106,7 +1110,7 @@ classdef GUIHandling
                 Program.GUIHandling.handle_main_id_method_changed(app, id_method);
             end
 
-            if any(strcmpi(char(id_method), {'GAT/Transformer', 'Transformer', 'Anshita'}))
+            if any(strcmpi(char(id_method), {'GAT/Transformer', 'Transformer', 'Anshita', 'Anshita GAT', 'GAT'}))
                 Program.GUIHandling.run_transformer_auto_id(app);
                 return
             end
@@ -1214,8 +1218,13 @@ classdef GUIHandling
                         [sp, app.mp_params] = Methods.YOLODetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
                             'ColorReadoutData', readout_rgbw, ...
                             'Conf', Program.GUIHandling.param_value(params, 'conf', 0.60), ...
+                            'ImgSize', Program.GUIHandling.param_value(params, 'imgsz', 512), ...
                             'BoxMinPx', Program.GUIHandling.param_value(params, 'box_min_px', 6), ...
                             'BoxMaxPx', Program.GUIHandling.param_value(params, 'box_max_px', 120), ...
+                            'PLo', Program.GUIHandling.param_value(params, 'p_lo', 0.5), ...
+                            'PHi', Program.GUIHandling.param_value(params, 'p_hi', 99.5), ...
+                            'ColorMatch', false, ...
+                            'DepthSanityRatioCap', Program.GUIHandling.param_value(params, 'depth_sanity_ratio_cap', 2.0), ...
                             'WeightsPath', Program.GUIHandling.param_value(params, 'weights_path', ""), ...
                             'OutputDir', Program.GUIHandling.yolo_output_dir(app), ...
                             'KeepArtifacts', true, ...
@@ -1253,7 +1262,7 @@ classdef GUIHandling
                 Program.GUIHandling.try_auto_detect_ui_step(app, 'Program.Handlers.neurons.unselect_neuron', ...
                     @() Program.Handlers.neurons.unselect_neuron(false));
                 Program.GUIHandling.try_auto_detect_ui_step(app, 'clear selected_neuron', ...
-                    @() set(app, 'selected_neuron', []));
+                    @() Program.GUIHandling.clear_selected_neuron(app));
                 Program.GUIHandling.try_auto_detect_ui_step(app, 'clear UserNeuronIDsListBox.Items', ...
                     @() set(app.UserNeuronIDsListBox, 'Items', {}));
                 Program.GUIHandling.try_auto_detect_ui_step(app, 'clear UserNeuronIDsListBox.ItemsData', ...
@@ -1302,9 +1311,12 @@ classdef GUIHandling
                     'Calling Program.Routines.ID.render...');
                 Program.Routines.ID.render();
                 Program.GUIHandling.normalize_main_zslider(app, original_z);
-                drawnow limitrate;
+                drawnow;
                 Program.GUIHandling.auto_detect_log(app, ...
-                    'Render complete: final count=%d.', app.image_neurons.num_neurons());
+                    'Render complete: final count=%d, XY children=%d, MIP children=%d.', ...
+                    app.image_neurons.num_neurons(), ...
+                    Program.GUIHandling.graphics_child_count(app.XY), ...
+                    Program.GUIHandling.graphics_child_count(app.MaxProjection));
             catch ME
                 Program.GUIHandling.auto_detect_log(app, ...
                     'ERROR post-detect propagation threw %s: %s', ME.identifier, ME.message);
@@ -1314,6 +1326,21 @@ classdef GUIHandling
             end
             uialert(app.CELL_ID, 'Auto-detect completed successfully.', ...
                 'Auto-detect Complete', 'Icon', 'success');
+        end
+
+        function clear_selected_neuron(app)
+            app.selected_neuron = [];
+        end
+
+        function n = graphics_child_count(ax)
+            n = 0;
+            try
+                if ~isempty(ax) && isvalid(ax) && isprop(ax, 'Children')
+                    n = numel(ax.Children);
+                end
+            catch
+                n = -1;
+            end
         end
 
         function auto_detect_log(app, varargin)
@@ -1717,6 +1744,12 @@ classdef GUIHandling
             output_dir = string(fullfile(root_dir, sprintf('%s_%s', safe_name, stamp)));
         end
 
+        function path_value = default_yolo_weights_path()
+            path_value = string(fullfile( ...
+                fileparts(fileparts(mfilename('fullpath'))), ...
+                'External_Dependencies', 'yolo_inf2', 'best.pt'));
+        end
+
         function params = main_method_params(app, group)
             key = sprintf('main_%s_params', char(string(group)));
             params = struct();
@@ -1740,6 +1773,10 @@ classdef GUIHandling
             params = Program.GUIHandling.replace_missing_or_old_default(params, 'conf', 0.45, 0.60);
             params = Program.GUIHandling.replace_missing_or_old_default(params, 'box_min_px', 2, 6);
             params = Program.GUIHandling.replace_missing_or_old_default(params, 'box_max_px', 80, 120);
+            params = Program.GUIHandling.replace_missing_or_old_default(params, 'imgsz', 640, 512);
+            params = Program.GUIHandling.replace_missing_or_old_default(params, 'p_lo', 2, 0.5);
+            params = Program.GUIHandling.replace_missing_or_old_default(params, 'p_hi', 98, 99.5);
+            params = Program.GUIHandling.replace_missing_or_old_default(params, 'depth_sanity_ratio_cap', 1.5, 2.0);
         end
 
         function params = replace_missing_or_old_default(params, field_name, old_value, new_value)
@@ -1797,7 +1834,7 @@ classdef GUIHandling
         end
 
         function items = main_auto_id_method_items(~)
-            items = {'Transformer'};
+            items = {'Anshita GAT'};
         end
 
         function layout = component_layout(component)
@@ -2227,15 +2264,115 @@ classdef GUIHandling
                 return
             end
 
-            if ~isappdata(app.CELL_ID, 'show_cellpose_mask_overlay')
-                setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', false);
-            end
-
             has_masks = Program.GUIHandling.cellpose_masks_available(app);
             if ~has_masks
                 setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', false);
             end
+            if ~isappdata(app.CELL_ID, 'show_cellpose_mask_overlay')
+                setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', false);
+            end
+            if ~isappdata(app.CELL_ID, 'cellpose_mask_overlay_source')
+                setappdata(app.CELL_ID, 'cellpose_mask_overlay_source', 'masks_stitched');
+            end
             overlay_on = logical(getappdata(app.CELL_ID, 'show_cellpose_mask_overlay'));
+            overlay_source = char(string(getappdata(app.CELL_ID, 'cellpose_mask_overlay_source')));
+
+            parent_menu = app.ImageMenu;
+            if isprop(app, 'ToggleNeuronDetectionMenu') && ...
+                    ~isempty(app.ToggleNeuronDetectionMenu) && isvalid(app.ToggleNeuronDetectionMenu) && ...
+                    ~isempty(app.ToggleNeuronDetectionMenu.Parent) && isvalid(app.ToggleNeuronDetectionMenu.Parent)
+                parent_menu = app.ToggleNeuronDetectionMenu.Parent;
+            end
+
+            parent_toggle = [];
+            existing = findall(app.CELL_ID, 'Type', 'uimenu', 'Tag', 'cellpose_masks_parent_menu');
+            for n = 1:numel(existing)
+                if isempty(parent_toggle) && isvalid(existing(n)) && isequal(existing(n).Parent, parent_menu)
+                    parent_toggle = existing(n);
+                else
+                    delete(existing(n));
+                end
+            end
+
+            if isempty(parent_toggle)
+                parent_toggle = uimenu(parent_menu, ...
+                    'Tag', 'cellpose_masks_parent_menu', ...
+                    'Enable', 'on');
+            end
+            parent_toggle.Text = 'Cellpose Masks';
+            parent_toggle.Enable = Program.GUIHandling.enabled_state_text(has_masks);
+
+            Program.GUIHandling.ensure_cellpose_source_menu(parent_toggle, ...
+                'cellpose_masks_stitched_menu', 'Stitched Mask', 'masks_stitched', ...
+                overlay_on, overlay_source);
+            Program.GUIHandling.ensure_cellpose_source_menu(parent_toggle, ...
+                'cellpose_masks_3d_menu', '3D Mask', 'masks_3D', ...
+                overlay_on, overlay_source);
+            setappdata(app.CELL_ID, 'cellpose_mask_overlay_menu_handle', parent_toggle);
+        end
+
+        function ensure_cellpose_source_menu(parent_menu, tag, text, source, overlay_on, overlay_source)
+            menu = findall(parent_menu, 'Type', 'uimenu', 'Tag', tag);
+            if isempty(menu) || ~isvalid(menu(1))
+                menu = uimenu(parent_menu, 'Tag', tag);
+            else
+                menu = menu(1);
+            end
+            menu.Text = text;
+            menu.MenuSelectedFcn = @(src, ~) Program.GUIHandling.show_cellpose_mask(src, source);
+            menu.Checked = Program.GUIHandling.checked_state_text(overlay_on && strcmpi(overlay_source, source));
+        end
+
+        function show_cellpose_mask(menu_handle, source)
+            app = Program.app;
+            if isempty(app) || ~isvalid(app) || ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
+                return
+            end
+
+            overlay_on = false;
+            if isappdata(app.CELL_ID, 'show_cellpose_mask_overlay')
+                overlay_on = logical(getappdata(app.CELL_ID, 'show_cellpose_mask_overlay'));
+            end
+            current_source = "";
+            if isappdata(app.CELL_ID, 'cellpose_mask_overlay_source')
+                current_source = string(getappdata(app.CELL_ID, 'cellpose_mask_overlay_source'));
+            end
+            next_overlay_on = ~(overlay_on && strcmpi(current_source, source));
+
+            if ~Program.GUIHandling.cellpose_masks_available(app)
+                setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', false);
+                uialert(app.CELL_ID, ...
+                    'Cellpose masks are not available for the current file yet. Run Cellpose detection first.', ...
+                    'No Cellpose Masks', 'Icon', 'warning');
+                return
+            end
+
+            setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', next_overlay_on);
+            setappdata(app.CELL_ID, 'cellpose_mask_overlay_source', char(source));
+            Program.GUIHandling.install_cellpose_mask_button(app);
+            Program.Routines.ID.render();
+        end
+
+        function install_yolo_boxes_button(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app)
+                return
+            end
+            if ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
+                return
+            end
+            if ~isprop(app, 'ImageMenu') || isempty(app.ImageMenu) || ~isvalid(app.ImageMenu)
+                return
+            end
+
+            if ~isappdata(app.CELL_ID, 'show_yolo_box_overlay')
+                setappdata(app.CELL_ID, 'show_yolo_box_overlay', false);
+            end
+
+            has_boxes = Program.GUIHandling.yolo_boxes_available(app);
+            if ~has_boxes
+                setappdata(app.CELL_ID, 'show_yolo_box_overlay', false);
+            end
+            overlay_on = logical(getappdata(app.CELL_ID, 'show_yolo_box_overlay'));
 
             parent_menu = app.ImageMenu;
             if isprop(app, 'ToggleNeuronDetectionMenu') && ...
@@ -2245,7 +2382,7 @@ classdef GUIHandling
             end
 
             toggle_menu = [];
-            existing = findall(app.CELL_ID, 'Type', 'uimenu', 'Tag', 'show_cellpose_masks_menu');
+            existing = findall(app.CELL_ID, 'Type', 'uimenu', 'Tag', 'show_yolo_boxes_menu');
             for n = 1:numel(existing)
                 if isempty(toggle_menu) && isvalid(existing(n)) && isequal(existing(n).Parent, parent_menu)
                     toggle_menu = existing(n);
@@ -2256,53 +2393,44 @@ classdef GUIHandling
 
             if isempty(toggle_menu)
                 toggle_menu = uimenu(parent_menu, ...
-                    'Tag', 'show_cellpose_masks_menu', ...
-                    'Enable', 'on');
+                    'Tag', 'show_yolo_boxes_menu');
             end
 
             if overlay_on
-                toggle_menu.Text = 'Hide Cellpose Mask';
+                toggle_menu.Text = 'Hide YOLO Boxes';
             else
-                toggle_menu.Text = 'Show Cellpose Mask';
+                toggle_menu.Text = 'Show YOLO Boxes';
             end
-            toggle_menu.MenuSelectedFcn = @(src, ~) Program.GUIHandling.show_cellpose_mask(src);
+            toggle_menu.Enable = Program.GUIHandling.enabled_state_text(has_boxes);
+            toggle_menu.MenuSelectedFcn = @(src, ~) Program.GUIHandling.show_yolo_boxes(src);
             toggle_menu.Checked = Program.GUIHandling.checked_state_text(overlay_on);
-            setappdata(app.CELL_ID, 'cellpose_mask_overlay_menu_handle', toggle_menu);
         end
 
-        function show_cellpose_mask(menu_handle)
+        function show_yolo_boxes(menu_handle)
             app = Program.app;
             if isempty(app) || ~isvalid(app) || ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
                 return
             end
 
-            overlay_on = false;
-            if isappdata(app.CELL_ID, 'show_cellpose_mask_overlay')
-                overlay_on = logical(getappdata(app.CELL_ID, 'show_cellpose_mask_overlay'));
-            end
-            next_overlay_on = ~overlay_on;
-
-            if ~Program.GUIHandling.cellpose_masks_available(app)
-                setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', false);
+            if ~Program.GUIHandling.yolo_boxes_available(app)
+                setappdata(app.CELL_ID, 'show_yolo_box_overlay', false);
                 if nargin >= 1 && ~isempty(menu_handle) && isvalid(menu_handle)
-                    menu_handle.Text = 'Show Cellpose Mask';
+                    menu_handle.Text = 'Show YOLO Boxes';
                     menu_handle.Checked = 'off';
+                    menu_handle.Enable = 'off';
                 end
                 uialert(app.CELL_ID, ...
-                    'Cellpose masks are not available for the current file yet. Run Cellpose detection first.', ...
-                    'No Cellpose Masks', 'Icon', 'warning');
+                    'YOLO box summaries are not available for the current file yet. Run YOLO detection first.', ...
+                    'No YOLO Boxes', 'Icon', 'warning');
                 return
             end
 
-            setappdata(app.CELL_ID, 'show_cellpose_mask_overlay', next_overlay_on);
-            if nargin >= 1 && ~isempty(menu_handle) && isvalid(menu_handle)
-                if next_overlay_on
-                    menu_handle.Text = 'Hide Cellpose Mask';
-                else
-                    menu_handle.Text = 'Show Cellpose Mask';
-                end
-                menu_handle.Checked = Program.GUIHandling.checked_state_text(next_overlay_on);
+            overlay_on = false;
+            if isappdata(app.CELL_ID, 'show_yolo_box_overlay')
+                overlay_on = logical(getappdata(app.CELL_ID, 'show_yolo_box_overlay'));
             end
+            setappdata(app.CELL_ID, 'show_yolo_box_overlay', ~overlay_on);
+            Program.GUIHandling.install_yolo_boxes_button(app);
             Program.Routines.ID.render();
         end
 
@@ -2334,7 +2462,44 @@ classdef GUIHandling
             tf = ~isempty(mask_path) && isfile(mask_path);
         end
 
+        function tf = yolo_boxes_available(app)
+            tf = false;
+            summary_path = Program.GUIHandling.yolo_summary_path(app);
+            tf = ~isempty(summary_path) && isfile(summary_path);
+        end
+
+        function summary_path = yolo_summary_path(app)
+            summary_path = '';
+            mp_params = [];
+            if nargin >= 1 && ~isempty(app) && isvalid(app) && ...
+                    isprop(app, 'mp_params') && isstruct(app.mp_params)
+                mp_params = app.mp_params;
+            end
+            if (isempty(mp_params) || ~isfield(mp_params, 'summary_path') || isempty(mp_params.summary_path)) && ...
+                    nargin >= 1 && ~isempty(app) && isvalid(app) && ...
+                    isprop(app, 'id_file') && ~isempty(app.id_file) && isfile(app.id_file)
+                try
+                    id_payload = load(app.id_file, 'mp_params');
+                    if isfield(id_payload, 'mp_params') && isstruct(id_payload.mp_params)
+                        mp_params = id_payload.mp_params;
+                    end
+                catch
+                end
+            end
+            if isstruct(mp_params) && isfield(mp_params, 'summary_path') && ~isempty(mp_params.summary_path)
+                summary_path = char(string(mp_params.summary_path));
+            end
+        end
+
         function value = checked_state_text(tf)
+            if logical(tf)
+                value = 'on';
+            else
+                value = 'off';
+            end
+        end
+
+        function value = enabled_state_text(tf)
             if logical(tf)
                 value = 'on';
             else

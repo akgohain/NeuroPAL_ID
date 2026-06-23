@@ -41,25 +41,32 @@ function get_slice(slider, view, ax)
     end
 
     % Clear the contents of the axis to draw the new Z-slice.
+    Program.Helpers.ensure_main_image_axes(app);
+    ax = app.XY;
     cla(ax);
     % Create the slice at z for displaying in the axis.
     [xy, ~, z] = Program.Helpers.get_current_display_slice(app, 'main', view);
     Program.Helpers.debug_array_summary('IDSlice', 'xy_slice', xy);
     % Display the current slice in the XY axis.
+    Program.Helpers.fill_axes_parent(ax);
     gui_image = image(xy, 'Parent', ax);
     Program.Helpers.configure_image_axes_ticks( ...
         ax, size(xy), app.image_um_scale(1:2), ...
         'XLim', [0, size(xy, 2)], ...
         'YLim', [0, size(xy, 1)]);
+    Program.Helpers.fill_axes_parent(ax);
     hold(ax, 'on');
     local_draw_cellpose_mask_overlay(app, ax, z);
+    local_draw_yolo_box_overlay(app, ax, z);
 
     if strcmp(app.TabGroup.SelectedTab.Title, 'Image Processing') & strcmp(app.VolumeDropDown.Value, 'Colormap')
+        Program.Helpers.fill_axes_parent(app.proc_xyAxes);
         image(xy, 'Parent', app.proc_xyAxes);
         Program.Helpers.configure_image_axes_ticks( ...
             app.proc_xyAxes, size(xy), app.image_um_scale(1:2), ...
             'XLim', [1, size(xy, 2)], ...
             'YLim', [1, size(xy, 1)]);
+        Program.Helpers.fill_axes_parent(app.proc_xyAxes);
     end
 
     % Add the AddNeuron function as mouse click listener.
@@ -224,6 +231,151 @@ neighbor_count = conv2(double(mask_slice), ones(3), 'same');
 boundary = mask_slice & (neighbor_count < 9);
 end
 
+function local_draw_yolo_box_overlay(app, ax, z_data)
+if ~local_yolo_box_overlay_enabled(app)
+    return
+end
+
+boxes = local_get_yolo_boxes_for_slice(app, z_data);
+if isempty(boxes)
+    return
+end
+
+for i = 1:size(boxes, 1)
+    x1 = boxes(i, 1);
+    y1 = boxes(i, 2);
+    x2 = boxes(i, 3);
+    y2 = boxes(i, 4);
+    score = boxes(i, 5);
+    if ~all(isfinite([x1, y1, x2, y2]))
+        continue
+    end
+    width = max(1, x2 - x1);
+    height = max(1, y2 - y1);
+    rectangle(ax, 'Position', [x1, y1, width, height], ...
+        'EdgeColor', [1, 0.85, 0], ...
+        'LineWidth', 1.1, ...
+        'LineStyle', '-', ...
+        'HitTest', 'off');
+    if isfinite(score)
+        text(ax, x1, max(1, y1 - 2), sprintf('%.2f', score), ...
+            'Color', [1, 0.85, 0], ...
+            'FontSize', 8, ...
+            'FontWeight', 'bold', ...
+            'BackgroundColor', [0, 0, 0], ...
+            'Margin', 1, ...
+            'HitTest', 'off');
+    end
+end
+end
+
+function boxes = local_get_yolo_boxes_for_slice(app, z_data)
+boxes = [];
+
+summary_path = local_resolve_yolo_summary_path(app);
+if isempty(summary_path) || ~isfile(summary_path)
+    return
+end
+
+summary = local_get_yolo_summary(app, summary_path);
+if isempty(summary) || ~isfield(summary, 'slices')
+    return
+end
+
+slices = summary.slices;
+if isempty(slices)
+    return
+end
+
+slice_index = round(double(z_data));
+slice_record = [];
+if slice_index >= 1 && slice_index <= numel(slices)
+    slice_record = slices(slice_index);
+else
+    for i = 1:numel(slices)
+        candidate_z = local_yolo_slice_index(slices(i));
+        if ~isnan(candidate_z) && round(candidate_z) == slice_index
+            slice_record = slices(i);
+            break
+        end
+    end
+end
+
+if isempty(slice_record) || ~isfield(slice_record, 'boxes_xyxy_conf')
+    return
+end
+
+boxes = double(slice_record.boxes_xyxy_conf);
+if isempty(boxes)
+    return
+end
+if isvector(boxes)
+    boxes = reshape(boxes, 1, []);
+end
+if size(boxes, 2) < 5
+    boxes(:, 5) = NaN;
+end
+boxes = boxes(:, 1:5);
+end
+
+function summary = local_get_yolo_summary(app, summary_path)
+summary = [];
+cache_metadata_key = 'yolo_box_cache_metadata';
+cache_data_key = 'yolo_box_cache_summary';
+
+try
+    file_info = dir(summary_path);
+catch
+    file_info = struct([]);
+end
+if numel(file_info) ~= 1
+    return
+end
+
+metadata = struct('path', summary_path, ...
+    'bytes', file_info.bytes, ...
+    'datenum', file_info.datenum);
+
+if isappdata(app.CELL_ID, cache_metadata_key) && isappdata(app.CELL_ID, cache_data_key)
+    cached_metadata = getappdata(app.CELL_ID, cache_metadata_key);
+    if isstruct(cached_metadata) && ...
+            isfield(cached_metadata, 'path') && strcmp(cached_metadata.path, metadata.path) && ...
+            isfield(cached_metadata, 'bytes') && cached_metadata.bytes == metadata.bytes && ...
+            isfield(cached_metadata, 'datenum') && cached_metadata.datenum == metadata.datenum
+        summary = getappdata(app.CELL_ID, cache_data_key);
+        return
+    end
+end
+
+try
+    summary = jsondecode(fileread(summary_path));
+catch
+    summary = [];
+    return
+end
+
+setappdata(app.CELL_ID, cache_metadata_key, metadata);
+setappdata(app.CELL_ID, cache_data_key, summary);
+end
+
+function z_index = local_yolo_slice_index(slice_record)
+z_index = NaN;
+candidate_fields = {'z', 'z_index', 'slice', 'slice_index'};
+for i = 1:numel(candidate_fields)
+    field_name = candidate_fields{i};
+    if isfield(slice_record, field_name)
+        value = double(slice_record.(field_name));
+        if isfinite(value)
+            z_index = value;
+            if z_index == floor(z_index)
+                z_index = z_index + 1 * (z_index == 0);
+            end
+            return
+        end
+    end
+end
+end
+
 function mask_volume = local_get_cellpose_mask_volume(app)
 mask_volume = [];
 
@@ -253,7 +405,7 @@ if numel(file_info) ~= 1
     return
 end
 
-cache_metadata = local_build_cellpose_mask_cache_metadata(mask_path, file_info, mp_params);
+cache_metadata = local_build_cellpose_mask_cache_metadata(app, mask_path, file_info, mp_params);
 
 if isappdata(app.CELL_ID, cache_metadata_key) && isappdata(app.CELL_ID, cache_data_key)
     cached_metadata = getappdata(app.CELL_ID, cache_metadata_key);
@@ -265,7 +417,7 @@ if isappdata(app.CELL_ID, cache_metadata_key) && isappdata(app.CELL_ID, cache_da
     end
 end
 
-mask_source = local_cellpose_mask_source(mp_params);
+mask_source = local_cellpose_mask_source(app, mp_params);
 switch lower(mask_source)
     case "masks_3d"
         mask_source = "masks_3D";
@@ -304,20 +456,31 @@ setappdata(app.CELL_ID, cache_metadata_key, cache_metadata);
 setappdata(app.CELL_ID, cache_data_key, mask_volume);
 end
 
-function mask_source = local_cellpose_mask_source(mp_params)
+function mask_source = local_cellpose_mask_source(app, mp_params)
 mask_source = "masks_stitched";
+if isappdata(app.CELL_ID, 'cellpose_mask_overlay_source')
+    mask_source = string(getappdata(app.CELL_ID, 'cellpose_mask_overlay_source'));
+end
 if isfield(mp_params, 'mask_source')
-    mask_source = lower(char(string(mp_params.mask_source)));
-    if strcmp(mask_source, 'masks_3d')
-        mask_source = "masks_3D";
+    stored_source = lower(char(string(mp_params.mask_source)));
+    if ~isappdata(app.CELL_ID, 'cellpose_mask_overlay_source')
+        mask_source = stored_source;
     end
+end
+mask_source = lower(char(mask_source));
+if strcmp(mask_source, '3d') || strcmp(mask_source, 'masks_3d')
+    mask_source = "masks_3D";
+elseif strcmp(mask_source, 'stitched') || strcmp(mask_source, 'masks_stitched')
+    mask_source = "masks_stitched";
+else
+    mask_source = "masks_stitched";
 end
 end
 
-function cache_metadata = local_build_cellpose_mask_cache_metadata(mask_path, file_info, mp_params)
+function cache_metadata = local_build_cellpose_mask_cache_metadata(app, mask_path, file_info, mp_params)
 cache_metadata = struct( ...
     'path', mask_path, ...
-    'mask_source', local_cellpose_mask_source(mp_params) ...
+    'mask_source', local_cellpose_mask_source(app, mp_params) ...
 );
 
 if isstruct(file_info) && ~isempty(file_info)
@@ -400,6 +563,25 @@ if isappdata(app.CELL_ID, key)
 else
     tf = false;
     setappdata(app.CELL_ID, key, tf);
+end
+
+function tf = local_yolo_box_overlay_enabled(app)
+key = 'show_yolo_box_overlay';
+
+if isappdata(app.CELL_ID, key)
+    tf = logical(getappdata(app.CELL_ID, key));
+else
+    tf = false;
+    setappdata(app.CELL_ID, key, tf);
+end
+end
+
+function summary_path = local_resolve_yolo_summary_path(app)
+summary_path = '';
+mp_params = local_resolve_mp_params(app);
+if isstruct(mp_params) && isfield(mp_params, 'summary_path') && ~isempty(mp_params.summary_path)
+    summary_path = char(string(mp_params.summary_path));
+end
 end
 end
 

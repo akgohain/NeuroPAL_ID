@@ -51,8 +51,6 @@ function hot_neuron_reset()
         uitreenode(ganglia,'Text','Dorso-Rectal');
         uitreenode(ganglia,'Text','Lumbar (L)');
         uitreenode(ganglia,'Text','Lumbar (R)');
-    else
-        return
     end
 
 
@@ -159,4 +157,3 @@ function hot_neuron_reset()
         app.UnIDdNeuronsListBox.Items = unid_neurons;
     end
 end
-

@@ -129,11 +129,25 @@ def main() -> None:
         str(req["imgsz"]),
         "--line_width",
         str(req["line_width"]),
+        "--voxel-spacing-um",
+        *[str(x) for x in req["scale_um_xyz"]],
+        "--scale-bar-um",
+        "10",
     ]
     if req.get("device"):
         infer_cmd.extend(["--device", str(req["device"])])
     if req.get("stretch_slices", True):
         infer_cmd.extend(["--stretch_slices", "--p_lo", str(req["p_lo"]), "--p_hi", str(req["p_hi"])])
+    if req.get("skip_low_signal_slices", True):
+        infer_cmd.extend(
+            [
+                "--skip-low-signal-slices",
+                "--slice-signal-percentile",
+                str(req.get("slice_signal_percentile", 90.0)),
+                "--slice-signal-rel-min",
+                str(req.get("slice_signal_rel_min", 0.15)),
+            ]
+        )
     run(infer_cmd)
 
     progress("Fusing YOLO detections across z...")
@@ -160,6 +174,7 @@ def main() -> None:
         str(req["fuse_max_dz"]),
         "--iou-min",
         str(req["iou_min"]),
+        "--crop-z-to-summary",
         "--color-dot-min",
         str(req["color_dot_min"]),
         "--voxel-spacing-um",

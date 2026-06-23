@@ -5,26 +5,29 @@ arguments
     volume
     scale_um_xyz double
     options.PythonExecutable (1,1) string = ""
-    options.WeightsPath (1,1) string = "/Users/adamg/neuroPAL/artifacts/swetha_yolo_inf/YOLO INF/best.pt"
-    options.InferScript (1,1) string = "/Users/adamg/neuroPAL/neuroPAL-detection/yolov8-cell/infer_volume_slices_yolo.py"
-    options.FuseScript (1,1) string = "/Users/adamg/neuroPAL/neuroPAL-detection/yolov8-cell/mip_centroids_iou_color_fuse.py"
+    options.WeightsPath (1,1) string = ""
+    options.InferScript (1,1) string = ""
+    options.FuseScript (1,1) string = ""
     options.OutputDir (1,1) string = ""
     options.KeepArtifacts (1,1) logical = false
     options.Conf (1,1) double = 0.60
-    options.ImgSize (1,1) double = 640
+    options.ImgSize (1,1) double = 512
     options.BoxMinPx (1,1) double = 6
     options.BoxMaxPx (1,1) double = 120
     options.Device (1,1) string = ""
     options.StretchSlices (1,1) logical = true
+    options.SkipLowSignalSlices (1,1) logical = true
+    options.SliceSignalPercentile (1,1) double = 90
+    options.SliceSignalRelMin (1,1) double = 0.15
     options.StretchMIP (1,1) logical = true
-    options.PLo (1,1) double = 2
-    options.PHi (1,1) double = 98
+    options.PLo (1,1) double = 0.5
+    options.PHi (1,1) double = 99.5
     options.FuseMaxDz (1,1) double = 1
     options.IoUMin (1,1) double = 0.5
-    options.ColorMatch (1,1) logical = true
+    options.ColorMatch (1,1) logical = false
     options.ColorDotMin (1,1) double = 0.8
     options.DepthSanity (1,1) logical = true
-    options.DepthSanityRatioCap (1,1) double = 1.5
+    options.DepthSanityRatioCap (1,1) double = 2.0
     options.Radius (1,1) double = 2
     options.LineWidth (1,1) double = 2
     options.ProgressFcn = []
@@ -35,9 +38,11 @@ if numel(scale_um_xyz) ~= 3
     error('Wrapper:InvalidScale', 'scale_um_xyz must contain exactly 3 values.');
 end
 
-default_weights_path = "/Users/adamg/neuroPAL/artifacts/swetha_yolo_inf/YOLO INF/best.pt";
-default_infer_script = "/Users/adamg/neuroPAL/neuroPAL-detection/yolov8-cell/infer_volume_slices_yolo.py";
-default_fuse_script = "/Users/adamg/neuroPAL/neuroPAL-detection/yolov8-cell/mip_centroids_iou_color_fuse.py";
+repo_root = fileparts(fileparts(mfilename('fullpath')));
+default_yolo_dir = fullfile(repo_root, 'External_Dependencies', 'yolo_inf2');
+default_weights_path = string(fullfile(default_yolo_dir, 'best.pt'));
+default_infer_script = string(fullfile(default_yolo_dir, 'infer_volume_slices_yolo.py'));
+default_fuse_script = string(fullfile(default_yolo_dir, 'mip_centroids_iou_color_fuse.py'));
 
 weights_option = options.WeightsPath;
 if strlength(weights_option) == 0
@@ -97,6 +102,9 @@ manifest = struct( ...
     'box_max_px', clamp(options.BoxMaxPx, 1, 4096), ...
     'device', char(options.Device), ...
     'stretch_slices', logical(options.StretchSlices), ...
+    'skip_low_signal_slices', logical(options.SkipLowSignalSlices), ...
+    'slice_signal_percentile', clamp(options.SliceSignalPercentile, 50, 99.9), ...
+    'slice_signal_rel_min', clamp(options.SliceSignalRelMin, 0, 1), ...
     'stretch_mip', logical(options.StretchMIP), ...
     'p_lo', clamp(options.PLo, 0, 100), ...
     'p_hi', clamp(options.PHi, 0, 100), ...
