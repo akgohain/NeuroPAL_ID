@@ -16,6 +16,10 @@ else
     exit 1
 fi
 
+if [ -z "${NEUROPAL_YOLO_PYTHON:-}" ] && [ -x "/Users/adamg/neuroPAL/.venv-ai-pipeline/bin/python" ]; then
+    export NEUROPAL_YOLO_PYTHON="/Users/adamg/neuroPAL/.venv-ai-pipeline/bin/python"
+fi
+
 filter_matlab_launcher_noise() {
     if [ "${NPAL_SHOW_MATLAB_STARTUP_WARNINGS:-0}" = "1" ]; then
         cat

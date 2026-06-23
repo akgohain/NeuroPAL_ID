@@ -169,7 +169,8 @@ if contains(output_text, 'no module named') || contains(output_text, 'modulenotf
 end
 if contains(output_text, 'no such file') || contains(output_text, 'filenotfounderror') || ...
         contains(output_text, 'best.pt')
-    message = sprintf('YOLO could not load weights: %s', char(string(weights_path)));
+    message = sprintf('YOLO could not load weights: %s\n\nPython output:\n%s', ...
+        char(string(weights_path)), strtrim(char(string(output))));
 end
 end
 

@@ -74,6 +74,22 @@ def iter_cellpose_style_slices(volume: np.ndarray):
         yield z_idx, volume[:, :, z_idx, :]
 
 
+def slice_signal_values(
+    volume: np.ndarray,
+    *,
+    percentile: float,
+) -> np.ndarray:
+    percentile = float(np.clip(percentile, 0.0, 100.0))
+    values = []
+    for _, plane in iter_cellpose_style_slices(volume):
+        arr = np.asarray(plane, dtype=np.float32)
+        if arr.size == 0:
+            values.append(0.0)
+        else:
+            values.append(float(np.nanpercentile(arr, percentile)))
+    return np.asarray(values, dtype=np.float32)
+
+
 def draw_predictions(
     image_rgb: np.ndarray,
     boxes_xyxy: np.ndarray,
@@ -163,6 +179,19 @@ def _run_inference(args: argparse.Namespace) -> None:
 
     max_z = int(volume.shape[2])
     n_total = min(max_z, int(args.max_slices)) if args.max_slices is not None else max_z
+    signal_by_z = None
+    signal_threshold = None
+    if args.skip_low_signal_slices:
+        signal_by_z = slice_signal_values(volume, percentile=args.slice_signal_percentile)
+        signal_max = float(np.nanmax(signal_by_z)) if signal_by_z.size else 0.0
+        signal_threshold = signal_max * float(np.clip(args.slice_signal_rel_min, 0.0, 1.0))
+        log.info(
+            "Low-signal filter | percentile=%.1f | max=%.4g | rel_min=%.3f | threshold=%.4g",
+            args.slice_signal_percentile,
+            signal_max,
+            args.slice_signal_rel_min,
+            signal_threshold,
+        )
     dev_s = str(args.device) if args.device is not None else "ultralytics-default"
     log.info(
         "Inference plan | device=%s | z-planes in file=%d | will run=%d planes | imgsz=%d conf=%.3f stretch=%s (%s-%s)",
@@ -203,6 +232,29 @@ def _run_inference(args: argparse.Namespace) -> None:
         if args.max_slices is not None and len(summary["slices"]) >= args.max_slices:
             break
         t_slice = time.perf_counter()
+        if signal_by_z is not None and float(signal_by_z[z_idx]) < float(signal_threshold):
+            summary["slices"].append(
+                {
+                    "z": int(z_idx),
+                    "n_predictions": 0,
+                    "prediction_png": "",
+                    "slice_png": "",
+                    "boxes_xyxy_conf": [],
+                    "skipped_low_signal": True,
+                    "slice_signal": float(signal_by_z[z_idx]),
+                    "slice_signal_threshold": float(signal_threshold),
+                }
+            )
+            if args.log_every <= 1:
+                log.info(
+                    "[%d/%d z=%04d] skipped low signal %.4g < %.4g",
+                    len(summary["slices"]),
+                    n_total,
+                    z_idx,
+                    float(signal_by_z[z_idx]),
+                    float(signal_threshold),
+                )
+            continue
         img_rgb = to_uint8_image(plane, stretch=args.stretch_slices, p_lo=args.p_lo, p_hi=args.p_hi)
         predict_kwargs = {"conf": args.conf, "imgsz": args.imgsz, "verbose": False}
         if args.device is not None:
@@ -330,6 +382,23 @@ def main() -> None:
     )
     parser.add_argument("--p_lo", type=float, default=2.0, help="Lower percentile for --stretch_slices.")
     parser.add_argument("--p_hi", type=float, default=98.0, help="Upper percentile for --stretch_slices.")
+    parser.add_argument(
+        "--skip-low-signal-slices",
+        action="store_true",
+        help="Skip z-planes whose signal percentile is below a relative threshold.",
+    )
+    parser.add_argument(
+        "--slice-signal-percentile",
+        type=float,
+        default=90.0,
+        help="Raw-volume percentile used by --skip-low-signal-slices.",
+    )
+    parser.add_argument(
+        "--slice-signal-rel-min",
+        type=float,
+        default=0.15,
+        help="Skip planes below this fraction of the maximum per-slice signal percentile.",
+    )
     parser.add_argument(
         "--save_slices",
         action="store_true",

@@ -21,6 +21,10 @@ else
     exit 1
 fi
 
+if [ -z "${NEUROPAL_YOLO_PYTHON:-}" ] && [ -x "/Users/adamg/neuroPAL/.venv-ai-pipeline/bin/python" ]; then
+    export NEUROPAL_YOLO_PYTHON="/Users/adamg/neuroPAL/.venv-ai-pipeline/bin/python"
+fi
+
 echo "NeuroPAL debug log: $log_path"
 echo "Reproduce the issue, then close MATLAB and send me that log."
 
