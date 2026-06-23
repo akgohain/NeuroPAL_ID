@@ -1089,58 +1089,66 @@ classdef GUIHandling
         end
 
         function handle_main_id_run(app, src, event)
-            controls = Program.GUIHandling.main_detect_id_controls(app);
-            callbacks = [];
-            if isprop(app, 'AutoIDButton') && ~isempty(app.AutoIDButton) && isvalid(app.AutoIDButton) && ...
-                    isappdata(app.AutoIDButton.Parent, 'main_id_legacy_callbacks')
-                callbacks = getappdata(app.AutoIDButton.Parent, 'main_id_legacy_callbacks');
-            end
-            if isempty(controls) || isempty(callbacks)
-                return
-            end
+            try
+                controls = Program.GUIHandling.main_detect_id_controls(app);
+                callbacks = [];
+                if isprop(app, 'AutoIDButton') && ~isempty(app.AutoIDButton) && isvalid(app.AutoIDButton) && ...
+                        isappdata(app.AutoIDButton.Parent, 'main_id_legacy_callbacks')
+                    callbacks = getappdata(app.AutoIDButton.Parent, 'main_id_legacy_callbacks');
+                end
+                if isempty(controls) || isempty(callbacks)
+                    return
+                end
 
-            if Program.GUIHandling.main_crop_checkbox_value(controls, 'id_crop_checkbox')
-                Program.GUIHandling.handle_main_crop_requested(app, 'auto-ID');
-                return
-            end
+                if Program.GUIHandling.main_crop_checkbox_value(controls, 'id_crop_checkbox')
+                    Program.GUIHandling.handle_main_crop_requested(app, 'auto-ID');
+                    return
+                end
 
-            id_method = "";
-            if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
-                id_method = string(controls.id_dropdown.Value);
-                Program.GUIHandling.handle_main_id_method_changed(app, id_method);
-            end
+                id_method = "";
+                if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
+                    id_method = string(controls.id_dropdown.Value);
+                    Program.GUIHandling.handle_main_id_method_changed(app, id_method);
+                end
 
-            if any(strcmpi(char(id_method), {'GAT/Transformer', 'Transformer', 'Anshita', 'Anshita GAT', 'GAT'}))
-                Program.GUIHandling.run_transformer_auto_id(app);
-                return
-            end
+                if any(strcmpi(char(id_method), {'GAT/Transformer', 'Transformer', 'Anshita', 'Anshita GAT', 'GAT'}))
+                    Program.GUIHandling.run_transformer_auto_id(app);
+                    return
+                end
 
-            Program.GUIHandling.invoke_gui_callback(callbacks.auto, src, event);
+                Program.GUIHandling.invoke_gui_callback(callbacks.auto, src, event);
+            catch ME
+                Program.GUIHandling.log_gui_callback_error(app, 'Auto-ID', ME);
+            end
         end
 
         function handle_main_detect_run(app, src, event)
-            controls = Program.GUIHandling.main_detect_id_controls(app);
-            callback = [];
-            if isprop(app, 'AutoDetectButton') && ~isempty(app.AutoDetectButton) && isvalid(app.AutoDetectButton) && ...
-                    isappdata(app.AutoDetectButton.Parent, 'main_detect_legacy_callback')
-                callback = getappdata(app.AutoDetectButton.Parent, 'main_detect_legacy_callback');
-            end
-            if isempty(callback)
-                return
-            end
+            try
+                controls = Program.GUIHandling.main_detect_id_controls(app);
+                callback = [];
+                if isprop(app, 'AutoDetectButton') && ~isempty(app.AutoDetectButton) && isvalid(app.AutoDetectButton) && ...
+                        isappdata(app.AutoDetectButton.Parent, 'main_detect_legacy_callback')
+                    callback = getappdata(app.AutoDetectButton.Parent, 'main_detect_legacy_callback');
+                end
+                if isempty(callback)
+                    return
+                end
 
-            if Program.GUIHandling.main_crop_checkbox_value(controls, 'detect_crop_checkbox')
-                Program.GUIHandling.handle_main_crop_requested(app, 'detection');
-                return
-            end
+                if Program.GUIHandling.main_crop_checkbox_value(controls, 'detect_crop_checkbox')
+                    Program.GUIHandling.handle_main_crop_requested(app, 'detection');
+                    return
+                end
 
-            backend = Program.GUIPreferences.get_detection_backend();
-            if any(strcmp(backend, {'cellpose', 'yolo'}))
-                Program.GUIHandling.run_modern_auto_detector(app, backend);
-                return
-            end
+                backend = Program.GUIPreferences.get_detection_backend();
+                if any(strcmp(backend, {'cellpose', 'yolo'}))
+                    Program.GUIHandling.run_modern_auto_detector(app, backend);
+                    return
+                end
 
-            Program.GUIHandling.invoke_gui_callback(callback, src, event);
+                Program.GUIHandling.invoke_gui_callback(callback, src, event);
+            catch ME
+                Program.GUIHandling.log_gui_callback_error(app, 'Auto-detect', ME);
+            end
         end
 
         function run_modern_auto_detector(app, backend)
@@ -1237,7 +1245,7 @@ classdef GUIHandling
             catch ME
                 Program.GUIHandling.auto_detect_log(app, ...
                     'ERROR detector threw %s: %s', ME.identifier, ME.message);
-                uialert(app.CELL_ID, Program.GUIHandling.method_error_message(ME), ...
+                Program.GUIHandling.safe_uialert(app, Program.GUIHandling.method_error_message(ME), ...
                     'Auto-detect Failed', 'Icon', 'error');
                 return
             end
@@ -1251,7 +1259,7 @@ classdef GUIHandling
                 detail = Program.GUIHandling.auto_detect_empty_detail(app.mp_params);
                 Program.GUIHandling.auto_detect_log(app, ...
                     'ABORT detector returned empty sp. detail="%s"', strtrim(detail));
-                uialert(app.CELL_ID, sprintf('Auto-detect failed to find any neurons.%s', detail), ...
+                Program.GUIHandling.safe_uialert(app, sprintf('Auto-detect failed to find any neurons.%s', detail), ...
                     'Auto-detect Failed', 'Icon', 'error');
                 return
             end
@@ -1320,11 +1328,11 @@ classdef GUIHandling
             catch ME
                 Program.GUIHandling.auto_detect_log(app, ...
                     'ERROR post-detect propagation threw %s: %s', ME.identifier, ME.message);
-                uialert(app.CELL_ID, Program.GUIHandling.method_error_message(ME), ...
+                Program.GUIHandling.safe_uialert(app, Program.GUIHandling.method_error_message(ME), ...
                     'Auto-detect Import Failed', 'Icon', 'error');
                 return
             end
-            uialert(app.CELL_ID, 'Auto-detect completed successfully.', ...
+            Program.GUIHandling.safe_uialert(app, 'Auto-detect completed successfully.', ...
                 'Auto-detect Complete', 'Icon', 'success');
         end
 
@@ -1552,10 +1560,10 @@ classdef GUIHandling
                 Program.Routines.ID.render();
                 drawnow limitrate;
                 message = Program.GUIHandling.transformer_match_success_message(app);
-                uialert(app.CELL_ID, message, ...
+                Program.GUIHandling.safe_uialert(app, message, ...
                     'Auto-ID Complete', 'Icon', 'success');
             catch ME
-                uialert(app.CELL_ID, Program.GUIHandling.method_error_message(ME), ...
+                Program.GUIHandling.safe_uialert(app, Program.GUIHandling.method_error_message(ME), ...
                     'Auto-ID Failed', 'Icon', 'error');
             end
         end
@@ -1636,6 +1644,50 @@ classdef GUIHandling
                         message = report;
                     end
             end
+        end
+
+        function safe_uialert(app, message, title, varargin)
+            try
+                if nargin < 3 || isempty(title)
+                    title = 'NeuroPAL';
+                end
+                if nargin < 2 || isempty(message)
+                    message = 'An unexpected error occurred.';
+                end
+                if nargin >= 1 && ~isempty(app) && isvalid(app) && ...
+                        isprop(app, 'CELL_ID') && ~isempty(app.CELL_ID) && isvalid(app.CELL_ID)
+                    uialert(app.CELL_ID, char(string(message)), char(string(title)), varargin{:});
+                    return
+                end
+            catch ME
+                Program.Helpers.debug_event('GUI', ...
+                    'Failed to show alert "%s": %s', char(string(title)), ME.message);
+            end
+
+            try
+                warning('NeuroPAL:GUIAlert', '%s: %s', char(string(title)), char(string(message)));
+            catch
+            end
+        end
+
+        function log_gui_callback_error(app, routine_name, ME)
+            routine_name = char(string(routine_name));
+            try
+                Program.Helpers.debug_event('GUI', ...
+                    '%s callback failed with %s: %s', routine_name, ME.identifier, ME.message);
+            catch
+            end
+
+            try
+                if strcmpi(routine_name, 'Auto-detect')
+                    Program.GUIHandling.auto_detect_log(app, ...
+                        'ERROR callback guard caught %s: %s', ME.identifier, ME.message);
+                end
+            catch
+            end
+
+            Program.GUIHandling.safe_uialert(app, Program.GUIHandling.method_error_message(ME), ...
+                sprintf('%s Failed', routine_name), 'Icon', 'error');
         end
 
         function tf = is_nwb_backed_image(app)
