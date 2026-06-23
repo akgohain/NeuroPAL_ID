@@ -24,9 +24,20 @@ fi
 echo "NeuroPAL debug log: $log_path"
 echo "Reproduce the issue, then close MATLAB and send me that log."
 
+filter_matlab_launcher_noise() {
+    if [ "${NPAL_SHOW_MATLAB_STARTUP_WARNINGS:-0}" = "1" ]; then
+        cat
+    else
+        sed \
+            -e '/^WARNING: package sun\.awt\.X11 not in java\.desktop$/d' \
+            -e '/^FALLBACK (log once): Fallback to SW vertex/d'
+    fi
+}
+
 NPAL_DEBUG=1 NPAL_DEBUG_LOG="$log_path" \
-exec "$matlab_bin" \
+"$matlab_bin" \
     -desktop \
     -logfile "$log_path" \
     -sd "$repo_root" \
-    -r "fprintf('Launching NeuroPAL_ID from %s\\n', pwd); try, run(fullfile(pwd,'scripts','launch_visualize_light.m')); catch ME, disp(getReport(ME,'extended','hyperlinks','off')); end"
+    -r "fprintf('Launching NeuroPAL_ID from %s\\n', pwd); try, run(fullfile(pwd,'scripts','launch_visualize_light.m')); catch ME, disp(getReport(ME,'extended','hyperlinks','off')); end" \
+    2>&1 | filter_matlab_launcher_noise

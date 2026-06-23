@@ -16,7 +16,18 @@ else
     exit 1
 fi
 
-exec "$matlab_bin" \
+filter_matlab_launcher_noise() {
+    if [ "${NPAL_SHOW_MATLAB_STARTUP_WARNINGS:-0}" = "1" ]; then
+        cat
+    else
+        sed \
+            -e '/^WARNING: package sun\.awt\.X11 not in java\.desktop$/d' \
+            -e '/^FALLBACK (log once): Fallback to SW vertex/d'
+    fi
+}
+
+"$matlab_bin" \
     -desktop \
     -sd "$repo_root" \
-    -r "try, run(fullfile(pwd,'scripts','launch_visualize_light.m')); catch ME, disp(getReport(ME,'extended','hyperlinks','off')); end"
+    -r "try, run(fullfile(pwd,'scripts','launch_visualize_light.m')); catch ME, disp(getReport(ME,'extended','hyperlinks','off')); end" \
+    2>&1 | filter_matlab_launcher_noise
