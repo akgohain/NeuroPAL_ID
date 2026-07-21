@@ -94,3 +94,17 @@ the current app model:
 ```sh
 python3 scripts/sync_mlapp_method.py MethodName
 ```
+
+## App sprint milestone: 2026-07-21
+
+- Added a true Video Tracking empty state and hid the disabled workflow until a recording is open.
+- Restored H5 video loading by removing calls to nonexistent App Designer cache/control methods.
+- Video loading now discards the representative HDF5 chunk after recording its sample class instead of retaining it as `bitDepth` metadata.
+- Added bounded timeline ticks and a stable, throttled frame-navigation callback.
+- Added real video-fixture capture support to the UI harness.
+- Reworked Image Processing titles and commit actions around preview, display channels, geometry, and explicit pending-change state.
+- Added an unsaved-processing-preview capture variant.
+- The final unloaded, image-loaded, and video-loaded matrix produced 30 snapshots at 1200x760 and 1400x880 with zero structural errors. Its only warning was a repeated 9.8 px Save button overflow; the focused post-fix audit produced five snapshots with zero errors and zero warnings.
+- MATLAB Code Analyzer reported zero messages for all files changed in the sprint, the frame-2 video navigation smoke test passed, and the App Designer drift check passed.
+
+The next app-side priorities are NeuroPAL ID workflow hierarchy, transactional cross-file state cleanup, failure-injection coverage, and richer log/runtime diagnostics.

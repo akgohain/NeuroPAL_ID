@@ -5047,9 +5047,9 @@ classdef GUIHandling
 
             app.ProcSavePanel.Title = 'Changes';
             app.ProcSavePanel.FontWeight = 'bold';
-            app.ProcSaveGrid.RowHeight = {20, 34, 34};
-            app.ProcSaveGrid.RowSpacing = 5;
-            app.ProcSaveGrid.Padding = [8 5 8 7];
+            app.ProcSaveGrid.RowHeight = {18, 30, 30};
+            app.ProcSaveGrid.RowSpacing = 4;
+            app.ProcSaveGrid.Padding = [8 2 8 4];
             label.Layout.Row = 1;
             label.Layout.Column = 1;
 
