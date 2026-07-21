@@ -61,12 +61,15 @@ function load(file)
             return
     end
 
-    app.video_frame_cache = [];
-    app.video_frame_cache_key = struct('file', '', 't', NaN);
-    if ismethod(app, 'resetVideoViewCache')
-        app.resetVideoViewCache();
+    % Older App Designer loaders may return a representative HDF5 chunk in
+    % bitDepth. Retaining that chunk wastes memory and obscures the sample
+    % type; keep only its class name.
+    if isfield(app.video_info, 'bitDepth') && ...
+            isnumeric(app.video_info.bitDepth) && ~isscalar(app.video_info.bitDepth)
+        app.video_info.bitDepth = class(app.video_info.bitDepth);
     end
-    app.clearVideoTimeSliderLiveState();
+
+    Program.Helpers.clear_video_view_state(app);
 
     app.xyAxes.XLim = [1, app.video_info.nx];
     app.xyAxes.YLim = [1, app.video_info.ny];
@@ -75,11 +78,7 @@ function load(file)
 
     % Define slider limits and values based on video
     app.tSlider.Limits = [1, app.video_info.nt];
-    app.ActivityAxes.XTick = 0:app.video_info.nt;
-    app.ActivityAxes.XTickLabel = 0:app.video_info.nt;
-    app.configureVideoColorDefaults();
-    app.configureVideoTimeSlider();
-    app.tSlider.Value = 1;
+    Program.Helpers.configure_video_controls(app);
 
     app.vert_zSlider.Limits = [1, app.video_info.nz];
     app.vert_zSlider.Value = round(app.video_info.nz/2);

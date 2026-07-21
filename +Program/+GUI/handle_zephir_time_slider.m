@@ -21,9 +21,7 @@ if is_final
     app.tSlider.Value = target_t;
     setappdata(app.CELL_ID, 'video_tslider_live_last_t', target_t);
     setappdata(app.CELL_ID, 'video_tslider_live_previewing', false);
-    tune_video_cache(app);
     app.visual_composer(target_t);
-    prefetch_neighbor_xy(app, target_t);
     drawnow limitrate nocallbacks
     return
 end
@@ -78,7 +76,7 @@ if isappdata(app.CELL_ID, 'video_tslider_live_last_seconds')
     last_seconds = getappdata(app.CELL_ID, 'video_tslider_live_last_seconds');
 end
 
-if now_seconds - last_seconds < 0.035
+if now_seconds - last_seconds < 0.12
     return
 end
 
@@ -88,57 +86,9 @@ tf = true;
 end
 
 function render_live_xy_preview(app, target_t)
-if live_orthos_enabled(app)
-    app.visual_composer(target_t);
-    return
-end
-
-z = round(double(app.hor_zSlider.Value));
-x = round(double(app.video_info.ny) - double(app.ySlider.Value));
-y = round(double(app.xSlider.Value));
-[target_t, z, x, y] = app.clampVideoViewCoordinates(target_t, z, x, y);
-
-xy = app.readCachedVideoXYStack(target_t, z);
-xy = app.scaleVideoProjection(xy);
-xy_img = app.setVideoImage(app.xyAxes, xy, 'npal_video_xy');
-xy_img.ButtonDownFcn = {@app.ImageClicked};
-
-app.xyAxes.XLim = [1, size(xy, 2)];
-app.xyAxes.YLim = [1, size(xy, 1)];
-Program.GUI.configure_zephir_video_axes(app);
-Program.Helpers.draw_video_cursor(x, y, z);
-end
-
-function tf = live_orthos_enabled(app)
-try
-    tf = isappdata(app.CELL_ID, 'zephir_live_orthos_during_drag') && ...
-        logical(getappdata(app.CELL_ID, 'zephir_live_orthos_during_drag'));
-catch
-    tf = false;
-end
-end
-
-function prefetch_neighbor_xy(app, target_t)
-z = round(double(app.hor_zSlider.Value));
-neighbor_t = unique([target_t - 1, target_t + 1]);
-neighbor_t = neighbor_t(neighbor_t >= 1 & neighbor_t <= double(app.video_info.nt));
-
-for t_idx = neighbor_t
-    try
-        app.readCachedVideoXYStack(t_idx, z);
-    catch
-    end
-end
-end
-
-function tune_video_cache(app)
-try
-    cache = app.ensureVideoViewCache();
-    cache.max_planes = max(cache.max_planes, 96);
-    cache.max_plane_bytes = max(cache.max_plane_bytes, 256 * 1024 * 1024);
-    cache.max_views = max(cache.max_views, 32);
-    cache.max_view_bytes = max(cache.max_view_bytes, 192 * 1024 * 1024);
-    app.video_view_cache = cache;
-catch
-end
+% The current App Designer class exposes a reliable full-frame renderer but
+% not the experimental plane-cache methods used by an earlier prototype.
+% Throttling above keeps this path responsive without calling missing app
+% methods. A future cache can be added behind this stable callback boundary.
+app.visual_composer(target_t);
 end

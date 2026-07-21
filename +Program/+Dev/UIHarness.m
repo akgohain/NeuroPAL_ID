@@ -12,6 +12,7 @@ classdef UIHarness
             parser.FunctionName = 'Program.Dev.UIHarness.run';
             addParameter(parser, 'OutputDir', '', @(value) ischar(value) || isstring(value));
             addParameter(parser, 'Fixture', '', @(value) ischar(value) || isstring(value));
+            addParameter(parser, 'VideoFixture', '', @(value) ischar(value) || isstring(value));
             addParameter(parser, 'Viewports', [1200 760; 1400 880], ...
                 @(value) isnumeric(value) && size(value, 2) == 2);
             addParameter(parser, 'KeepOpen', false, @(value) islogical(value) && isscalar(value));
@@ -32,14 +33,22 @@ classdef UIHarness
                 error('NeuroPAL:UIHarness:MissingFixture', ...
                     'UI fixture does not exist: %s', fixture);
             end
+            video_fixture = char(string(parser.Results.VideoFixture));
+            if ~isempty(video_fixture) && exist(video_fixture, 'file') ~= 2
+                error('NeuroPAL:UIHarness:MissingVideoFixture', ...
+                    'UI video fixture does not exist: %s', video_fixture);
+            end
 
             app = visualize_light;
+            fprintf('UI harness: application ready\n');
             assignin('base', 'NEUROPAL_DEV_APP', app);
             cleanup = onCleanup(@() Program.Dev.UIHarness.cleanup_app( ...
                 app, parser.Results.KeepOpen));
 
             figure_handle = app.CELL_ID;
-            figure_handle.WindowState = 'normal';
+            if ~strcmpi(char(string(figure_handle.WindowState)), 'normal')
+                figure_handle.WindowState = 'normal';
+            end
             drawnow;
 
             report = struct();
@@ -47,6 +56,7 @@ classdef UIHarness
                 'Format', 'yyyy-MM-dd HH:mm:ss Z'));
             report.matlab_version = version;
             report.fixture = fixture;
+            report.video_fixture = video_fixture;
             report.output_dir = output_dir;
             report.viewports = parser.Results.Viewports;
             report.scenarios = struct([]);
@@ -61,6 +71,16 @@ classdef UIHarness
                 loaded = Program.Dev.UIHarness.capture_scenario( ...
                     app, output_dir, 'loaded', parser.Results.Viewports);
                 report.scenarios(end + 1) = loaded;
+            end
+
+            if ~isempty(video_fixture)
+                fprintf('UI harness: loading video fixture %s\n', video_fixture);
+                Program.Routines.Videos.load(video_fixture);
+                fprintf('UI harness: video fixture ready\n');
+                drawnow;
+                video_loaded = Program.Dev.UIHarness.capture_scenario( ...
+                    app, output_dir, 'video-loaded', parser.Results.Viewports);
+                report.scenarios(end + 1) = video_loaded;
             end
 
             report.summary = Program.Dev.UIHarness.summarize(report.scenarios);
@@ -134,6 +154,16 @@ classdef UIHarness
                         scenario.snapshots, snapshot);
                     Program.GUIHandling.handle_processing_advanced_toggle(app);
                     drawnow;
+
+                    setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
+                    Program.GUIHandling.update_processing_commit_state(app);
+                    snapshot = Program.Dev.UIHarness.capture_snapshot( ...
+                        app, output_dir, scenario_name, app.ImageProcessingTab, ...
+                        requested_size, 'unsaved-preview');
+                    scenario.snapshots = Program.Dev.UIHarness.append_snapshot( ...
+                        scenario.snapshots, snapshot);
+                    rmappdata(app.CELL_ID, 'proc_runtime_dirty');
+                    Program.GUIHandling.update_processing_commit_state(app);
                 end
 
                 if strcmpi(scenario_name, 'unloaded') && ...
@@ -350,6 +380,7 @@ classdef UIHarness
             fprintf(fid, 'NeuroPAL UI audit\n');
             fprintf(fid, 'Generated: %s\n', report.generated_at);
             fprintf(fid, 'Fixture: %s\n', report.fixture);
+            fprintf(fid, 'Video fixture: %s\n', report.video_fixture);
             fprintf(fid, 'Snapshots: %d\n', report.summary.snapshot_count);
             fprintf(fid, 'Layout errors: %d\n', report.summary.error_count);
             fprintf(fid, 'Layout warnings: %d\n', report.summary.warning_count);

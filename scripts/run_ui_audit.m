@@ -7,6 +7,7 @@ addpath(repo_root);
 
 output_dir = getenv('NPAL_UI_AUDIT_OUTPUT');
 fixture = getenv('NPAL_UI_AUDIT_FIXTURE');
+video_fixture = getenv('NPAL_UI_AUDIT_VIDEO_FIXTURE');
 
 if isempty(output_dir)
     output_dir = fullfile(repo_root, '.ui_artifacts', ...
@@ -15,5 +16,6 @@ end
 
 report = Program.Dev.UIHarness.run( ...
     'OutputDir', output_dir, ...
-    'Fixture', fixture);
+    'Fixture', fixture, ...
+    'VideoFixture', video_fixture);
 end

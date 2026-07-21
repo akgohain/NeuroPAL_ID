@@ -23,11 +23,8 @@ function reload(path)
 
     app.video_info.aspect_ratio = app.video_info.ny/app.video_info.nx;  % Aspect Ratio
     app.video_info.cached = 1;                          % Frames cached
-    app.video_frame_cache = [];
-    app.video_frame_cache_key = struct('file', '', 't', NaN);
-    if ismethod(app, 'resetVideoViewCache')
-        app.resetVideoViewCache();
-    end
+    Program.Helpers.clear_video_view_state(app);
+    Program.Helpers.configure_video_controls(app);
 
     Program.Helpers.set_bounds;
     Program.Routines.Processing.render;

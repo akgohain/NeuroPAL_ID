@@ -7,7 +7,7 @@ if nargin < 1 || isempty(app) || ~isvalid(app)
     return
 end
 
-layout_version = 20;
+layout_version = 21;
 if isappdata(app.CELL_ID, 'zephir_video_ui_setup') && ...
         getappdata(app.CELL_ID, 'zephir_video_ui_setup') && ...
         isappdata(app.CELL_ID, 'zephir_video_ui_layout_version') && ...
@@ -32,6 +32,7 @@ remove_header(app, root);
 left_grid = setup_left_workstation(app, root);
 setup_viewer(app, left_grid);
 setup_navigation(app, left_grid);
+setup_empty_state(app, root);
 toggle_button = setup_workflow_toggle(app, root);
 workflow_panel = setup_workflow_tabs(app, root);
 apply_workflow_collapse_state(app, root, workflow_panel, toggle_button);
@@ -39,6 +40,59 @@ setup_video_tracking_copy(app);
 wrap_action_callbacks(app);
 
 Program.GUI.update_zephir_video_tab(app);
+end
+
+function setup_empty_state(app, parent_grid)
+panel = tagged_panel(parent_grid, 'zephir-video-empty-state', '');
+panel.Layout.Row = [1 2];
+panel.Layout.Column = 1;
+panel.BorderType = 'line';
+panel.BackgroundColor = [0.98 0.985 0.99];
+
+grid = tagged_grid(panel, 'zephir-video-empty-grid');
+grid.ColumnWidth = {'1x', 420, '1x'};
+grid.RowHeight = {'1x', 42, 58, 40, 26, '1x'};
+grid.Padding = [24 20 24 20];
+grid.RowSpacing = 8;
+grid.BackgroundColor = panel.BackgroundColor;
+
+title_label = tagged_label(grid, 'zephir-empty-title');
+title_label.Layout.Row = 2;
+title_label.Layout.Column = 2;
+title_label.Text = 'Start with a time-series recording';
+title_label.FontSize = 22;
+title_label.FontWeight = 'bold';
+title_label.HorizontalAlignment = 'center';
+title_label.FontColor = [0.12 0.16 0.20];
+
+body_label = tagged_label(grid, 'zephir-empty-body');
+body_label.Layout.Row = 3;
+body_label.Layout.Column = 2;
+body_label.Text = ['Open an H5, NWB, ND2, or TIFF recording to inspect frames, ' ...
+    'seed reference neurons, and run ZephIR tracking.'];
+body_label.FontSize = 13;
+body_label.HorizontalAlignment = 'center';
+body_label.FontColor = [0.32 0.36 0.40];
+
+app.TrackingButton.Parent = grid;
+app.TrackingButton.Layout.Row = 4;
+app.TrackingButton.Layout.Column = 2;
+app.TrackingButton.Text = 'Open video...';
+app.TrackingButton.FontSize = 14;
+app.TrackingButton.FontWeight = 'bold';
+app.TrackingButton.BackgroundColor = [0.16 0.45 0.68];
+app.TrackingButton.FontColor = [1 1 1];
+app.TrackingButton.Visible = 'on';
+app.TrackingButton.Enable = 'on';
+set_tooltip(app.TrackingButton, 'Choose a supported time-series recording.');
+
+hint_label = tagged_label(grid, 'zephir-empty-hint');
+hint_label.Layout.Row = 5;
+hint_label.Layout.Column = 2;
+hint_label.Text = 'Large recordings are streamed lazily; opening does not load the full stack into memory.';
+hint_label.FontSize = 11;
+hint_label.HorizontalAlignment = 'center';
+hint_label.FontColor = [0.42 0.46 0.50];
 end
 
 function grid = setup_left_workstation(~, root)
@@ -126,18 +180,21 @@ toggle_panel.Layout.Row = 2;
 toggle_panel.Layout.Column = 1;
 
 toggle_grid = tagged_grid(toggle_panel, 'zephir-workflow-toggle-grid');
-toggle_grid.ColumnWidth = {'1x', 28, '1x'};
+toggle_grid.ColumnWidth = {'1x', 28};
 toggle_grid.RowHeight = {'1x'};
 toggle_grid.Padding = [0 0 0 0];
 toggle_grid.ColumnSpacing = 0;
 toggle_grid.BackgroundColor = toggle_panel.BackgroundColor;
 
-old_status = findobj(toggle_grid, 'Tag', 'zephir_workflow_status_label');
-for idx = 1:numel(old_status)
-    if isvalid(old_status(idx)) && isprop(old_status(idx), 'Visible')
-        old_status(idx).Visible = 'off';
-    end
-end
+status_label = tagged_label(toggle_grid, 'zephir_status_state');
+status_label.Layout.Row = 1;
+status_label.Layout.Column = 1;
+status_label.Text = 'Next: open a video';
+status_label.FontSize = 11;
+status_label.FontWeight = 'bold';
+status_label.HorizontalAlignment = 'center';
+status_label.WordWrap = 'off';
+status_label.FontColor = [0.55 0.36 0.04];
 
 toggle_button = findobj(toggle_grid, 'Tag', 'zephir_workflow_toggle_button');
 if isempty(toggle_button) || ~isvalid(toggle_button(1))
@@ -147,7 +204,7 @@ else
 end
 toggle_button.Layout.Row = 1;
 toggle_button.Layout.Column = 2;
-    toggle_button.Text = 'v';
+toggle_button.Text = 'v';
 toggle_button.FontSize = 13;
 toggle_button.FontWeight = 'bold';
 toggle_button.BackgroundColor = [0.94 0.95 0.96];
@@ -237,12 +294,12 @@ end
 is_collapsed = get_zephir_workflow_collapsed(app);
 
 if is_collapsed
-    root.RowHeight = {'1x', 18, 1};
+    root.RowHeight = {'1x', 22, 1};
     workflow_panel.Visible = 'off';
 toggle_button.Text = '^';
     toggle_button.Tooltip = 'Show workflow/settings.';
 else
-    root.RowHeight = {'1x', 18, 350};
+    root.RowHeight = {'1x', 22, 350};
     workflow_panel.Visible = 'on';
     toggle_button.Text = 'v';
     toggle_button.Tooltip = 'Hide workflow/settings.';

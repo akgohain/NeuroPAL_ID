@@ -28,9 +28,18 @@ Unloaded and representative loaded states:
 scripts/run_ui_audit .ui_artifacts/candidate /Users/adamg/neuroPAL/6_mYAa.mat
 ```
 
+Include a real video-loaded state when changing tracking or video processing:
+
+```sh
+scripts/run_ui_audit .ui_artifacts/candidate \
+  /Users/adamg/neuroPAL/6_mYAa.mat \
+  /Users/adamg/neuroPAL/ZephIR_example_data/neuroPAL_ID_compatible/data.h5
+```
+
 Each run produces PNG screenshots and JSON component manifests for every main
 tab at 1200x760 and 1400x880. Loaded runs also capture expanded spectral
-unmixing, and unloaded runs capture the debug-enabled log layout. `ui-audit.json`
+unmixing and an unsaved processing-preview state; unloaded runs capture the
+debug-enabled log layout. `ui-audit.json`
 contains the aggregate diagnostics. The output directory is intentionally
 ignored by Git.
 

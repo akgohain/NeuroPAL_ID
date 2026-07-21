@@ -28,8 +28,15 @@ else
     fixture="${NPAL_UI_AUDIT_FIXTURE:-}"
 fi
 
+if [ "$#" -ge 3 ]; then
+    video_fixture=$3
+else
+    video_fixture="${NPAL_UI_AUDIT_VIDEO_FIXTURE:-}"
+fi
+
 NPAL_UI_AUDIT_OUTPUT="$output_dir" \
 NPAL_UI_AUDIT_FIXTURE="$fixture" \
+NPAL_UI_AUDIT_VIDEO_FIXTURE="$video_fixture" \
 "$matlab_bin" -batch \
     "cd('$repo_root'); addpath(fullfile(pwd,'scripts')); run_ui_audit;"
 

@@ -51,6 +51,7 @@ set_label(app, 'zephir_dataset_format', format_text_value, [0.10 0.10 0.10]);
 set_label(app, 'zephir_dataset_channels', channels_text_value, [0.10 0.10 0.10]);
 set_label(app, 'zephir_dataset_scale', scale_text_value, [0.10 0.10 0.10]);
 set_label(app, 'zephir_dataset_memory', memory_text_value, [0.10 0.10 0.10]);
+set_empty_state(app, has_video);
 
 has_neuropal_neurons = neuro_pal_neurons_available(app);
 
@@ -65,8 +66,67 @@ set_component_state(app.ExtractActivityButton, bool_state(has_video && has_check
 set_component_state(app.ManipulateNeuronsButton, bool_state(has_video && has_live_annotations));
 set_component_state(app.AutosegmentFrameButton, 'off');
 
-app.TrackingButton.Visible = 'off';
+app.TrackingButton.Visible = bool_state(~has_video);
 app.TrackingButton.Enable = 'on';
+end
+
+function set_empty_state(app, has_video)
+empty_panel = findobj(app.VideoTrackingTab, 'Tag', 'zephir-video-empty-state');
+if ~isempty(empty_panel) && isvalid(empty_panel(1))
+    empty_panel(1).Visible = bool_state(~has_video);
+    set_tree_enabled(empty_panel(1), 'on');
+end
+
+toggle_panel = findobj(app.VideoTrackingTab, 'Tag', 'zephir-workflow-toggle-panel');
+if ~isempty(toggle_panel) && isvalid(toggle_panel(1))
+    set_tree_enabled(toggle_panel(1), 'on');
+end
+
+workflow_panel = findobj(app.VideoTrackingTab, 'Tag', 'zephir-right-workflow-panel');
+toggle_button = findobj(app.VideoTrackingTab, 'Tag', 'zephir_workflow_toggle_button');
+if ~has_video
+    app.VideoGridLayout.RowHeight = {'1x', 22, 1};
+    if ~isempty(workflow_panel) && isvalid(workflow_panel(1))
+        workflow_panel(1).Visible = 'off';
+    end
+    if ~isempty(toggle_button) && isvalid(toggle_button(1))
+        toggle_button(1).Visible = 'off';
+    end
+else
+    is_collapsed = isappdata(app.CELL_ID, 'zephir_workflow_collapsed') && ...
+        logical(getappdata(app.CELL_ID, 'zephir_workflow_collapsed'));
+    if ~isempty(toggle_button) && isvalid(toggle_button(1))
+        toggle_button(1).Visible = 'on';
+    end
+    if is_collapsed
+        app.VideoGridLayout.RowHeight = {'1x', 22, 1};
+        if ~isempty(workflow_panel) && isvalid(workflow_panel(1))
+            workflow_panel(1).Visible = 'off';
+        end
+    else
+        app.VideoGridLayout.RowHeight = {'1x', 22, 350};
+        if ~isempty(workflow_panel) && isvalid(workflow_panel(1))
+            workflow_panel(1).Visible = 'on';
+        end
+    end
+end
+
+viewer_parts = {app.Panel_55, app.Panel_34};
+for idx = 1:numel(viewer_parts)
+    component = viewer_parts{idx};
+    if ~isempty(component) && isvalid(component)
+        component.Visible = bool_state(has_video);
+    end
+end
+end
+
+function set_tree_enabled(root, state)
+components = [root; findall(root)];
+for component_idx = 1:numel(components)
+    if isprop(components(component_idx), 'Enable')
+        components(component_idx).Enable = state;
+    end
+end
 end
 
 function [has_video, source_file, source_dir] = video_source(app)
@@ -367,6 +427,9 @@ if isempty(label) || ~isvalid(label(1))
 end
 label = label(1);
 label.Text = char(string(text));
+if isprop(label, 'Enable')
+    label.Enable = 'on';
+end
 if isprop(label, 'Tooltip')
     label.Tooltip = {char(string(text))};
 end
