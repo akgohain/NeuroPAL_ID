@@ -21,6 +21,7 @@ function render()
         Program.Handlers.histograms.draw();
         Program.GUIHandling.shorten_knob_labels(app);
     end
+    Program.GUIHandling.update_processing_commit_state(app);
 end
 
 function dims = local_volume_dims(volume)

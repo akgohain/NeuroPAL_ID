@@ -4998,6 +4998,10 @@ classdef GUIHandling
             end
 
             advanced_button = Program.GUIHandling.ensure_processing_advanced_button(app);
+            Program.GUIHandling.ensure_processing_commit_ui(app);
+            app.ProcToggleVolumePanel.Title = 'Preview';
+            app.VolumeChannelsPanel.Title = 'Display Channels';
+            app.ImageManipulationPanel.Title = 'Geometry';
             app.SpectralUnmixingPanel.Layout.Row = 4;
             advanced_button.Layout.Row = 5;
             advanced_button.Layout.Column = 1;
@@ -5026,7 +5030,68 @@ classdef GUIHandling
                 advanced_button.Text = 'Show Spectral Unmixing';
             end
 
-            app.ProcSideGrid.RowHeight = {95, 'fit', 'fit', spectral_height, 34, 93};
+            app.ProcSideGrid.RowHeight = {95, 'fit', 'fit', spectral_height, 34, 116};
+            Program.GUIHandling.update_processing_commit_state(app);
+        end
+
+        function label = ensure_processing_commit_ui(app)
+            label = findobj(app.ProcSaveGrid, 'Tag', 'processing-commit-status');
+            if isempty(label) || ~isvalid(label(1))
+                label = uilabel(app.ProcSaveGrid, ...
+                    'Tag', 'processing-commit-status', ...
+                    'HorizontalAlignment', 'center', ...
+                    'FontSize', 11);
+            else
+                label = label(1);
+            end
+
+            app.ProcSavePanel.Title = 'Changes';
+            app.ProcSavePanel.FontWeight = 'bold';
+            app.ProcSaveGrid.RowHeight = {20, 34, 34};
+            app.ProcSaveGrid.RowSpacing = 5;
+            app.ProcSaveGrid.Padding = [8 5 8 7];
+            label.Layout.Row = 1;
+            label.Layout.Column = 1;
+
+            app.ProcResetButton.Layout.Row = 2;
+            app.ProcResetButton.Text = 'Discard Preview';
+            app.ProcResetButton.FontSize = 12;
+            app.ProcResetButton.FontWeight = 'normal';
+            app.ProcResetButton.BackgroundColor = [0.86 0.87 0.88];
+            app.ProcResetButton.FontColor = [0.12 0.14 0.16];
+            app.ProcResetButton.Tooltip = 'Discard preview changes and restore the loaded data settings.';
+
+            app.ProcSaveButton.Layout.Row = 3;
+            app.ProcSaveButton.Text = 'Save Changes';
+            app.ProcSaveButton.FontSize = 13;
+            app.ProcSaveButton.FontWeight = 'bold';
+            app.ProcSaveButton.BackgroundColor = [0.10 0.43 0.66];
+            app.ProcSaveButton.FontColor = [1 1 1];
+            app.ProcSaveButton.Tooltip = 'Commit the current processing preview to the active dataset.';
+        end
+
+        function update_processing_commit_state(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'ProcSaveGrid') || isempty(app.ProcSaveGrid) || ...
+                    ~isvalid(app.ProcSaveGrid)
+                return
+            end
+
+            label = Program.GUIHandling.ensure_processing_commit_ui(app);
+            is_ready = Program.GUIHandling.processing_tab_rendered(app);
+            is_dirty = isappdata(app.CELL_ID, 'proc_runtime_dirty') && ...
+                logical(getappdata(app.CELL_ID, 'proc_runtime_dirty'));
+
+            if ~is_ready
+                label.Text = 'Open data to begin';
+                label.FontColor = [0.45 0.47 0.50];
+            elseif is_dirty
+                label.Text = 'Preview has unsaved changes';
+                label.FontColor = [0.72 0.38 0.02];
+            else
+                label.Text = 'No pending changes';
+                label.FontColor = [0.30 0.48 0.34];
+            end
         end
 
         function install_processing_advanced_callback(app)
@@ -5520,6 +5585,9 @@ classdef GUIHandling
                 title_label.VerticalAlignment = 'center';
 
                 if ~isempty(gamma_label)
+                    gamma_label.Text = 'Gamma';
+                    gamma_label.FontSize = 10;
+                    gamma_label.Tooltip = 'Gamma correction for this display channel.';
                     gamma_label.Layout.Row = 1;
                     gamma_label.Layout.Column = 7;
                     gamma_label.HorizontalAlignment = 'right';
@@ -5548,6 +5616,9 @@ classdef GUIHandling
                 title_label.VerticalAlignment = 'center';
 
                 if ~isempty(gamma_label)
+                    gamma_label.Text = 'Gamma';
+                    gamma_label.FontSize = 10;
+                    gamma_label.Tooltip = 'Gamma correction for this display channel.';
                     gamma_label.Layout.Row = 1;
                     gamma_label.Layout.Column = 8;
                     gamma_label.HorizontalAlignment = 'right';
@@ -5615,7 +5686,7 @@ classdef GUIHandling
         end
 
         function configure_processing_color_panel(app)
-            app.Panel_57.Title = 'Adjust Colors';
+            app.Panel_57.Title = 'Color Preview';
             app.Panel_57.BorderType = 'line';
             app.Panel_57.FontWeight = 'bold';
             if isprop(app.Panel_57, 'TitlePosition')
@@ -5649,14 +5720,20 @@ classdef GUIHandling
             end
             if isprop(app, 'ProcMeasureROINoiseButton') && isvalid(app.ProcMeasureROINoiseButton)
                 app.ProcMeasureROINoiseButton.Visible = 'on';
+                app.ProcMeasureROINoiseButton.Text = 'Set floor from ROI';
                 app.ProcMeasureROINoiseButton.ButtonPushedFcn = @(src, event) ...
                     Program.GUIHandling.measure_threshold_from_roi(app);
             end
             if isprop(app, 'ProcMeasure90pthNoiseButton') && isvalid(app.ProcMeasure90pthNoiseButton)
                 app.ProcMeasure90pthNoiseButton.Visible = 'on';
+                app.ProcMeasure90pthNoiseButton.Text = 'Set floor from percentile';
                 app.ProcMeasure90pthNoiseButton.ButtonPushedFcn = @(src, event) ...
                     Program.GUIHandling.measure_threshold_from_percentile(app);
             end
+            app.ProcNormalizeColorsButton.Text = 'Normalize channel ranges...';
+            app.HidezerointensitypixelsCheckBox.Text = 'Ignore zero pixels';
+            app.HidezerointensitypixelsCheckBox.Tooltip = ...
+                'Exclude zero-valued pixels when drawing channel histograms.';
 
             Program.GUIHandling.update_processing_threshold_target_options(app);
             Program.GUIHandling.apply_processing_responsive_layout(app);
