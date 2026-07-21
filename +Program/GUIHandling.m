@@ -145,6 +145,7 @@ classdef GUIHandling
             Program.GUIHandling.hide_next_neuron_mode_control(app);
             Program.GUIHandling.configure_main_detect_id_controls(app);
             Program.GUIHandling.configure_main_z_controls(app);
+            Program.GUIHandling.update_main_id_workflow_state(app);
         end
 
         function configure_main_z_controls(app)
@@ -201,10 +202,11 @@ classdef GUIHandling
                     detect_pos(1) = label_pos(1) + label_pos(3) + label_spacing;
                 end
             end
+            [detect_items, detect_ids] = Methods.MethodRegistry.uiChoices('detection');
             detect_dropdown = uidropdown(parent, ...
                 'Tag', 'MainDetectMethodDropDown', ...
-                'Items', {'Matching Pursuit', 'Neural Network', 'Cellpose', 'YOLO'}, ...
-                'ItemsData', {'mp', 'nn', 'cellpose', 'yolo'}, ...
+                'Items', detect_items, ...
+                'ItemsData', detect_ids, ...
                 'Tooltip', 'Neuron detection backend.', ...
                 'ValueChangedFcn', @(src, event) ...
                     Program.GUIHandling.handle_main_detect_method_changed(app, src.Value));
@@ -373,12 +375,13 @@ classdef GUIHandling
 
             sidebar_grid = app.GridLayout22;
             try
+                app.IdGridLayout.ColumnWidth = {'1x', '1x', 'fit', 300};
                 old_params_grid = findobj(sidebar_grid, 'Tag', 'MainMethodParamsGrid');
                 delete(old_params_grid);
                 if isprop(app, 'SideGrid') && ~isempty(app.SideGrid) && isvalid(app.SideGrid)
-                    app.SideGrid.RowHeight = {'fit', '1x', '1x'};
-                    app.SideGrid.RowSpacing = 4;
-                    app.SideGrid.Padding = [0 10 10 0];
+                    app.SideGrid.RowHeight = {78, 430, '1x'};
+                    app.SideGrid.RowSpacing = 8;
+                    app.SideGrid.Padding = [0 10 10 8];
                 end
                 if isprop(app, 'NeuronRankGrid') && ~isempty(app.NeuronRankGrid) && isvalid(app.NeuronRankGrid)
                     app.NeuronRankGrid.RowHeight = {0, '1x'};
@@ -388,23 +391,25 @@ classdef GUIHandling
                         app.Panel_17.Visible = 'off';
                     end
                 end
-                sidebar_grid.RowHeight = {82, 82, 24, 24, 64, 18, 1};
+                app.NeuronRankPanel.Title = 'Detection and identity';
+                app.NeuronListBoxPanel.Title = 'Identity coverage';
+                sidebar_grid.RowHeight = {26, 96, 96, 72, 22, '1x'};
                 sidebar_grid.RowSpacing = 3;
                 sidebar_grid.Padding = [0 0 0 0];
-                app.UserNeuronIDsListBoxLabel.Layout.Row = 3;
+                app.UserNeuronIDsListBoxLabel.Layout.Row = 5;
                 app.UserNeuronIDsListBoxLabel.Layout.Column = 1;
-                app.NeuronRankedConfidenceLabel.Layout.Row = 4;
+                app.NeuronRankedConfidenceLabel.Layout.Row = 1;
                 app.NeuronRankedConfidenceLabel.Layout.Column = 1;
-                app.UserNeuronIDsListBox.Layout.Row = 5;
+                app.UserNeuronIDsListBox.Layout.Row = 6;
                 app.UserNeuronIDsListBox.Layout.Column = 1;
             catch
                 return
             end
 
             detect_row = Program.GUIHandling.ensure_sidebar_control_row( ...
-                sidebar_grid, 'MainDetectControlRow', 1);
+                sidebar_grid, 'MainDetectControlRow', 2);
             id_row = Program.GUIHandling.ensure_sidebar_control_row( ...
-                sidebar_grid, 'MainIDControlRow', 2);
+                sidebar_grid, 'MainIDControlRow', 3);
             if isempty(detect_row) || isempty(id_row)
                 return
             end
@@ -415,23 +420,26 @@ classdef GUIHandling
             end
 
             Program.GUIHandling.move_label_to_grid(app, 'NeuronsLabel', ...
-                detect_row, 1, 'Auto-detect:');
-            app.NeuronsLabel.Layout.Row = [1 3];
+                detect_row, 1, '1  Detect neurons');
+            app.NeuronsLabel.Layout.Row = 1;
+            app.NeuronsLabel.Layout.Column = [1 3];
+            app.NeuronsLabel.HorizontalAlignment = 'left';
 
+            [detect_items, detect_ids] = Methods.MethodRegistry.uiChoices('detection');
             detect_dropdown = uidropdown(detect_row, ...
                 'Tag', 'MainDetectMethodDropDown', ...
-                'Items', {'Matching Pursuit', 'Neural Network', 'Cellpose', 'YOLO'}, ...
-                'ItemsData', {'mp', 'nn', 'cellpose', 'yolo'}, ...
+                'Items', detect_items, ...
+                'ItemsData', detect_ids, ...
                 'Tooltip', 'Neuron detection backend.', ...
                 'ValueChangedFcn', @(src, event) ...
                     Program.GUIHandling.handle_main_detect_method_changed(app, src.Value));
-            detect_dropdown.Layout.Row = 1;
-            detect_dropdown.Layout.Column = [2 4];
+            detect_dropdown.Layout.Row = 2;
+            detect_dropdown.Layout.Column = [1 3];
 
             app.AutoDetectButton.Parent = detect_row;
-            app.AutoDetectButton.Layout.Row = 2;
-            app.AutoDetectButton.Layout.Column = 2;
-            app.AutoDetectButton.Text = 'Run';
+            app.AutoDetectButton.Layout.Row = 3;
+            app.AutoDetectButton.Layout.Column = 1;
+            app.AutoDetectButton.Text = 'Run detection';
             app.AutoDetectButton.FontSize = 14;
             app.AutoDetectButton.Visible = 'on';
 
@@ -441,21 +449,24 @@ classdef GUIHandling
                 'Value', false, ...
                 'Tooltip', 'Select an image crop before running detection.');
             detect_crop_checkbox.FontSize = 12;
-            detect_crop_checkbox.Layout.Row = 2;
-            detect_crop_checkbox.Layout.Column = [3 4];
+            detect_crop_checkbox.Layout.Row = 3;
+            detect_crop_checkbox.Layout.Column = 2;
+            detect_crop_checkbox.Visible = 'off';
 
             detect_settings_button = uibutton(detect_row, 'push', ...
                 'Tag', 'MainDetectSettingsButton', ...
-                'Text', 'Hyperparameters', ...
+                'Text', 'Settings...', ...
                 'Tooltip', 'Edit auto-detect hyperparameters.', ...
                 'ButtonPushedFcn', @(src, event) ...
                     Program.GUIHandling.show_main_method_params_dialog(app, 'detect'));
             detect_settings_button.FontSize = 12;
             detect_settings_button.Layout.Row = 3;
-            detect_settings_button.Layout.Column = [2 4];
+            detect_settings_button.Layout.Column = 3;
 
-            Program.GUIHandling.move_label_to_grid(app, 'AutoLabel', id_row, 1, 'Auto-ID:');
-            app.AutoLabel.Layout.Row = [1 3];
+            Program.GUIHandling.move_label_to_grid(app, 'AutoLabel', id_row, 1, '2  Assign identities');
+            app.AutoLabel.Layout.Row = 1;
+            app.AutoLabel.Layout.Column = [1 3];
+            app.AutoLabel.HorizontalAlignment = 'left';
             app.AutoIDDropDown.Visible = 'off';
 
             id_items = Program.GUIHandling.main_auto_id_method_items(app);
@@ -466,16 +477,16 @@ classdef GUIHandling
                 'Value', id_items{1}, ...
                 'ValueChangedFcn', @(src, event) ...
                     Program.GUIHandling.handle_main_id_method_changed(app, src.Value));
-            id_dropdown.Layout.Row = 1;
-            id_dropdown.Layout.Column = [2 4];
+            id_dropdown.Layout.Row = 2;
+            id_dropdown.Layout.Column = [1 3];
             if ~any(strcmp(id_dropdown.Items, id_dropdown.Value))
                 id_dropdown.Value = id_dropdown.Items{1};
             end
 
             app.AutoIDButton.Parent = id_row;
-            app.AutoIDButton.Layout.Row = 2;
-            app.AutoIDButton.Layout.Column = 2;
-            app.AutoIDButton.Text = 'Run';
+            app.AutoIDButton.Layout.Row = 3;
+            app.AutoIDButton.Layout.Column = 1;
+            app.AutoIDButton.Text = 'Run auto-ID';
             app.AutoIDButton.FontSize = 14;
             app.AutoIDButton.Visible = 'on';
 
@@ -485,18 +496,37 @@ classdef GUIHandling
                 'Value', false, ...
                 'Tooltip', 'Select an image crop before running auto-ID.');
             id_crop_checkbox.FontSize = 12;
-            id_crop_checkbox.Layout.Row = 2;
-            id_crop_checkbox.Layout.Column = [3 4];
+            id_crop_checkbox.Layout.Row = 3;
+            id_crop_checkbox.Layout.Column = 2;
+            id_crop_checkbox.Visible = 'off';
 
             id_settings_button = uibutton(id_row, 'push', ...
                 'Tag', 'MainIDSettingsButton', ...
-                'Text', 'Hyperparameters', ...
+                'Text', 'Settings...', ...
                 'Tooltip', 'Edit auto-ID hyperparameters.', ...
                 'ButtonPushedFcn', @(src, event) ...
                     Program.GUIHandling.show_main_method_params_dialog(app, 'id'));
             id_settings_button.FontSize = 12;
             id_settings_button.Layout.Row = 3;
-            id_settings_button.Layout.Column = [2 4];
+            id_settings_button.Layout.Column = 3;
+
+            manual_row = Program.GUIHandling.ensure_sidebar_control_row( ...
+                sidebar_grid, 'MainManualIDControlRow', 4, {72, '1x', 68});
+            manual_row.RowHeight = {22, 30};
+            app.UserLabel.Parent = manual_row;
+            app.UserLabel.Text = '3  Review and correct';
+            app.UserLabel.FontWeight = 'bold';
+            app.UserLabel.HorizontalAlignment = 'left';
+            app.UserLabel.Layout.Row = 1;
+            app.UserLabel.Layout.Column = [1 3];
+            app.IDEditField.Parent = manual_row;
+            app.IDEditField.Layout.Row = 2;
+            app.IDEditField.Layout.Column = [1 2];
+            app.IDEditField.Placeholder = 'Neuron ID';
+            app.UserIDButton.Parent = manual_row;
+            app.UserIDButton.Layout.Row = 2;
+            app.UserIDButton.Layout.Column = 3;
+            app.UserIDButton.Text = 'Assign';
 
             app.AutoIDAllButton.Visible = 'off';
             Program.GUIHandling.position_main_user_id_controls_after(app, []);
@@ -507,14 +537,210 @@ classdef GUIHandling
                 'detect_crop_checkbox', detect_crop_checkbox, ...
                 'id_crop_checkbox', id_crop_checkbox, ...
                 'detect_settings_button', detect_settings_button, ...
-                'id_settings_button', id_settings_button);
+                'id_settings_button', id_settings_button, ...
+                'manual_row', manual_row, ...
+                'workflow_status', app.NeuronRankedConfidenceLabel);
             controls_parent = app.AutoDetectButton.Parent;
             setappdata(controls_parent, 'main_detect_id_controls', controls);
             Program.GUIHandling.install_main_detect_run_dispatcher(app);
             Program.GUIHandling.install_main_id_run_dispatcher(app);
             setappdata(controls_parent, 'main_detect_id_controls_configured', true);
             Program.GUIHandling.sync_main_detect_id_controls(app);
+            Program.GUIHandling.update_main_id_workflow_state(app);
             did_configure = true;
+        end
+
+        function update_main_id_workflow_state(app)
+            if nargin < 1 || isempty(app)
+                app = Program.app;
+            end
+            if isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'IdGridLayout') || isempty(app.IdGridLayout) || ...
+                    ~isvalid(app.IdGridLayout)
+                return
+            end
+
+            empty_state = Program.GUIHandling.ensure_main_id_empty_state(app);
+            has_image = false;
+            try
+                has_image = ~isempty(app.image_data);
+            catch
+            end
+            content_names = {'SidePanel', 'Panel_6', 'Panel_7', 'Panel_8', 'XYPanel'};
+            for content_i = 1:numel(content_names)
+                content_name = content_names{content_i};
+                if isprop(app, content_name) && ~isempty(app.(content_name)) && ...
+                        isvalid(app.(content_name))
+                    app.(content_name).Visible = Program.GUIHandling.on_off(has_image);
+                end
+            end
+            if ~isempty(empty_state) && isvalid(empty_state)
+                empty_state.Visible = Program.GUIHandling.on_off(~has_image);
+                if ~has_image
+                    Program.GUIHandling.set_descendant_enable_state(empty_state, 'on');
+                    try
+                        uistack(empty_state, 'top');
+                    catch
+                    end
+                end
+            end
+
+            controls = Program.GUIHandling.main_detect_id_controls(app);
+            if isempty(controls)
+                return
+            end
+
+            neuron_count = 0;
+            auto_id_count = 0;
+            user_id_count = 0;
+            try
+                if ~isempty(app.image_neurons)
+                    neuron_count = app.image_neurons.num_neurons();
+                    auto_id_count = app.image_neurons.num_auto_id_neurons();
+                    user_id_count = sum(arrayfun(@(neuron) ...
+                        ~isempty(strtrim(char(string(neuron.annotation)))), ...
+                        app.image_neurons.neurons));
+                end
+            catch
+            end
+
+            if ~has_image
+                status = 'Open an image to begin';
+            elseif neuron_count == 0
+                status = 'Next: detect neurons';
+            elseif auto_id_count == 0 && user_id_count == 0
+                status = sprintf('%d detected  |  Next: assign identities', neuron_count);
+            else
+                status = sprintf('%d detected  |  %d identified  |  Review remaining', ...
+                    neuron_count, max(auto_id_count, user_id_count));
+            end
+
+            if isfield(controls, 'workflow_status') && ...
+                    ~isempty(controls.workflow_status) && isvalid(controls.workflow_status)
+                controls.workflow_status.Text = status;
+                controls.workflow_status.FontWeight = 'bold';
+                controls.workflow_status.HorizontalAlignment = 'left';
+                controls.workflow_status.FontColor = [0.12 0.29 0.48];
+            end
+            if isprop(app, 'UserNeuronIDsListBoxLabel') && isvalid(app.UserNeuronIDsListBoxLabel)
+                candidate_count = 0;
+                try
+                    candidate_count = numel(app.UserNeuronIDsListBox.Items);
+                catch
+                end
+                if candidate_count == 0
+                    app.UserNeuronIDsListBoxLabel.Text = 'Ranked auto-ID candidates';
+                else
+                    app.UserNeuronIDsListBoxLabel.Text = sprintf( ...
+                        'Ranked candidates for %d neurons', candidate_count);
+                end
+            end
+            if isprop(app, 'IDdLabel') && isvalid(app.IDdLabel)
+                app.IDdLabel.Text = 'Confirmed';
+            end
+            if isprop(app, 'UnIDdLabel') && isvalid(app.UnIDdLabel)
+                app.UnIDdLabel.Text = 'Unconfirmed';
+            end
+            if isfield(controls, 'detect_dropdown') && isvalid(controls.detect_dropdown)
+                controls.detect_dropdown.Enable = Program.GUIHandling.on_off(has_image);
+            end
+            if isfield(controls, 'detect_settings_button') && isvalid(controls.detect_settings_button)
+                controls.detect_settings_button.Enable = Program.GUIHandling.on_off(has_image);
+            end
+            if isfield(controls, 'detect_crop_checkbox') && isvalid(controls.detect_crop_checkbox)
+                controls.detect_crop_checkbox.Enable = Program.GUIHandling.on_off(has_image);
+            end
+            if isfield(controls, 'id_dropdown') && isvalid(controls.id_dropdown)
+                controls.id_dropdown.Enable = Program.GUIHandling.on_off(neuron_count > 0);
+            end
+            if isfield(controls, 'id_crop_checkbox') && isvalid(controls.id_crop_checkbox)
+                controls.id_crop_checkbox.Enable = Program.GUIHandling.on_off(neuron_count > 0);
+            end
+            if isprop(app, 'AutoDetectButton') && isvalid(app.AutoDetectButton)
+                app.AutoDetectButton.Enable = Program.GUIHandling.on_off(has_image);
+            end
+            if isprop(app, 'AutoIDButton') && isvalid(app.AutoIDButton)
+                app.AutoIDButton.Enable = Program.GUIHandling.on_off(neuron_count > 0);
+            end
+            if isfield(controls, 'id_settings_button') && isvalid(controls.id_settings_button)
+                controls.id_settings_button.Enable = Program.GUIHandling.on_off(neuron_count > 0);
+            end
+            if isprop(app, 'IDEditField') && isvalid(app.IDEditField)
+                app.IDEditField.Enable = Program.GUIHandling.on_off(neuron_count > 0);
+            end
+            if isprop(app, 'UserIDButton') && isvalid(app.UserIDButton)
+                app.UserIDButton.Enable = Program.GUIHandling.on_off(neuron_count > 0);
+            end
+        end
+
+        function panel = ensure_main_id_empty_state(app)
+            panel = findobj(app.IdGridLayout, 'Tag', 'MainIDEmptyState');
+            if ~isempty(panel) && isvalid(panel(1))
+                panel = panel(1);
+                return
+            end
+
+            panel = uipanel(app.IdGridLayout, ...
+                'Tag', 'MainIDEmptyState', ...
+                'BorderType', 'none', ...
+                'BackgroundColor', [0.97 0.98 0.99]);
+            panel.Layout.Row = [2 8];
+            panel.Layout.Column = [1 4];
+            grid = uigridlayout(panel, ...
+                'ColumnWidth', {'1x', 430, '1x'}, ...
+                'RowHeight', {'1x', 40, 56, 38, 28, 32, '1x'}, ...
+                'Padding', [20 20 20 20], ...
+                'RowSpacing', 8);
+
+            title_label = uilabel(grid, ...
+                'Text', 'Identify a NeuroPAL volume', ...
+                'FontSize', 24, ...
+                'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'center', ...
+                'FontColor', [0.10 0.18 0.28]);
+            title_label.Layout.Row = 2;
+            title_label.Layout.Column = 2;
+
+            description = uilabel(grid, ...
+                'Text', {'Open a multichannel image and detect neuron centers.'; ...
+                    'Assign ranked identities, then review uncertain predictions.'}, ...
+                'FontSize', 14, ...
+                'HorizontalAlignment', 'center', ...
+                'FontColor', [0.30 0.35 0.42]);
+            description.Layout.Row = 3;
+            description.Layout.Column = 2;
+
+            open_button = uibutton(grid, 'push', ...
+                'Text', 'Open NeuroPAL image', ...
+                'FontSize', 15, ...
+                'FontWeight', 'bold', ...
+                'BackgroundColor', [0.10 0.42 0.78], ...
+                'FontColor', [1 1 1], ...
+                'ButtonPushedFcn', @(src, event) ...
+                    Program.GUIHandling.open_main_image_from_empty_state(app));
+            open_button.Layout.Row = 4;
+            open_button.Layout.Column = 2;
+
+            formats = uilabel(grid, ...
+                'Text', 'MAT, NWB, ND2, CZI, TIFF, and HDF5', ...
+                'FontSize', 12, ...
+                'HorizontalAlignment', 'center', ...
+                'FontColor', [0.38 0.42 0.48]);
+            formats.Layout.Row = 5;
+            formats.Layout.Column = 2;
+
+            workflow = uilabel(grid, ...
+                'Text', 'Workflow:  Open  >  Detect  >  Auto-ID  >  Review', ...
+                'FontSize', 12, ...
+                'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'center', ...
+                'FontColor', [0.16 0.34 0.55]);
+            workflow.Layout.Row = 6;
+            workflow.Layout.Column = 2;
+        end
+
+        function open_main_image_from_empty_state(~)
+            Program.Routines.open();
         end
 
         function row = ensure_sidebar_control_row(parent_grid, tag, row_index, column_width)
@@ -523,7 +749,7 @@ classdef GUIHandling
                 return
             end
             if nargin < 4 || isempty(column_width)
-                column_width = {96, 64, 58, '1x'};
+                column_width = {110, 0, '1x'};
             end
 
             existing = findobj(parent_grid, 'Tag', tag);
@@ -1143,6 +1369,7 @@ classdef GUIHandling
                 end
 
                 Program.GUIHandling.invoke_gui_callback(callbacks.auto, src, event);
+                Program.GUIHandling.update_main_id_workflow_state(app);
             catch ME
                 Program.GUIHandling.log_gui_callback_error(app, 'Auto-ID', ME);
             end
@@ -1360,6 +1587,7 @@ classdef GUIHandling
             end
             Program.GUIHandling.safe_uialert(app, 'Auto-detect completed successfully.', ...
                 'Auto-detect Complete', 'Icon', 'success');
+            Program.GUIHandling.update_main_id_workflow_state(app);
         end
 
         function clear_selected_neuron(app)
@@ -1588,6 +1816,7 @@ classdef GUIHandling
                 Program.Routines.ID.hot_neuron_reset();
                 Program.Routines.ID.render();
                 drawnow limitrate;
+                Program.GUIHandling.update_main_id_workflow_state(app);
                 message = Program.GUIHandling.transformer_match_success_message(app);
                 Program.GUIHandling.safe_uialert(app, message, ...
                     'Auto-ID Complete', 'Icon', 'success');
@@ -1914,7 +2143,7 @@ classdef GUIHandling
         end
 
         function items = main_auto_id_method_items(~)
-            items = {'Anshita GAT'};
+            [items, ~] = Methods.MethodRegistry.uiChoices('identity');
         end
 
         function layout = component_layout(component)
@@ -2844,6 +3073,9 @@ classdef GUIHandling
 
             if strcmp(group, 'processing_tab')
                 Program.GUIHandling.update_processing_histogram_interactivity(app);
+            end
+            if strcmp(group, 'identification_tab')
+                Program.GUIHandling.update_main_id_workflow_state(app);
             end
 
             if exist('event', 'var')

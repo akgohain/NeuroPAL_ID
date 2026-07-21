@@ -107,4 +107,10 @@ python3 scripts/sync_mlapp_method.py MethodName
 - The final unloaded, image-loaded, and video-loaded matrix produced 30 snapshots at 1200x760 and 1400x880 with zero structural errors. Its only warning was a repeated 9.8 px Save button overflow; the focused post-fix audit produced five snapshots with zero errors and zero warnings.
 - MATLAB Code Analyzer reported zero messages for all files changed in the sprint, the frame-2 video navigation smoke test passed, and the App Designer drift check passed.
 
-The next app-side priorities are NeuroPAL ID workflow hierarchy, transactional cross-file state cleanup, failure-injection coverage, and richer log/runtime diagnostics.
+The NeuroPAL ID tab now presents an explicit open → detect → auto-ID → review
+workflow and sources its visible methods from `Methods.MethodRegistry`. See
+`AUTO_ID_INTEGRATION.md` for the benchmark-to-product promotion gate.
+
+The next app-side priorities are transactional detection/identity imports,
+Spotiflow adapter packaging, failure-injection coverage, and richer log/runtime
+diagnostics.

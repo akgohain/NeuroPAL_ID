@@ -65,6 +65,7 @@ function initialize()
     Program.GUIHandling.gui_lock(app, 'disable', 'identification_tab');
     Program.GUIHandling.gui_lock(app, 'disable', 'processing_tab');
     Program.GUIHandling.gui_lock(app, 'disable', 'video_tab');
+    Program.GUIHandling.update_main_id_workflow_state(app);
     Program.GUI.update_zephir_video_tab(app);
 
     % Initialize the neuron birth times.

@@ -337,5 +337,6 @@ function open(path)
     set(app.ProcessingGridLayout, 'Visible', 'on');
     set(app.IdButton, 'Visible', 'off');
     set(app.ProcessingButton, 'Visible', 'off');
+    Program.GUIHandling.update_main_id_workflow_state(app);
     drawnow;
 end
