@@ -20,7 +20,7 @@ classdef TransformerAutoId
             end
 
             progress = Methods.TransformerAutoId.openProgressDialog(app);
-            cleanup = onCleanup(@() Methods.TransformerAutoId.closeProgressDialog(progress)); %#ok<NASGU>
+            cleanup = onCleanup(@() Methods.TransformerAutoId.closeProgressDialog(progress));
 
             nwb_path = Methods.TransformerAutoId.resolveNWBPath(app, options.NWBPath);
             if strlength(nwb_path) > 0
@@ -92,6 +92,7 @@ classdef TransformerAutoId
                 error('Methods:TransformerAutoId:NoNeurons', ...
                     'Run auto-detection before transformer auto-ID.');
             end
+            predictions = Methods.MethodContract.identity(predictions);
             required = {'neuron_idx', 'predicted_class', 'confidence'};
             for i = 1:numel(required)
                 if ~ismember(required{i}, predictions.Properties.VariableNames)
@@ -102,72 +103,103 @@ classdef TransformerAutoId
 
             n = app.image_neurons.num_neurons();
             [prediction_to_neuron, match_stats] = Methods.TransformerAutoId.matchPredictionRows(app, predictions);
-            app.image_neurons.delete_model_IDs();
-            top_k = 5;
-            for i = 1:n
-                app.image_neurons.neurons(i).deterministic_id = '';
-                app.image_neurons.neurons(i).probabilistic_ids = repmat({'Artifact'}, 1, top_k);
-                app.image_neurons.neurons(i).probabilistic_probs = zeros(1, top_k);
-                app.image_neurons.neurons(i).rank = 0;
-            end
-            matched_neuron_indices = [];
-            matched_confidences = [];
-            for r = 1:height(predictions)
-                idx = prediction_to_neuron(r);
-                if idx < 1 || idx > n
-                    continue
+            snapshot = Methods.TransformerAutoId.captureModelIDs(app.image_neurons);
+            try
+                app.image_neurons.delete_model_IDs();
+                top_k = 5;
+                for i = 1:n
+                    app.image_neurons.neurons(i).deterministic_id = '';
+                    app.image_neurons.neurons(i).probabilistic_ids = repmat({'Artifact'}, 1, top_k);
+                    app.image_neurons.neurons(i).probabilistic_probs = zeros(1, top_k);
+                    app.image_neurons.neurons(i).rank = 0;
                 end
-                neuron = app.image_neurons.neurons(round(idx));
-                predicted_class = char(string(predictions.predicted_class(r)));
-                if isempty(strtrim(predicted_class)) || strcmpi(predicted_class, 'nan')
-                    predicted_class = 'Artifact';
+                matched_neuron_indices = [];
+                matched_confidences = [];
+                for r = 1:height(predictions)
+                    idx = prediction_to_neuron(r);
+                    if idx < 1 || idx > n
+                        continue
+                    end
+                    neuron = app.image_neurons.neurons(round(idx));
+                    predicted_class = char(string(predictions.predicted_class(r)));
+                    if isempty(strtrim(predicted_class)) || strcmpi(predicted_class, 'nan')
+                        predicted_class = 'Artifact';
+                    end
+                    neuron.deterministic_id = predicted_class;
+                    if ismember('top5_classes', predictions.Properties.VariableNames)
+                        names = Methods.TransformerAutoId.parseTopList(predictions.top5_classes(r));
+                    else
+                        names = {predicted_class};
+                    end
+                    if isempty(names)
+                        names = {predicted_class};
+                    end
+                    if ~strcmp(char(names{1}), predicted_class)
+                        names = [{predicted_class}, names(:)'];
+                    end
+                    names = names(:)';
+                    if numel(names) < top_k
+                        names(end+1:top_k) = {'Artifact'};
+                    elseif numel(names) > top_k
+                        names = names(1:top_k);
+                    end
+                    neuron.probabilistic_ids = names(:)';
+                    if ismember('top5_probs', predictions.Properties.VariableNames)
+                        probs = str2double(Methods.TransformerAutoId.parseTopList(predictions.top5_probs(r)));
+                    else
+                        probs = double(predictions.confidence(r));
+                    end
+                    probs = double(probs(:)');
+                    probs(~isfinite(probs)) = 0;
+                    if isempty(probs)
+                        probs = double(predictions.confidence(r));
+                    end
+                    if numel(probs) < top_k
+                        probs(end+1:top_k) = 0;
+                    elseif numel(probs) > top_k
+                        probs = probs(1:top_k);
+                    end
+                    neuron.probabilistic_probs = probs;
+                    matched_neuron_indices(end + 1, 1) = round(idx); %#ok<AGROW>
+                    matched_confidences(end + 1, 1) = double(predictions.confidence(r)); %#ok<AGROW>
                 end
-                neuron.deterministic_id = predicted_class;
-                if ismember('top5_classes', predictions.Properties.VariableNames)
-                    names = Methods.TransformerAutoId.parseTopList(predictions.top5_classes(r));
-                else
-                    names = {predicted_class};
-                end
-                if isempty(names)
-                    names = {predicted_class};
-                end
-                if ~strcmp(char(names{1}), predicted_class)
-                    names = [{predicted_class}, names(:)'];
-                end
-                names = names(:)';
-                if numel(names) < top_k
-                    names(end+1:top_k) = {'Artifact'};
-                elseif numel(names) > top_k
-                    names = names(1:top_k);
-                end
-                neuron.probabilistic_ids = names(:)';
-                if ismember('top5_probs', predictions.Properties.VariableNames)
-                    probs = str2double(Methods.TransformerAutoId.parseTopList(predictions.top5_probs(r)));
-                else
-                    probs = double(predictions.confidence(r));
-                end
-                probs = double(probs(:)');
-                probs(~isfinite(probs)) = 0;
-                if isempty(probs)
-                    probs = double(predictions.confidence(r));
-                end
-                if numel(probs) < top_k
-                    probs(end+1:top_k) = 0;
-                elseif numel(probs) > top_k
-                    probs = probs(1:top_k);
-                end
-                neuron.probabilistic_probs = probs;
-                matched_neuron_indices(end + 1, 1) = round(idx); %#ok<AGROW>
-                matched_confidences(end + 1, 1) = double(predictions.confidence(r)); %#ok<AGROW>
-            end
 
-            if ~isempty(matched_neuron_indices)
-                [~, order] = sort(matched_confidences, 'ascend', 'MissingPlacement', 'last');
-                for rank_i = 1:numel(order)
-                    app.image_neurons.neurons(matched_neuron_indices(order(rank_i))).rank = rank_i;
+                if ~isempty(matched_neuron_indices)
+                    [~, order] = sort(matched_confidences, 'ascend', 'MissingPlacement', 'last');
+                    for rank_i = 1:numel(order)
+                        app.image_neurons.neurons(matched_neuron_indices(order(rank_i))).rank = rank_i;
+                    end
                 end
+                Methods.TransformerAutoId.storeMatchStats(app, match_stats);
+            catch ME
+                Methods.TransformerAutoId.restoreModelIDs(app.image_neurons, snapshot);
+                rethrow(ME);
             end
-            Methods.TransformerAutoId.storeMatchStats(app, match_stats);
+        end
+
+        function snapshot = captureModelIDs(image_neurons)
+            neurons = image_neurons.neurons;
+            snapshot = struct( ...
+                'deterministic_id', {cell(1, numel(neurons))}, ...
+                'probabilistic_ids', {cell(1, numel(neurons))}, ...
+                'probabilistic_probs', {cell(1, numel(neurons))}, ...
+                'rank', {cell(1, numel(neurons))});
+            for i = 1:numel(neurons)
+                snapshot.deterministic_id{i} = neurons(i).deterministic_id;
+                snapshot.probabilistic_ids{i} = neurons(i).probabilistic_ids;
+                snapshot.probabilistic_probs{i} = neurons(i).probabilistic_probs;
+                snapshot.rank{i} = neurons(i).rank;
+            end
+        end
+
+        function restoreModelIDs(image_neurons, snapshot)
+            neurons = image_neurons.neurons;
+            for i = 1:min(numel(neurons), numel(snapshot.deterministic_id))
+                neurons(i).deterministic_id = snapshot.deterministic_id{i};
+                neurons(i).probabilistic_ids = snapshot.probabilistic_ids{i};
+                neurons(i).probabilistic_probs = snapshot.probabilistic_probs{i};
+                neurons(i).rank = snapshot.rank{i};
+            end
         end
 
         function refreshAppUI(app)
@@ -314,7 +346,6 @@ classdef TransformerAutoId
         end
 
         function labels = appNeuronLabels(app)
-            labels = strings(0, 1);
             try
                 n = app.image_neurons.num_neurons();
                 labels = strings(n, 1);
