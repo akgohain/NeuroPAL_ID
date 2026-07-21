@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "method_id": "detection_moe",
+  "display_name": "Accurate detection ensemble",
+  "source_revision": "benchmark-selection-20260716",
+  "configuration": {
+    "spotiflow_threshold": 0.30,
+    "yolo_threshold": 0.30,
+    "nnunet_threshold": 0.30,
+    "agreement_radius_um": 3.0,
+    "isolation_radius_um": 2.5
+  },
+  "artifacts": [
+    {"role": "spotiflow_bundle", "path": "spotiflow", "required": true},
+    {"role": "yolo_bundle", "path": "yolo", "required": true},
+    {"role": "nnunet_bundle", "path": "nnunet", "required": true}
+  ]
+}

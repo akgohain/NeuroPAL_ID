@@ -435,7 +435,7 @@ classdef TransformerAutoId
 
             if ismember('neuron_idx', predictions.Properties.VariableNames)
                 for r = 1:n_predictions
-                    idx = double(predictions.neuron_idx(r)) + 1;
+                    idx = double(predictions.neuron_idx(r));
                     if idx >= 1 && idx <= n
                         prediction_to_neuron(r) = round(idx);
                     end

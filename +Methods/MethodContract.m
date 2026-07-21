@@ -38,6 +38,16 @@ classdef MethodContract
                 error('Methods:MethodContract:InvalidIdentityConfidence', ...
                     'Identity confidence values must be finite and lie in [0, 1].');
             end
+            neuron_indices = double(result.neuron_idx);
+            if numel(unique(neuron_indices)) ~= numel(neuron_indices)
+                error('Methods:MethodContract:DuplicateNeuronIndex', ...
+                    'Identity results must contain at most one row per neuron_idx.');
+            end
+            predicted_class = strtrim(string(result.predicted_class));
+            if any(ismissing(predicted_class) | strlength(predicted_class) == 0)
+                error('Methods:MethodContract:MissingPredictedClass', ...
+                    'Every identity result needs a nonempty predicted_class.');
+            end
         end
     end
 

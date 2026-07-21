@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "method_id": "spotiflow_supervised",
+  "display_name": "Spotiflow NeuroPAL",
+  "source_revision": "spotiflow-0.6.5",
+  "configuration": {
+    "which": "last",
+    "input_mode": "rgbw",
+    "normalizer_mode": "per-channel",
+    "probability_threshold": -1,
+    "minimum_distance": 1
+  },
+  "artifacts": [
+    {"role": "checkpoint", "path": "checkpoint", "required": true}
+  ]
+}

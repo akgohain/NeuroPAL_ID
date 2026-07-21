@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "method_id": "crf_cellid_2",
+  "display_name": "CRF Cell-ID 2.0",
+  "source_revision": "f025f12a3e7102a8fa0ac8ec390534da1586bd57",
+  "configuration": {
+    "entrypoint": "run_neuropal_id_request",
+    "graph_mode": "knn",
+    "graph_k": 12,
+    "max_iterations": 500
+  },
+  "artifacts": [
+    {"role": "atlas", "path": "atlas.mat", "required": true},
+    {"role": "unary_model", "path": "unary_model.mat", "required": true},
+    {"role": "adapter", "path": "run_neuropal_id_request.m", "required": true}
+  ]
+}
