@@ -1,4 +1,4 @@
-function get_slice(slider, view, ax)
+function get_slice(~, ~, ~)
     %% Draw the neurons in this z-slice.
 
     app = Program.app;
@@ -431,7 +431,6 @@ catch
     return
 end
 
-raw_mask = [];
 if isfield(payload, char(mask_source))
     raw_mask = payload.(char(mask_source));
 elseif isfield(payload, 'masks_stitched')
@@ -564,6 +563,7 @@ else
     tf = false;
     setappdata(app.CELL_ID, key, tf);
 end
+end
 
 function tf = local_yolo_box_overlay_enabled(app)
 key = 'show_yolo_box_overlay';
@@ -582,36 +582,6 @@ mp_params = local_resolve_mp_params(app);
 if isstruct(mp_params) && isfield(mp_params, 'summary_path') && ~isempty(mp_params.summary_path)
     summary_path = char(string(mp_params.summary_path));
 end
-end
-end
-
-function tf = local_cellpose_slice_centroids_enabled(app)
-tf = false;
-end
-
-function [rows, cols] = local_label_slice_centroids(label_slice)
-rows = [];
-cols = [];
-label_ids = unique(label_slice(:));
-label_ids = label_ids(label_ids > 0);
-if isempty(label_ids)
-    return
-end
-
-rows = nan(numel(label_ids), 1);
-cols = nan(numel(label_ids), 1);
-for i = 1:numel(label_ids)
-    [r, c] = find(label_slice == label_ids(i));
-    if isempty(r)
-        continue
-    end
-    rows(i) = mean(r);
-    cols(i) = mean(c);
-end
-
-keep = isfinite(rows) & isfinite(cols);
-rows = rows(keep);
-cols = cols(keep);
 end
 
 function aligned_mask = local_align_mask_to_image(mask_data, image_shape_xyz)

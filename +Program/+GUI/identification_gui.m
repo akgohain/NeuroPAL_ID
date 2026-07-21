@@ -64,9 +64,6 @@ classdef identification_gui
 
             % Initialize code as 0.
             code = 0;
-            file_name = '';
-            file_path = '';
-
             % Check whether we're actively opening a file. If so, return.
             if obj.is_opening_file
                 return
@@ -126,7 +123,7 @@ classdef identification_gui
 
             % Open the file.
             try                
-                [data, info, prefs, worm, mp, neurons, np_file, id_file] = ...
+                [data, info, prefs, worm, mp, ~, np_file, id_file] = ...
                     DataHandling.NeuroPALImage.open(file_path);
             catch ME
                 msg = getReport(ME, 'extended', 'hyperlinks', 'off');
@@ -213,7 +210,7 @@ classdef identification_gui
                 try
                     app.DICDropDown.Value = app.DICDropDown.Items{prefs.DIC};
                 catch
-                    app.DICDropDown.Value = '5';
+                    app.DICDropDown.Value = app.DICDropDown.Items{end};
                 end
             end
             app.DICCheckBox.Value = false;
@@ -223,7 +220,7 @@ classdef identification_gui
                 try
                     app.GFPDropDown.Value = app.GFPDropDown.Items{prefs.GFP};
                 catch
-                    app.GFPDropDown.Value = '6';
+                    app.GFPDropDown.Value = app.GFPDropDown.Items{end};
                 end
             end
             app.GFPCheckBox.Value = false;
@@ -246,12 +243,6 @@ classdef identification_gui
                 'enable', 'identification_tab');
             Program.GUIHandling.gui_lock(app, ...
                 'disable', 'neuron_gui');
-
-            % Determine the image scale.
-            scale = ones(1,3);
-            if ~isempty(info.scale)
-                scale = info.scale;
-            end
 
             code = 1;
         end
@@ -280,9 +271,6 @@ classdef identification_gui
         end
 
         function is_valid_worm = validate_worm_properties(worm_struct, app, file_name)
-            % Initialize is_valid_worm.
-            is_valid_worm = 0;
-
             % Define all biological worm properties.
             worm_properties = ["age", "sex", "body"];
 
@@ -320,7 +308,7 @@ classdef identification_gui
                 % worm?)
                 if ~ismember(bio_value, dropdown.Items)
                     % If not, raise an error.
-                    error("Unrecognized worm %s \"%s\" in %s", ...
+                    error('Unrecognized worm %s "%s" in %s', ...
                         lower(bio_property), bio_value, file_name);
                 end
             end           

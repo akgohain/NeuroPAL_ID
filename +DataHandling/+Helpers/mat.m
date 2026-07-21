@@ -11,14 +11,13 @@ classdef mat
         function [obj, metadata] = open(file)
             f = matfile(file);
             info = f.info;
+            data_class = DataHandling.Helpers.mat.variable_class(f, 'data');
 
             % Collect metadata details about the ND2 file
             metadata = struct( ...
                 'path', {info.file}, ...
-                'bit_depth', {class(f.data)}, ...
+                'bit_depth', {DataHandling.Helpers.mat.class_bit_depth(data_class)}, ...
                 'scale', {info.scale});
-
-            metadata.bit_depth = str2num(metadata.bit_depth(5:end));
             metadata.dimensions = DataHandling.Helpers.mat.get_dimensions(f);
             metadata.channels = DataHandling.Helpers.mat.get_channels(f);
 
@@ -35,7 +34,7 @@ classdef mat
         function dimension_struct = get_dimensions(file)
             dimensions = size(file, 'data');
             
-            if length(dimensions) < 5
+            if numel(dimensions) >= 5
                 nt = dimensions(5);
             else
                 nt = 1;
@@ -51,19 +50,49 @@ classdef mat
         end
 
         function channel_struct = get_channels(file)            
-            if file.version >= 2
+            variable_names = who(file);
+            if ismember('channels', variable_names)
                 channel_struct = file.channels;
-            else
-                channel_struct = struct( ...
-                    'names', {DataHandling.Helpers.nd2.get_channel_names(file)}, ...
-                    'order', {Program.Handlers.channels.parse_order(names)}, ...
-                    'has_bools', {Program.Handlers.channels.parse_presence(names)});
+                return
+            end
+
+            dimensions = size(file, 'data');
+            nc = dimensions(4);
+            channel_names = repmat("Unknown", 1, nc);
+            source = struct();
+            if ismember('prefs', variable_names)
+                source = file.prefs;
+            elseif ismember('info', variable_names)
+                source = file.info;
+            end
+            roles = {'RGBW', 'DIC', 'GFP'};
+            role_names = {{'neptune', 'cyofp1', 'bfp', 'rfp'}, {'dic'}, {'gfp'}};
+            for role_index = 1:numel(roles)
+                role = roles{role_index};
+                if ~isfield(source, role)
+                    continue
+                end
+                indices = double(source.(role)(:).');
+                names = role_names{role_index};
+                for index = 1:min(numel(indices), numel(names))
+                    channel_index = round(indices(index));
+                    if isfinite(channel_index) && channel_index >= 1 && channel_index <= nc
+                        channel_names(channel_index) = string(names{index});
+                    end
+                end
+            end
+
+            channel_struct = cell(1, nc);
+            for channel_index = 1:nc
+                channel_struct{channel_index} = Program.channel(channel_names(channel_index));
+                channel_struct{channel_index}.arr_idx = channel_index;
             end
         end
 
         function metadata = load_metadata(file)
             tdims = size(file, 'data');
             info = file.info;
+            data_class = DataHandling.Helpers.mat.variable_class(file, 'data');
 
             metadata = struct( ...
                 'path', {info.file}, ...
@@ -71,9 +100,10 @@ classdef mat
                 'ny', {tdims(1)}, ...
                 'nz', {tdims(3)}, ...
                 'nc', {tdims(4)}, ...
-                'has_dic', {info.GFP}, ... % Placeholder for differential interference contrast
-                'has_gfp', {info.DIC}, ... % Placeholder for GFP channel presence
-                'bit_depth', {class(file.data)}, ...
+                'has_dic', {isfield(info, 'DIC') && any(isfinite(info.DIC))}, ...
+                'has_gfp', {isfield(info, 'GFP') && any(isfinite(info.GFP))}, ...
+                'bit_depth', {DataHandling.Helpers.mat.class_bit_depth(data_class)}, ...
+                'dtype_str', {data_class}, ...
                 'rgbw', {info.RGBW}, ...
                 'scale', {info.scale});
 
@@ -83,7 +113,31 @@ classdef mat
                 metadata.nt = 1;
             end
 
-            metadata.channels = file.channels;
+            metadata.channels = DataHandling.Helpers.mat.get_channels(file);
+        end
+
+        function class_name = variable_class(file, variable_name)
+            details = whos(file, variable_name);
+            if isempty(details)
+                error('DataHandling:Helpers:MAT:MissingVariable', ...
+                    'MAT file is missing required variable "%s".', variable_name);
+            end
+            class_name = details(1).class;
+        end
+
+        function bits = class_bit_depth(class_name)
+            token = regexp(char(string(class_name)), '\d+', 'match', 'once');
+            if ~isempty(token)
+                bits = str2double(token);
+            elseif strcmp(class_name, 'logical')
+                bits = 1;
+            elseif strcmp(class_name, 'single')
+                bits = 32;
+            elseif strcmp(class_name, 'double')
+                bits = 64;
+            else
+                bits = nan;
+            end
         end
 
         function obj = get_plane(varargin)

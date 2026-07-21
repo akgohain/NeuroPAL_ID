@@ -144,6 +144,18 @@ classdef GUIHandling
             Program.GUIHandling.hide_main_click_mode_control(app);
             Program.GUIHandling.hide_next_neuron_mode_control(app);
             Program.GUIHandling.configure_main_detect_id_controls(app);
+            Program.GUIHandling.configure_main_z_controls(app);
+        end
+
+        function configure_main_z_controls(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'GridLayout12') || isempty(app.GridLayout12) || ...
+                    ~isvalid(app.GridLayout12)
+                return
+            end
+            app.GridLayout12.ColumnWidth = {60, '1x'};
+            app.GridLayout12.ColumnSpacing = 3;
+            app.CenterZLabel.Text = 'Center Z:';
         end
 
         function configure_main_detect_id_controls(app)
@@ -363,8 +375,22 @@ classdef GUIHandling
             try
                 old_params_grid = findobj(sidebar_grid, 'Tag', 'MainMethodParamsGrid');
                 delete(old_params_grid);
-                sidebar_grid.RowHeight = {88, 88, 20, 20, 125, '1x', '1x'};
+                if isprop(app, 'SideGrid') && ~isempty(app.SideGrid) && isvalid(app.SideGrid)
+                    app.SideGrid.RowHeight = {'fit', '1x', '1x'};
+                    app.SideGrid.RowSpacing = 4;
+                    app.SideGrid.Padding = [0 10 10 0];
+                end
+                if isprop(app, 'NeuronRankGrid') && ~isempty(app.NeuronRankGrid) && isvalid(app.NeuronRankGrid)
+                    app.NeuronRankGrid.RowHeight = {0, '1x'};
+                    app.NeuronRankGrid.RowSpacing = 0;
+                    app.NeuronRankGrid.Padding = [0 0 0 0];
+                    if isprop(app, 'Panel_17') && ~isempty(app.Panel_17) && isvalid(app.Panel_17)
+                        app.Panel_17.Visible = 'off';
+                    end
+                end
+                sidebar_grid.RowHeight = {82, 82, 24, 24, 64, 18, 1};
                 sidebar_grid.RowSpacing = 3;
+                sidebar_grid.Padding = [0 0 0 0];
                 app.UserNeuronIDsListBoxLabel.Layout.Row = 3;
                 app.UserNeuronIDsListBoxLabel.Layout.Column = 1;
                 app.NeuronRankedConfidenceLabel.Layout.Row = 4;
@@ -420,7 +446,7 @@ classdef GUIHandling
 
             detect_settings_button = uibutton(detect_row, 'push', ...
                 'Tag', 'MainDetectSettingsButton', ...
-                'Text', 'Hyperparams', ...
+                'Text', 'Hyperparameters', ...
                 'Tooltip', 'Edit auto-detect hyperparameters.', ...
                 'ButtonPushedFcn', @(src, event) ...
                     Program.GUIHandling.show_main_method_params_dialog(app, 'detect'));
@@ -464,7 +490,7 @@ classdef GUIHandling
 
             id_settings_button = uibutton(id_row, 'push', ...
                 'Tag', 'MainIDSettingsButton', ...
-                'Text', 'Hyperparams', ...
+                'Text', 'Hyperparameters', ...
                 'Tooltip', 'Edit auto-ID hyperparameters.', ...
                 'ButtonPushedFcn', @(src, event) ...
                     Program.GUIHandling.show_main_method_params_dialog(app, 'id'));
@@ -1357,7 +1383,8 @@ classdef GUIHandling
             catch
                 message = strjoin(string(varargin), ' ');
             end
-            line = sprintf('[%s] [auto-detect] %s', datestr(now, 'HH:MM:SS.FFF'), message);
+            timestamp = char(datetime('now', 'Format', 'HH:mm:ss.SSS'));
+            line = sprintf('[%s] [auto-detect] %s', timestamp, message);
             fprintf('%s\n', line);
             Program.GUIHandling.cache_auto_detect_log(app, line);
             Program.GUIHandling.append_auto_detect_log_to_gui(app, line);
@@ -1383,6 +1410,14 @@ classdef GUIHandling
             end
         end
 
+        function lines = append_bounded_log(lines, line)
+            lines = cellstr(string(lines));
+            lines{end + 1} = line;
+            if numel(lines) > 500
+                lines = lines(end - 499:end);
+            end
+        end
+
         function append_auto_detect_log_to_gui(app, line)
             try
                 prop_names = properties(app);
@@ -1391,7 +1426,7 @@ classdef GUIHandling
             end
             for i = 1:numel(prop_names)
                 prop_name = prop_names{i};
-                if isempty(regexpi(prop_name, 'log'))
+                if isempty(regexpi(prop_name, 'log', 'once'))
                     continue
                 end
                 try
@@ -1406,17 +1441,11 @@ classdef GUIHandling
                         else
                             value = cellstr(string(value));
                         end
-                        value{end + 1} = line;
-                        if numel(value) > 500
-                            value = value(end - 499:end);
-                        end
+                        value = Program.GUIHandling.append_bounded_log(value, line);
                         control.Value = value;
                     elseif isa(control, 'matlab.ui.control.ListBox')
                         items = cellstr(string(control.Items));
-                        items{end + 1} = line;
-                        if numel(items) > 500
-                            items = items(end - 499:end);
-                        end
+                        items = Program.GUIHandling.append_bounded_log(items, line);
                         control.Items = items;
                     end
                 catch
@@ -1731,7 +1760,6 @@ classdef GUIHandling
 
         function indices = main_detection_channel_indices(app)
             nc = size(app.image_data, 4);
-            indices = [];
             try
                 state = Program.Handlers.channels.main_state(app);
                 candidates = [state.r.idx, state.g.idx, state.b.idx, state.white.idx];
@@ -2375,7 +2403,7 @@ classdef GUIHandling
             menu.Checked = Program.GUIHandling.checked_state_text(overlay_on && strcmpi(overlay_source, source));
         end
 
-        function show_cellpose_mask(menu_handle, source)
+        function show_cellpose_mask(~, source)
             app = Program.app;
             if isempty(app) || ~isvalid(app) || ~isprop(app, 'CELL_ID') || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
                 return
@@ -2515,7 +2543,6 @@ classdef GUIHandling
         end
 
         function tf = yolo_boxes_available(app)
-            tf = false;
             summary_path = Program.GUIHandling.yolo_summary_path(app);
             tf = ~isempty(summary_path) && isfile(summary_path);
         end
@@ -2910,7 +2937,7 @@ classdef GUIHandling
             handles = Program.GUIHandling.threshold_stepper_handles(app);
             if ~isempty(handles)
                 target_names = [target_names, ...
-                    {'ProcThresholdMinField', 'ProcThresholdMaxField'}]; %#ok<AGROW>
+                    {'ProcThresholdMinField', 'ProcThresholdMaxField'}];
             end
 
             target_names = unique(target_names, 'stable');
@@ -2983,9 +3010,9 @@ classdef GUIHandling
                 if app.data_flags.(data_file)
                     if exist('tree', 'var')
                         tree_app = Program.GUIHandling.get_parent_app(tree);
-                        loaded_files = [loaded_files tree_app.(sprintf('%sNode', strrep(data_file, '_', '')))];
+                        loaded_files(end + 1) = tree_app.(sprintf('%sNode', strrep(data_file, '_', ''))); %#ok<AGROW>
                     else
-                        loaded_files = [loaded_files {strrep(data_file, '_', '')}];
+                        loaded_files(end + 1) = {strrep(data_file, '_', '')}; %#ok<AGROW>
                     end
                 end
             end  
@@ -3096,10 +3123,10 @@ classdef GUIHandling
             end
         end
 
-        function drag_manager(app, mode, event)
+        function drag_manager(app, mode, ~)
             % Manages all click & drag events.
 
-            if app.DisplayNeuronActivityMenu.Checked == 1W
+            if app.DisplayNeuronActivityMenu.Checked == 1
                 pos = get(app.CELL_ID, 'CurrentPoint');
                 switch mode
                     case 'down'
@@ -3132,7 +3159,8 @@ classdef GUIHandling
                                     x(2) = x(2) + y;
                                     x(4) = y_divs;
                                     % sprintf('Cursor y: %d\nSubplot #%d y: %.2f through %.2f', pos(2), n, x(2), x(2) + x(4))
-                                    if (pos(1)>x(1)&pos(1)<(x(1)+x(3))&pos(2)>x(2)&pos(2)<(x(2)+x(4)))
+                                    if pos(1) > x(1) && pos(1) < (x(1) + x(3)) && ...
+                                            pos(2) > x(2) && pos(2) < (x(2) + x(4))
                                         selected_plot = num_plots - (n-1);
                                         break
                                     end
@@ -3149,7 +3177,7 @@ classdef GUIHandling
             end
         end
 
-        function target = grab_land(app, figure, pos, parent_class, parent_tag, class, tag)
+        function target = grab_land(~, figure, pos, parent_class, parent_tag, class, tag)
             % Check if drag & drop ended up on target component.
 
             try
@@ -3287,12 +3315,8 @@ classdef GUIHandling
                 'ProcDICCheckBox', ...
                 'ProcGFPCheckBox'};
 
-            checked_channels = [];
-            for c=1:length(channels)
-                if app.(channels{c}).Value
-                    checked_channels = [checked_channels c];
-                end
-            end
+            checked_channels = find(cellfun( ...
+                @(name) logical(app.(name).Value), channels));
         end
 
         function proc_save_prompt(app, action)
@@ -3304,8 +3328,7 @@ classdef GUIHandling
             Program.Routines.GUI.set_manipulation_panel('closed');
         end
 
-        function histogram_handler(app, mode, image)
-            %#ok<INUSD>
+        function histogram_handler(~, mode, ~)
             switch lower(string(mode))
                 case "reset"
                     Program.Handlers.histograms.reset();
@@ -3561,11 +3584,11 @@ classdef GUIHandling
 
             items = {};
             if has_image
-                items{end+1} = 'Colormap'; %#ok<AGROW>
+                items{end+1} = 'Colormap';
             end
 
             if has_image || has_video
-                items{end+1} = 'Video'; %#ok<AGROW>
+                items{end+1} = 'Video';
             end
 
             if isempty(items)
@@ -4077,7 +4100,7 @@ classdef GUIHandling
             end
         end
 
-        function apply_processing_runtime_action(app, action)
+        function apply_processing_runtime_action(~, action)
             if nargin < 2 || strlength(string(action)) == 0
                 return
             end
@@ -4501,7 +4524,6 @@ classdef GUIHandling
 
         function confirm_processing_rotation(app)
             rotate_actions = {};
-            rotate_angle = 0;
             should_rotate_neurons = false;
 
             try
@@ -4515,13 +4537,13 @@ classdef GUIHandling
             end
 
             if app.flip_lr.Value
-                rotate_actions{end+1} = 'hori'; %#ok<AGROW>
+                rotate_actions{end+1} = 'hori';
             end
             if app.flip_ud.Value
-                rotate_actions{end+1} = 'vert'; %#ok<AGROW>
+                rotate_actions{end+1} = 'vert';
             end
             if app.proc_rot_spinner.Value ~= 0
-                rotate_actions{end+1} = 'rotate'; %#ok<AGROW>
+                rotate_actions{end+1} = 'rotate';
             end
 
             if isempty(rotate_actions)
@@ -4975,57 +4997,36 @@ classdef GUIHandling
                 return
             end
 
-            has_advanced_button = isprop(app, 'ProcAdvancedOptionsButton') && ...
-                ~isempty(app.ProcAdvancedOptionsButton) && isvalid(app.ProcAdvancedOptionsButton);
+            advanced_button = Program.GUIHandling.ensure_processing_advanced_button(app);
+            app.SpectralUnmixingPanel.Layout.Row = 4;
+            advanced_button.Layout.Row = 5;
+            advanced_button.Layout.Column = 1;
+            app.ProcSavePanel.Layout.Row = 6;
 
-            if has_advanced_button
-                app.ProcSavePanel.Layout.Row = 4;
-                app.ProcAdvancedOptionsButton.Layout.Row = 5;
-                app.SpectralUnmixingPanel.Layout.Row = 6;
-            else
-                % Some local mlapp packages still use the older processing sidebar
-                % layout without a dedicated advanced-options button row.
-                app.SpectralUnmixingPanel.Layout.Row = 4;
-                app.ProcSavePanel.Layout.Row = 6;
+            if isprop(app.ProcSideGrid, 'Scrollable')
+                app.ProcSideGrid.Scrollable = 'on';
             end
+            app.ProcSideGrid.RowSpacing = 4;
+            app.ProcSideGrid.Padding = [4 4 4 4];
 
             is_image_mode = strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap');
-            row3_height = 72;
-            try
-                current_heights = app.ProcSideGrid.RowHeight;
-                if numel(current_heights) >= 3
-                    row3_height = current_heights{3};
-                end
-            catch
+            is_expanded = false;
+            if isappdata(app.CELL_ID, 'proc_advanced_expanded')
+                is_expanded = logical(getappdata(app.CELL_ID, 'proc_advanced_expanded'));
             end
+            is_expanded = is_image_mode && is_expanded;
 
-            if has_advanced_button
-                row5_height = 0;
-                if is_image_mode
-                    row6_height = 212;
-                    app.SpectralUnmixingPanel.Visible = 'on';
-                else
-                    row6_height = 0;
-                    app.SpectralUnmixingPanel.Visible = 'off';
-                end
-
-                app.ProcAdvancedOptionsButton.Visible = 'off';
-                if isprop(app.ProcAdvancedOptionsButton, 'Enable')
-                    app.ProcAdvancedOptionsButton.Enable = 'off';
-                end
-
-                app.ProcSideGrid.RowHeight = {95, 'fit', row3_height, 93, row5_height, row6_height};
+            app.SpectralUnmixingPanel.Visible = Program.GUIHandling.on_off(is_expanded);
+            advanced_button.Enable = Program.GUIHandling.on_off(is_image_mode);
+            if is_expanded
+                spectral_height = 212;
+                advanced_button.Text = 'Hide Spectral Unmixing';
             else
-                row4_height = 212;
-                if is_image_mode
-                    app.SpectralUnmixingPanel.Visible = 'on';
-                else
-                    row4_height = 0;
-                    app.SpectralUnmixingPanel.Visible = 'off';
-                end
-
-                app.ProcSideGrid.RowHeight = {95, 'fit', row3_height, row4_height, '1x', 93};
+                spectral_height = 0;
+                advanced_button.Text = 'Show Spectral Unmixing';
             end
+
+            app.ProcSideGrid.RowHeight = {95, 'fit', 'fit', spectral_height, 34, 93};
         end
 
         function install_processing_advanced_callback(app)
@@ -5033,17 +5034,8 @@ classdef GUIHandling
                 app = Program.app;
             end
 
-            if ~isprop(app, 'ProcAdvancedOptionsButton') || isempty(app.ProcAdvancedOptionsButton) || ...
-                    ~isvalid(app.ProcAdvancedOptionsButton)
-                return
-            end
-
-            app.ProcAdvancedOptionsButton.Visible = 'off';
-            if isprop(app.ProcAdvancedOptionsButton, 'Enable')
-                app.ProcAdvancedOptionsButton.Enable = 'off';
-            end
-            app.ProcAdvancedOptionsButton.ButtonPushedFcn = @(src, event) ...
-                Program.GUIHandling.handle_processing_advanced_toggle(app);
+            Program.GUIHandling.ensure_processing_advanced_button(app);
+            Program.GUIHandling.configure_processing_sidebar_layout(app);
         end
 
         function handle_processing_advanced_toggle(app)
@@ -5051,7 +5043,35 @@ classdef GUIHandling
                 app = Program.app;
             end
 
+            is_expanded = false;
+            if isappdata(app.CELL_ID, 'proc_advanced_expanded')
+                is_expanded = logical(getappdata(app.CELL_ID, 'proc_advanced_expanded'));
+            end
+            setappdata(app.CELL_ID, 'proc_advanced_expanded', ~is_expanded);
             Program.GUIHandling.configure_processing_sidebar_layout(app);
+        end
+
+        function button = ensure_processing_advanced_button(app)
+            button = [];
+            if isprop(app, 'ProcAdvancedOptionsButton') && ...
+                    ~isempty(app.ProcAdvancedOptionsButton) && isvalid(app.ProcAdvancedOptionsButton)
+                button = app.ProcAdvancedOptionsButton;
+            end
+            if isempty(button)
+                matches = findobj(app.ProcSideGrid, 'Tag', 'ProcessingAdvancedOptionsButton');
+                if ~isempty(matches)
+                    button = matches(1);
+                end
+            end
+            if isempty(button)
+                button = uibutton(app.ProcSideGrid, 'push', ...
+                    'Tag', 'ProcessingAdvancedOptionsButton', ...
+                    'Text', 'Show Spectral Unmixing');
+            end
+            button.Visible = 'on';
+            button.Tooltip = 'Show or hide spectral-unmixing controls.';
+            button.ButtonPushedFcn = @(src, event) ...
+                Program.GUIHandling.handle_processing_advanced_toggle(app);
         end
 
         function set_processing_histogram_controls_enabled(app, prefix, state)
@@ -5266,6 +5286,63 @@ classdef GUIHandling
             Program.GUIHandling.position_normalize_colors_editor(app);
         end
 
+        function configure_log_tab(app)
+            if nargin < 1 || isempty(app) || ~isvalid(app) || ...
+                    ~isprop(app, 'LogControlPanel') || isempty(app.LogControlPanel) || ...
+                    ~isvalid(app.LogControlPanel)
+                return
+            end
+
+            if isprop(app, 'UpperLogGrid') && isvalid(app.UpperLogGrid)
+                app.UpperLogGrid.ColumnWidth = {'1x', '1x'};
+                app.UpperLogGrid.ColumnSpacing = 10;
+                app.UpperLogGrid.Padding = [10 10 10 10];
+            end
+            app.LogControlPanel.ColumnWidth = {'1x', '1x'};
+            app.LogControlPanel.ColumnSpacing = 10;
+            app.LogControlPanel.Padding = [0 0 0 0];
+
+            if isprop(app, 'SystemInfoGrid') && isvalid(app.SystemInfoGrid)
+                app.SystemInfoGrid.ColumnWidth = {110, '1x'};
+                app.SystemInfoGrid.Padding = [0 0 0 0];
+            end
+            if isprop(app, 'InterdependentFunctionalityLabel')
+                app.InterdependentFunctionalityLabel.Text = 'Cross-module';
+            end
+            if isprop(app, 'DynamicgridstructuresLabel')
+                app.DynamicgridstructuresLabel.Text = 'Grid layout';
+            end
+
+            app.EnabledebugmenuCheckBox.ValueChangedFcn = @(src, event) ...
+                Program.GUIHandling.update_log_debug_visibility(app, src.Value);
+            Program.GUIHandling.update_log_debug_visibility( ...
+                app, logical(app.EnabledebugmenuCheckBox.Value));
+        end
+
+        function update_log_debug_visibility(app, is_enabled)
+            if nargin < 2
+                is_enabled = logical(app.EnabledebugmenuCheckBox.Value);
+            end
+            is_enabled = logical(is_enabled);
+
+            state = Program.GUIHandling.on_off(is_enabled);
+            app.DebugMenu.Visible = state;
+            app.DebugPanel.Visible = state;
+            app.TestResultPanel.Visible = state;
+            app.RuntestroutineButton.Enable = state;
+            app.PrintdebuglogButton.Enable = state;
+
+            row_heights = app.LogControlPanel.RowHeight;
+            if numel(row_heights) >= 4
+                if is_enabled
+                    row_heights{4} = 260;
+                else
+                    row_heights{4} = 0;
+                end
+                app.LogControlPanel.RowHeight = row_heights;
+            end
+        end
+
         function width = processing_container_width(app)
             candidates = nan(1, 4);
 
@@ -5301,7 +5378,7 @@ classdef GUIHandling
             width = min(304, max(292, round(total_width * 0.19)));
         end
 
-        function width = processing_main_width(app, total_width, side_width)
+        function width = processing_main_width(~, total_width, side_width)
             width = max(total_width - side_width - 8, 320);
         end
 
@@ -5329,7 +5406,10 @@ classdef GUIHandling
 
         function layout_processing_threshold_controls(app, compact)
             row_heights = repmat({0}, 1, max(13, numel(app.ProcThresholdGrid.RowHeight)));
-            app.ProcThresholdGrid.RowSpacing = 6;
+            % Grid spacing is also inserted between zero-height legacy rows.
+            % Keep the breathing room inside active rows so collapsed rows
+            % cannot push live controls below their parent.
+            app.ProcThresholdGrid.RowSpacing = 0;
             app.ProcThresholdGrid.Padding = [8 8 8 8];
 
             if isprop(app, 'ProcThresholdManipulationLabel') && isvalid(app.ProcThresholdManipulationLabel)
@@ -5346,7 +5426,7 @@ classdef GUIHandling
 
             if compact
                 app.ProcThresholdGrid.ColumnWidth = {'1x', '1x'};
-                row_heights(1:3) = {30, 30, 24};
+                row_heights(1:3) = {36, 36, 24};
 
                 app.ProcMeasureROINoiseButton.Layout.Row = 1;
                 app.ProcMeasureROINoiseButton.Layout.Column = 1;
@@ -5359,7 +5439,7 @@ classdef GUIHandling
                 app.Panel_87.Layout.Column = [1 2];
             else
                 app.ProcThresholdGrid.ColumnWidth = {'1x'};
-                row_heights(1:4) = {30, 30, 30, 24};
+                row_heights(1:4) = {36, 36, 36, 24};
 
                 app.ProcMeasureROINoiseButton.Layout.Row = 1;
                 app.ProcMeasureROINoiseButton.Layout.Column = 1;
@@ -5431,7 +5511,8 @@ classdef GUIHandling
 
             if compact
                 header_grid.RowHeight = {'fit', 'fit'};
-                header_grid.ColumnWidth = {2, 'fit', 44, 'fit', 44, '1x', 'fit', 46, 2};
+                header_grid.ColumnWidth = {0, '1x', 38, 24, 38, 6, 42, 40, 0};
+                header_grid.Padding = [4 1 4 1];
 
                 title_label.Layout.Row = 1;
                 title_label.Layout.Column = [2 6];
@@ -5458,7 +5539,8 @@ classdef GUIHandling
                 controls.max_field.Layout.Column = 5;
             else
                 header_grid.RowHeight = {'fit'};
-                header_grid.ColumnWidth = {2, 'fit', '1x', 24, 44, 24, 44, 'fit', 46, 2};
+                header_grid.ColumnWidth = {0, '1x', 6, 24, 38, 24, 38, 42, 40, 0};
+                header_grid.Padding = [4 1 4 1];
 
                 title_label.Layout.Row = 1;
                 title_label.Layout.Column = 2;
@@ -5501,6 +5583,7 @@ classdef GUIHandling
 
         function update_processing_zslider_visibility(app)
             mip_enabled = logical(app.ProcShowMIPCheckBox.Value);
+            slow_preview_enabled = logical(app.ProcPreviewZslowCheckBox.Value);
             target_enable = 'on';
             if mip_enabled
                 target_enable = 'off';
@@ -5518,6 +5601,8 @@ classdef GUIHandling
             if isprop(app.proc_vert_zSlider, 'Enable') && ~strcmp(app.proc_vert_zSlider.Enable, target_enable)
                 app.proc_vert_zSlider.Enable = target_enable;
             end
+            app.proc_hor_zSlider.Visible = Program.GUIHandling.on_off(slow_preview_enabled);
+            app.proc_vert_zSlider.Visible = Program.GUIHandling.on_off(slow_preview_enabled);
             if isprop(app.proc_zEditField, 'Enable') && ~strcmp(app.proc_zEditField.Enable, target_enable)
                 app.proc_zEditField.Enable = target_enable;
             end
@@ -5590,13 +5675,11 @@ classdef GUIHandling
                         ny = current_dims(1);
                         nx = current_dims(2);
                         nz = current_dims(3);
-                        nc = current_dims(4);
     
                     case 'video'
                         nx = app.video_info.nx;
                         ny = app.video_info.ny;
                         nz = app.video_info.nz;
-                        nc = app.video_info.nc;
                         nt = app.video_info.nt;
                 end
 
@@ -5604,7 +5687,6 @@ classdef GUIHandling
                 ny = dims(1);
                 nx = dims(2);
                 nz = dims(3);
-                nc = dims(4);
 
                 if length(dims) > 4
                     nt = dims(5);
@@ -5785,8 +5867,7 @@ classdef GUIHandling
             Program.GUIHandling.capture_processing_defaults(app, mode, false);
         end
 
-        function set_thresholds(app, max_val)
-            %#ok<INUSD>
+        function set_thresholds(app, ~)
             setappdata(app.CELL_ID, 'proc_threshold_raw_max', 255);
 
             threshold_limits = [0 255];
@@ -6023,8 +6104,7 @@ classdef GUIHandling
             end
         end
 
-        function description = processing_threshold_target_description(app)
-            %#ok<INUSD>
+        function description = processing_threshold_target_description(~)
             description = 'all mapped channels';
         end
 
@@ -6138,8 +6218,7 @@ classdef GUIHandling
             value = max(value, 1);
         end
 
-        function value = proc_threshold_raw_value(app, raw_max)
-            %#ok<INUSD>
+        function value = proc_threshold_raw_value(~, ~)
             value = 0;
         end
 
@@ -6376,9 +6455,6 @@ classdef GUIHandling
         end
 
         function [preview_frame, raw_max] = threshold_preview_frame(app)
-            preview_frame = [];
-            raw_max = 1;
-
             raw = Program.GUIHandling.get_active_volume(app, 'request', 'all');
             package = Program.Routines.Processing.compose_volume(app, raw);
             render_volume = double(package.render_volume);
@@ -6392,9 +6468,10 @@ classdef GUIHandling
         end
 
         function channels = processing_measurement_frames(app)
-            channels = struct('prefix', {}, 'frame', {});
             raw = Program.GUIHandling.get_active_volume(app, 'request', 'array');
             rows = Program.GUIHandling.processing_threshold_target_rows(app);
+            channels = repmat(struct('prefix', '', 'frame', []), 1, numel(rows));
+            channel_count = 0;
 
             for n = 1:numel(rows)
                 row = rows(n);
@@ -6410,10 +6487,12 @@ classdef GUIHandling
                     frame = squeeze(channel_volume(:, :, z_idx));
                 end
 
-                channels(end + 1) = struct( ... %#ok<AGROW>
+                channel_count = channel_count + 1;
+                channels(channel_count) = struct( ...
                     'prefix', Program.GUIHandling.pos_prefixes{row.row}, ...
                     'frame', double(frame));
             end
+            channels = channels(1:channel_count);
         end
 
         function set_processing_channel_min(app, prefix, value)
@@ -6988,9 +7067,9 @@ classdef GUIHandling
                 case 'add'
                     columns = fieldnames(channel);
 
-                    new_row = {};
+                    new_row = cell(1, length(columns));
                     for comp=1:length(columns)
-                        new_row{end+1} = channel.(columns{comp});
+                        new_row{comp} = channel.(columns{comp});
                     end
 
                     app.OpticalUITable.Data = [channel_table; new_row];
@@ -7132,6 +7211,20 @@ classdef GUIHandling
                     end
 
             end
+        end
+
+        function set_dropdown_value(dropdown, value)
+            if isempty(dropdown) || ~isvalid(dropdown)
+                return
+            end
+
+            value = char(string(value));
+            items = cellstr(string(dropdown.Items));
+            if ~any(strcmp(items, value))
+                items{end + 1} = value;
+                dropdown.Items = items;
+            end
+            dropdown.Value = value;
         end
 
     end

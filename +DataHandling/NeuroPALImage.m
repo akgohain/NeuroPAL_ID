@@ -76,6 +76,7 @@ classdef NeuroPALImage
             % Is the file already in NeuroPAL format?
             if ~exist(np_file,'file')
                 Program.Handlers.dialogue.add_task(sprintf('Converting %s file to NeuroPAL_ID file...', ext));
+                conversion_cleanup = onCleanup(@() Program.Handlers.dialogue.resolve());
                 switch lower(ext)
                     case '.mat' % NeuroPAL format
                         error('File not found: "%s"', file);
@@ -97,7 +98,7 @@ classdef NeuroPALImage
                     otherwise % Unknown format
                         error('Unknown image format: "%s"', file);
                 end
-                Program.Handlers.dialogue.resolve();
+                clear conversion_cleanup
             end
             
             % Did we manage to convert the file?
@@ -210,12 +211,7 @@ classdef NeuroPALImage
                 end
                 prefs.RGBW = round(prefs.RGBW(1:4));
                 invalid_rgbw = isnan(prefs.RGBW) | prefs.RGBW < 1 | prefs.RGBW > nc;
-                if all(invalid_rgbw)
-                    prefs.RGBW = nan(1, 4);
-                    prefs.RGBW(1:min(4, nc)) = 1:min(4, nc);
-                else
-                    prefs.RGBW(invalid_rgbw) = 1;
-                end
+                prefs.RGBW(invalid_rgbw) = nan;
 
                 % DIC: keep only a valid scalar index, otherwise NaN.
                 if isempty(prefs.DIC)
@@ -246,6 +242,30 @@ classdef NeuroPALImage
                         prefs.GFP = nan;
                     else
                         prefs.GFP = valid_gfp(1);
+                    end
+                end
+
+                % Fill missing color roles with distinct, unused channels
+                % when possible. Assigning every unknown role to channel 1
+                % makes partially-described CZI/NWB files appear grayscale
+                % and silently duplicates the same data three times.
+                missing_rgbw = find(~isfinite(prefs.RGBW));
+                reserved = prefs.RGBW(isfinite(prefs.RGBW));
+                if isfinite(prefs.DIC)
+                    reserved(end + 1) = prefs.DIC;
+                end
+                if isfinite(prefs.GFP)
+                    reserved(end + 1) = prefs.GFP;
+                end
+                candidates = setdiff(1:nc, unique(reserved), 'stable');
+                fallback = setdiff(1:nc, prefs.RGBW(isfinite(prefs.RGBW)), 'stable');
+                candidates = unique([candidates, fallback, 1:nc], 'stable');
+                for slot = missing_rgbw
+                    if isempty(candidates)
+                        prefs.RGBW(slot) = 1;
+                    else
+                        prefs.RGBW(slot) = candidates(1);
+                        candidates(1) = [];
                     end
                 end
             end
@@ -403,7 +423,6 @@ classdef NeuroPALImage
             import DataHandling.*;
             
             % Open the file.
-            np_file = [];
             [image_data, ~] = DataHandling.imreadCZI(czi_file);
             data = image_data.data;
             image_data.data = [];
@@ -504,118 +523,10 @@ classdef NeuroPALImage
             % nwb_file = the NWB file to convert
             % np_file = the NeuroPAL format file
             
-            % Initialize the packages.
-            import Program.*;
-            import DataHandling.*;
-            
             % Prefer direct HDF5/HDMF image conversion. MatNWB parses the
             % whole file and can fail on unrelated acquisition objects or
             % broken ExternalLinks before reaching the NeuroPAL image.
             np_file = DataHandling.NeuroPALImage.convertNWB_H5(nwb_file);
-            return
-
-            data = image_data.acquisition.get('NeuroPALImageRaw').data.load();
-        
-            data_order = 1:ndims(data);
-
-            if size(data, 4) ~= min(size(data))
-                data_order(1) = 3;
-                data_order(2) = 4;
-                data_order(3) = 2;
-                data_order(4) = 1;
-                %data_order(1) = 2;
-                %data_order(2) = 1;
-                data = permute(data, data_order);
-            end
-            
-            %image_data.scale(1) = image_data.scale(2);
-            %image_data.scale(2) = image_data.scale(2);
-                    
-            % Setup the NP file data.
-            info.file = nwb_file;
-            
-            if strcmp(class(image_data.acquisition.get('NeuroPALImageRaw').imaging_volume), 'types.untyped.SoftLink')
-                imagingVolume = image_data.acquisition.get('NeuroPALImageRaw').imaging_volume.deref(image_data);
-            else
-                imagingVolume = image_data.acquisition.get('NeuroPALImageRaw').imaging_volume;
-            end
-
-            grid_spacing_data = imagingVolume.grid_spacing.load();
-            info.scale = grid_spacing_data;
-            info.DIC = nan;
-                    
-            % Determine the color channels. Channel-order metadata is kept
-            % in HDF5/NDX fields even when MatNWB parses the volume object.
-            image_info = DataHandling.Helpers.nwb.image_data_info(nwb_file);
-            [info.RGBW, info.DIC, info.GFP] = ...
-                DataHandling.Helpers.nwb.infer_image_channels( ...
-                    nwb_file, image_info.group_path, size(data, 4), []);
-
-            if any(ismember(image_data.processing.keys, 'NeuroPAL'))
-                if any(ismember(image_data.processing.get('NeuroPAL').dynamictable.keys, 'NeuroPAL_ID'))
-                    gammas = image_data.processing.get('NeuroPAL').dynamictable.get('NeuroPAL_ID').vectordata.get('gammas').data.load();
-                    info.gamma = gammas';
-                else
-                    info.gamma = NeuroPALImage.gamma_default;
-                end
-            else
-                info.gamma = NeuroPALImage.gamma_default;
-            end
-
-            % Initialize the worm info.
-            valid_locations = {'Whole Worm', 'Head', 'Midbody', 'Anterior Midbody', 'Central Midbody', 'Posterior Midbody', 'Tail'};
-            nwb_loc = lower(imagingVolume.location);
-            for j = 1:length(valid_locations)
-                list_str = lower(valid_locations{j});
-                if contains(list_str, nwb_loc)
-                    worm.body = valid_locations{j};
-                    break;
-                end
-            end
-
-            worm.age = DataHandling.NeuroPALImage.normalize_age( ...
-                image_data.general_subject.growth_stage);
-
-            valid_sexes = {'XX', 'XO'}; % Isn't Massachusetts supposed to be deep blue?
-            if ~any(strcmp(valid_sexes, image_data.general_subject.sex))
-                male_syns = {'M','Male', 'm', 'male', 'O', 'o'};
-                if ~any(strcmp(male_syns, image_data.general_subject.sex))
-                    worm.sex = 'XX';
-                else
-                    worm.sex = 'XO';
-                end
-            else
-                worm.sex = image_data.general_subject.sex;
-            end
-
-            worm.strain = image_data.general_subject.strain;
-
-            if strcmp(class(image_data.general_subject.description), 'types.untyped.DataStub')
-                worm.notes = image_data.general_subject.description.load();
-            else
-                worm.notes = image_data.general_subject.description;
-            end
-
-            % Initialize the user preferences.
-            prefs.RGBW = info.RGBW;
-            prefs.DIC = info.DIC;
-            prefs.GFP = info.GFP;
-            prefs.gamma = info.gamma;
-            prefs.rotate.horizontal = false;
-            prefs.rotate.vertical = false;
-            prefs.z_center = ceil(size(data,3) / 2);
-            prefs.is_Z_LR = true;
-            prefs.is_Z_flip = true;
-
-            % Save the NWB file to our MAT file format.
-            np_file = strrep(nwb_file, '.nwb', '.mat');
-            version = ProgramInfo.version;
-            save(np_file, 'version', 'data', 'info', 'prefs', 'worm', '-v7.3');
-            
-            % Try to load neuron data and detection parameters from NWB file
-            [~, ~] = DataHandling.NeuroPALImage.loadNeuronDataFromNWB(image_data, worm.body, info.scale);
-
-            % Note: Neuron data is now stored directly in NWB file - no companion ID file created
         end
 
         function np_file = convertNWB_H5(nwb_file)
@@ -630,10 +541,8 @@ classdef NeuroPALImage
             image_group = image_info.group_path;
             image_volume_group = image_info.imaging_volume_path;
 
-            data = h5read(nwb_file, image_info.data_path);
-            if ndims(data) >= 4 && size(data, 4) ~= min(size(data))
-                data = permute(data, [3, 4, 2, 1]);
-            end
+            layout = DataHandling.Helpers.nwb.image_layout(image_info);
+            nc = layout.output_dims(4);
 
             info = struct();
             info.file = nwb_file;
@@ -646,9 +555,9 @@ classdef NeuroPALImage
             info.scale = double(info.scale(:).');
             [info.RGBW, info.DIC, info.GFP] = ...
                 DataHandling.Helpers.nwb.infer_image_channels( ...
-                    nwb_file, image_group, size(data, 4), 1:min(4, size(data, 4)));
+                    nwb_file, image_group, nc, 1:min(4, nc));
             info.gamma = DataHandling.Helpers.nwb.image_gamma( ...
-                nwb_file, size(data, 4), DataHandling.NeuroPALImage.gamma_default);
+                nwb_file, nc, DataHandling.NeuroPALImage.gamma_default);
 
             location = DataHandling.NeuroPALImage.h5_read_string( ...
                 nwb_file, [image_volume_group '/location'], '');
@@ -673,13 +582,22 @@ classdef NeuroPALImage
             prefs.gamma = info.gamma;
             prefs.rotate.horizontal = false;
             prefs.rotate.vertical = false;
-            prefs.z_center = ceil(size(data, 3) / 2);
+            prefs.z_center = ceil(layout.output_dims(3) / 2);
             prefs.is_Z_LR = true;
             prefs.is_Z_flip = true;
 
-            np_file = strrep(nwb_file, '.nwb', '.mat');
+            [folder, name] = fileparts(nwb_file);
+            np_file = fullfile(folder, [name '.mat']);
             version = Program.ProgramInfo.version;
-            save(np_file, 'version', 'data', 'info', 'prefs', 'worm', '-v7.3');
+            metadata = struct('version', version, 'info', info, ...
+                'prefs', prefs, 'worm', worm);
+            report = DataHandling.Helpers.nwb.stream_image_to_mat( ...
+                nwb_file, image_info, np_file, metadata);
+            Program.Helpers.debug_event('NWBConversion', ...
+                ['Converted "%s" to "%s" using %d bounded chunks ' ...
+                 '(chunk depth %d, resumed=%d).'], ...
+                nwb_file, np_file, report.chunks_written, ...
+                report.chunk_z, report.resumed);
         end
 
         function tf = h5_exists(file, path)
@@ -1016,7 +934,17 @@ classdef NeuroPALImage
                             % Convert string back to appropriate data type
                             if contains(param_value_str, '[') && contains(param_value_str, ']')
                                 % Vector/matrix parameter
-                                mp_params.(param_name) = str2num(param_value_str);
+                                rows = split(strip(extractBetween( ...
+                                    string(param_value_str), '[', ']')), ';');
+                                numeric_rows = cellfun(@(row) sscanf( ...
+                                    strrep(row, ',', ' '), '%f').', cellstr(rows), ...
+                                    'UniformOutput', false);
+                                row_widths = cellfun(@numel, numeric_rows);
+                                if ~isempty(row_widths) && all(row_widths == row_widths(1))
+                                    mp_params.(param_name) = vertcat(numeric_rows{:});
+                                else
+                                    mp_params.(param_name) = param_value_str;
+                                end
                             else
                                 % Scalar parameter
                                 param_value = str2double(param_value_str);
@@ -1049,7 +977,6 @@ classdef NeuroPALImage
             import DataHandling.*;
             
             % Open the file.
-            np_file = [];
             if strcmp(any_file(end-3:end), '.lif')
                 [image_data, ~] = DataHandling.imreadLif(any_file);
             elseif strcmp(any_file(end-2:end), '.h5')

@@ -1,0 +1,36 @@
+#!/usr/bin/env sh
+set -eu
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+
+if [ -n "${MATLAB_BIN:-}" ]; then
+    matlab_bin="$MATLAB_BIN"
+elif [ -x "/Applications/MATLAB_R2024a.app/bin/matlab" ]; then
+    matlab_bin="/Applications/MATLAB_R2024a.app/bin/matlab"
+elif command -v matlab >/dev/null 2>&1; then
+    matlab_bin=$(command -v matlab)
+else
+    echo "Could not find MATLAB. Set MATLAB_BIN to its executable." >&2
+    exit 1
+fi
+
+if [ "$#" -ge 1 ]; then
+    output_dir=$1
+else
+    timestamp=$(date +"%Y%m%d_%H%M%S")
+    output_dir="$repo_root/.ui_artifacts/$timestamp"
+fi
+
+if [ "$#" -ge 2 ]; then
+    fixture=$2
+else
+    fixture="${NPAL_UI_AUDIT_FIXTURE:-}"
+fi
+
+NPAL_UI_AUDIT_OUTPUT="$output_dir" \
+NPAL_UI_AUDIT_FIXTURE="$fixture" \
+"$matlab_bin" -batch \
+    "cd('$repo_root'); addpath(fullfile(pwd,'scripts')); run_ui_audit;"
+
+echo "$output_dir"

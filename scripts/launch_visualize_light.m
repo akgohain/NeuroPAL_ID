@@ -7,4 +7,9 @@ if exist(app_path, 'file') ~= 2
 end
 
 addpath(repo_root);
-visualize_light;
+app = visualize_light;
+
+% Keep an explicit reference in the base workspace. App Designer normally
+% registers the app, but retaining the object makes development launches
+% deterministic and gives diagnostics/UI tooling a stable handle.
+assignin('base', 'NEUROPAL_DEV_APP', app);

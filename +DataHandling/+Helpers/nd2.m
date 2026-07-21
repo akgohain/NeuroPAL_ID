@@ -13,7 +13,7 @@ classdef nd2
     methods (Static, Access = public)
 
         function ttl = get_ttl(file)
-            ttl_keys = DataHandling.Helpers.nd2.get_ttl_keys(file);
+            ttl = DataHandling.Helpers.nd2.get_ttl_keys(file);
         end
 
         function ttl = get_ttl_keys(file, target)
@@ -64,43 +64,6 @@ classdef nd2
             cleanup_reader = onCleanup(@() reader.close());
             nt = reader.getSizeT;
             clear cleanup_reader
-        end
-
-        function get_ttl_data(file)
-            
-            % 2. Determine number of frames in the series
-            seriesIndex = 0;
-            reader.setSeries(seriesIndex);
-            numFrames = reader.getImageCount();  % total plane count (for a single Z stack, this equals number of T frames)
-            
-            % We can see how many series exist, but often ND2 has just one series
-            seriesCount = reader.getSeriesCount();
-            for s = 0:seriesCount-1
-                fprintf('== Series %d ==\n', s);
-                reader.setSeries(s);
-                nPlanes = reader.getImageCount();  % planes = Z*C*T, not frames alone
-                
-                for p = 0:nPlanes-1
-                    % Print the global metadata keys for debugging
-                    fprintf('-- Plane index %d --\n', p);
-                    
-                    % Attempt to fetch any metadata
-                    % (Bio-Formats often uses separate 'core' or 'plane' metadata structures)
-                    planeMeta = reader.getPlaneMetadata(p);
-                    
-                    if ~isempty(planeMeta)
-                        planeKeys = planeMeta.keySet().iterator();
-                        while planeKeys.hasNext()
-                            key = planeKeys.next();
-                            val = planeMeta.get(key);
-                            fprintf('%s = %s\n', char(key), char(val));
-                        end
-                    else
-                        disp('No plane metadata found for this plane.');
-                    end
-                end
-            end
-
         end
 
         function [obj, metadata] = open(file)
@@ -159,8 +122,6 @@ classdef nd2
 
             bits = f.getMetadataStore.getPixelsSignificantBits(0).getValue();   % Get bit depth.
             bit_depth = sprintf("uint%.f", bits);                               % Convert bit depth to class string.
-
-            data = [];                                                          % Initialize data as proportionate zero array.
 
             info = struct('file', {file});                                      % Initialize info struct.
             info.scale = DataHandling.Helpers.nd2.parse_scale(f);               % Set image scale
@@ -276,14 +237,17 @@ classdef nd2
             Program.Handlers.dialogue.resolve();
 
             Program.Handlers.dialogue.add_task('Writing metadata...');
-            DataHandling.Helpers.nd2.assert_sufficient_disk_space( ...
-                tmp_np_file, [ny, nx, nz, nc, nt], Program.config.defaults{'class'});
-            save(tmp_np_file, 'version', 'data', 'info', 'prefs', 'worm', '-v7.3');
+            output_class = Program.config.defaults{'class'};
+            raw_bytes = prod(double([ny, nx, nz, nc, nt])) * ...
+                DataHandling.Helpers.large_file.bytes_per_element(output_class);
+            DataHandling.Helpers.large_file.assert_sufficient_disk_space( ...
+                tmp_np_file, raw_bytes);
+            save(tmp_np_file, 'version', 'info', 'prefs', 'worm', '-v7.3');
             Program.Handlers.dialogue.resolve();
 
             Program.Handlers.dialogue.add_task('Running Nikon write routine...');
             DataHandling.Helpers.nd2.write_data(tmp_np_file, f);
-            movefile(tmp_np_file, np_file, 'f');
+            DataHandling.Helpers.large_file.promote(tmp_np_file, np_file);
             clear tmp_cleanup
             Program.Handlers.dialogue.resolve();
             clear f_cleanup
@@ -300,24 +264,22 @@ classdef nd2
         end
 
         function channel_struct = get_channels(reader)            
+            names = DataHandling.Helpers.nd2.get_channel_names(reader);
             channel_struct = struct( ...
-                'names', {DataHandling.Helpers.nd2.get_channel_names(reader)}, ...
+                'names', {names}, ...
                 'order', {Program.Handlers.channels.parse_order(names)}, ...
                 'has_bools', {Program.Handlers.channels.parse_presence(names)});
         end
 
         function names = get_channel_names(reader)
-            names = {};
-
             if isstring(reader) || ischar(reader)
                 reader = bfGetReader(reader);
             end
 
+            names = strings(1, reader.getSizeC);
             for c = 1:reader.getSizeC
-                names{end+1} = string(reader.getMetadataStore.getChannelName(0, c - 1));
+                names(c) = string(reader.getMetadataStore.getChannelName(0, c - 1));
             end
-
-            names = string(names);
         end
 
 
@@ -363,23 +325,15 @@ classdef nd2
                 labels(is_match) = key;
             end
         
-            sorted_names = strings(0, 1);
-            permute_record = [];
-        
+            ordered_indices = cell(numel(labels_order), 1);
             for j = 1:numel(labels_order)
                 key = labels_order{j};
-
-                idx = find(labels == key);
-
-                sorted_names = [sorted_names; channels(idx)];
-                permute_record = [permute_record; idx];
+                ordered_indices{j} = find(labels == key);
             end
         
             unmatched_idx = find(labels == "");
-            if ~isempty(unmatched_idx)
-                sorted_names = [sorted_names; channels(unmatched_idx)];
-                permute_record = [permute_record; unmatched_idx];
-            end
+            permute_record = vertcat(ordered_indices{:}, unmatched_idx);
+            sorted_names = channels(permute_record);
 
             Program.Handlers.dialogue.resolve();
         end
@@ -467,57 +421,10 @@ classdef nd2
     end
 
     methods (Static, Access = private)
-        function bytes = bytes_per_element(dclass)
-            dclass = char(dclass);
-            switch dclass
-                case 'single'
-                    bytes = 4;
-                case 'double'
-                    bytes = 8;
-                otherwise
-                    token = regexp(dclass, '^(?:u?int)(\d+)$', 'tokens', 'once');
-                    if isempty(token)
-                        error('DataHandling:ND2:UnsupportedDataClass', ...
-                            'Unsupported ND2 output data class: %s', dclass);
-                    end
-                    bytes = str2double(token{1}) / 8;
-            end
-        end
-
-        function assert_sufficient_disk_space(output_file, dims, dclass)
-            output_dir = fileparts(output_file);
-            if isempty(output_dir)
-                output_dir = pwd;
-            end
-
-            file_obj = javaObject('java.io.File', output_dir);
-            usable_bytes = double(file_obj.getUsableSpace());
-            raw_bytes = prod(double(dims)) * DataHandling.Helpers.nd2.bytes_per_element(dclass);
-            required_bytes = raw_bytes * 1.20 + 512 * 1024^2;
-            if usable_bytes < required_bytes
-                error('DataHandling:ND2:InsufficientDiskSpace', ...
-                    ['Not enough free disk space to convert this ND2. ' ...
-                     'Need about %s free for a safe MAT-file write; only %s is available in %s.'], ...
-                    DataHandling.Helpers.nd2.format_bytes(required_bytes), ...
-                    DataHandling.Helpers.nd2.format_bytes(usable_bytes), output_dir);
-            end
-        end
-
         function delete_file_if_exists(path)
             if exist(path, 'file')
                 delete(path);
             end
-        end
-
-        function text = format_bytes(bytes)
-            units = {'B', 'KiB', 'MiB', 'GiB', 'TiB'};
-            value = double(bytes);
-            unit_idx = 1;
-            while value >= 1024 && unit_idx < numel(units)
-                value = value / 1024;
-                unit_idx = unit_idx + 1;
-            end
-            text = sprintf('%.1f %s', value, units{unit_idx});
         end
 
         function [p, z, c, t] = parse_plane_idx(plane_idx)
@@ -541,73 +448,36 @@ classdef nd2
             nc = nd2_reader.getSizeC;
             nt = nd2_reader.getSizeT;
         
-            % Maximum memory to use for a single chunk:
-            if ispc
-                max_arr = memory().MaxPossibleArrayBytes * 0.90;
-            else
-                [~, max_arr] = system('sysctl hw.memsize | awk ''{print $2}''');
-                max_arr = str2double(max_arr) * 0.90;
-            end
-        
             % Determine the data class from config:
             dclass = Program.config.defaults{'class'};
+            bytes_per_el = DataHandling.Helpers.large_file.bytes_per_element(dclass);
+            max_arr = DataHandling.Helpers.large_file.memory_budget_bytes();
 
-            % Pre-allocate the entire output in the MAT-file:
-            np_write.data = zeros(ny, nx, nz, nc, nt, dclass);
-        
-            switch dclass
-                case 'single'
-                    bytes_per_el = 4;
-                case 'double'
-                    bytes_per_el = 8;
-                otherwise
-                    bytes_per_el = str2double(dclass(5:end))/8;
+            % Extend the on-disk array without constructing a full-size
+            % in-memory zeros array.
+            if nt > 1
+                np_write.data(ny, nx, nz, nc, nt) = cast(0, dclass);
+            else
+                np_write.data(ny, nx, nz, nc) = cast(0, dclass);
             end
 
             ttl_bytes = ny * nx * nz * nc * nt * bytes_per_el;
 
-            if nt <= 1 && ttl_bytes <= max_arr
-                Program.Handlers.dialogue.step('Reading entire Nikon volume...');
-                d_cell = bfopen(char(nd2_reader.getCurrentFile));
-
-                d_cell = d_cell{1};
-                n_planes = length(d_cell);
-                data = zeros(ny, nx, nz, nc, nt, dclass);
-
-                for pidx = 1:n_planes
-                    Program.Handlers.dialogue.set_value(pidx/n_planes);
-                    [~, z, c, t] = DataHandling.Helpers.nd2.parse_plane_idx(d_cell{pidx, 2});
-                    
-                    if nt > 1 
-                        Program.Handlers.dialogue.step(sprintf( ...
-                            'Caching plane %.f/%.f (z = %.f, c = %.f, t = %.f)', ...
-                            pidx, n_planes, z, c, t));
-                        data(:, :, z, c, t) = d_cell{pidx, 1};
-
-                    else
-                        Program.Handlers.dialogue.step(sprintf( ...
-                            'Caching plane %.f/%.f (z = %.f, c = %.f)', ...
-                            pidx, n_planes, z, c));
-                        data(:, :, z, c) = d_cell{pidx, 1};
-                    end
-                end
-
-                Program.Handlers.dialogue.step(sprintf( ...
-                    'Writing %.f planes to file...', n_planes));
-                np_write.data = data;
-                
-            else                
-                if nt > 1
+            if nt > 1
                     % --- For movies (nt > 1), chunk along the time dimension. ---
             
                     % Number of bytes in one full frame: (ny x nx x nz x nc)
                     bytes_per_frame = ttl_bytes / nt;
 
                     % Calculate how many frames to process at once:
-                    chunk_size_t = max(1, floor(max_arr / bytes_per_frame));
+                    chunk_size_t = max(1, floor(max_arr / (bytes_per_frame * 2.5)));
             
                     t_start = 1;
                     while t_start <= nt
+                        if DataHandling.Helpers.large_file.cancel_requested()
+                            error('DataHandling:LargeFile:Cancelled', ...
+                                'ND2 conversion cancelled before the final file was published.');
+                        end
                         t_end = min(t_start + chunk_size_t - 1, nt);
                         Program.Handlers.dialogue.set_value(t_end/nt);
                         Program.Handlers.dialogue.step(sprintf( ...
@@ -628,19 +498,23 @@ classdef nd2
                         t_start = t_end + 1;
                     end
             
-                else
+            else
                     % --- Single time point: chunk along the z dimension. ---
             
                     % Number of bytes in one z-slab: (ny x nx x nc)
                     bytes_per_z_slab = ttl_bytes / nz;
                     % Calculate how many z-planes we can process at once:
-                    chunk_size_z = max(1, floor(max_arr / bytes_per_z_slab));
+                    chunk_size_z = max(1, floor(max_arr / (bytes_per_z_slab * 2.5)));
             
                     z_start = 1;
                     while z_start <= nz
+                        if DataHandling.Helpers.large_file.cancel_requested()
+                            error('DataHandling:LargeFile:Cancelled', ...
+                                'ND2 conversion cancelled before the final file was published.');
+                        end
                         z_end = min(z_start + chunk_size_z - 1, nz);
 
-                        Program.Handlers.dialogue.set_value(z_end/nt);
+                        Program.Handlers.dialogue.set_value(z_end/nz);
                         Program.Handlers.dialogue.step(sprintf( ...
                             'Slices %.f-%.f (out of %.f)', ...
                             z_start, z_end, nz));
@@ -658,7 +532,6 @@ classdef nd2
                         % Move chunk window
                         z_start = z_end + 1;
                     end
-                end
             end
         end
 
@@ -672,12 +545,13 @@ classdef nd2
                 z_scale = DataHandling.Helpers.nd2.get_keys(reader, key_map('z_scale'), 'globals');
 
                 if isempty(xy_scale) || isempty(z_scale)
-                    DataHandling.Helpers.nd2.parse_scale(reader, 'Global ');
+                    scale = DataHandling.Helpers.nd2.parse_scale(reader, 'Global ');
+                    return
                 end
 
             else
                 xy_scale = DataHandling.Helpers.nd2.get_keys(reader, sprintf("%s %s", pfx, key_map('xy_scale')), 'globals');
-                z_scale = DataHandling.Helpers.nd2.get_keys(reader,  sprintf("%s %s", pfx, key_map('xy_scale')), 'globals');
+                z_scale = DataHandling.Helpers.nd2.get_keys(reader,  sprintf("%s %s", pfx, key_map('z_scale')), 'globals');
 
             end
 
@@ -686,9 +560,9 @@ classdef nd2
 
             else
                 scale = [ ...
-                    str2num(xy_scale) ...
-                    str2num(xy_scale) ...
-                    str2num(z_scale)];
+                    str2double(xy_scale) ...
+                    str2double(xy_scale) ...
+                    str2double(z_scale)];
                 
             end
         end

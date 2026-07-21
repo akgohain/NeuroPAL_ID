@@ -10,6 +10,8 @@ function reset_id_render(arr)
     daspect(app.XY, [1 1 1]);
     daspect(app.MaxProjection, [1 1 1]);
     axis(app.MaxProjection, 'off');
+    Program.Helpers.fill_axes_parent(app.XY);
+    Program.Helpers.fill_axes_parent(app.MaxProjection);
 
     % Constrain the image.
     app.XY.XLim = [0, nx];

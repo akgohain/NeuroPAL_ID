@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+set -eu
+
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+
+if [ -z "${NPAL_LARGE_FILE_FIXTURE:-}" ]; then
+    echo "Set NPAL_LARGE_FILE_FIXTURE to an NWB file." >&2
+    exit 2
+fi
+
+if [ -n "${MATLAB_BIN:-}" ]; then
+    matlab_bin="$MATLAB_BIN"
+elif [ -x "/Applications/MATLAB_R2024a.app/bin/matlab" ]; then
+    matlab_bin="/Applications/MATLAB_R2024a.app/bin/matlab"
+else
+    matlab_bin=$(command -v matlab)
+fi
+
+NPAL_LARGE_FILE_OUTPUT="${NPAL_LARGE_FILE_OUTPUT:-$repo_root/.ui_artifacts/large-file-audit}" \
+"$matlab_bin" -batch \
+    "cd('$repo_root'); addpath(fullfile(pwd,'scripts')); run_large_file_audit;"

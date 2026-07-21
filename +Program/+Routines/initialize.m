@@ -52,10 +52,15 @@ function initialize()
     Program.GUIHandling.hide_main_click_mode_control(app);
     Program.GUIHandling.hide_next_neuron_mode_control(app);
     Program.GUIHandling.configure_main_detect_id_controls(app);
+    Program.GUIHandling.configure_main_z_controls(app);
     Program.GUIHandling.remove_redundant_processing_menus(app);
+    Program.GUIHandling.configure_log_tab(app);
     app.neuron_marker.shape = 'c';
     app.neuron_marker.color.edge = [0,0,0];
     Program.GUIHandling.prepare_unloaded_module_views(app);
+    Program.GUIHandling.ensure_processing_color_ui(app);
+    Program.GUIHandling.configure_processing_sidebar_layout(app);
+    Program.GUIHandling.update_processing_zslider_visibility(app);
     Program.GUI.setup_zephir_video_tab(app);
     Program.GUIHandling.gui_lock(app, 'disable', 'identification_tab');
     Program.GUIHandling.gui_lock(app, 'disable', 'processing_tab');
@@ -104,9 +109,9 @@ function initialize()
         % This is a new user, give them some help!
     else
 
-        answer = uiconfirm(app.CELL_ID, ...
-            {['Welcome to NeuroPAL ID!'], ...
-            ['Please read the instructions very carefully.']}, ...
+        uiconfirm(app.CELL_ID, ...
+            {'Welcome to NeuroPAL ID!', ...
+            'Please read the instructions very carefully.'}, ...
             'NeuroPAL ID Instructions', 'Options', {'OK'}, ...
             'DefaultOption', 1, 'CancelOption', 1, 'Icon', 'info');
 

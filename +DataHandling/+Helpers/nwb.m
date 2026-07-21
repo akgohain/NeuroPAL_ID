@@ -30,10 +30,6 @@ classdef nwb
             labels = cellstr(string(labels(:)))';
         end
 
-        function path = search(file, module)
-            % to be merged from loader branch
-        end
-
         function [obj, metadata] = open(file)
             if Program.states.instance().is_video
                 DataHandling.Helpers.nwb.volume_path('/acquisition/CalciumImageSeries');
@@ -53,11 +49,11 @@ classdef nwb
                 'nc', {target_module.deref(f).data.internal.dims(4)}, ...
                 'has_dic', {1}, ...
                 'has_gfp', {1}, ...
-                'bit_depth', {str2num(target_module.deref(f).data.internal.dataType(5:end))}, ...
+                'bit_depth', {str2double(target_module.deref(f).data.internal.dataType(5:end))}, ...
                 'rgbw', {[target_module.deref(f).RGBW_channels.load()]'}, ...
                 'scale', {[0 0 0]});
 
-            if length(target_module.deref(f).data.internal.dims) > 4
+            if numel(target_module.deref(f).data.internal.dims) > 4
                 metadata.nt = target_module.deref(f).data.internal.dims(5);
             else
                 metadata.nt = 1;
@@ -82,9 +78,11 @@ classdef nwb
             % image size probing and fallback conversion.
 
             acquisition = h5info(file, '/acquisition');
-            candidates = struct('group_path', {}, 'data_path', {}, ...
-                'imaging_volume_path', {}, 'name', {}, 'dims', {}, 'datatype', {}, ...
-                'bytes_per_sample', {}, 'num_bytes', {});
+            candidate_template = struct('group_path', '', 'data_path', '', ...
+                'imaging_volume_path', '', 'name', '', 'dims', [], 'datatype', [], ...
+                'chunk_size', [], 'bytes_per_sample', 0, 'num_bytes', 0);
+            candidates = repmat(candidate_template, 1, numel(acquisition.Groups));
+            candidate_count = 0;
 
             for i = 1:numel(acquisition.Groups)
                 group = acquisition.Groups(i);
@@ -115,16 +113,19 @@ classdef nwb
                 imaging_volume_path = DataHandling.Helpers.nwb.link_target_path( ...
                     file, [group.Name '/imaging_volume']);
 
-                candidates(end + 1) = struct( ... %#ok<AGROW>
+                candidate_count = candidate_count + 1;
+                candidates(candidate_count) = struct( ...
                     'group_path', group.Name, ...
                     'data_path', data_path, ...
                     'imaging_volume_path', imaging_volume_path, ...
                     'name', group_name, ...
                     'dims', dims, ...
                     'datatype', data_info.Datatype, ...
+                    'chunk_size', double(data_info.ChunkSize), ...
                     'bytes_per_sample', bytes_per_sample, ...
                     'num_bytes', prod(dims) * bytes_per_sample);
             end
+            candidates = candidates(1:candidate_count);
 
             if isempty(candidates)
                 error('DataHandling:Helpers:NWB:NoImageVolume', ...
@@ -147,10 +148,9 @@ classdef nwb
 
         function target_path = link_target_path(file, path)
             target_path = path;
-            fid = [];
             try
                 fid = H5F.open(file, 'H5F_ACC_RDONLY', 'H5P_DEFAULT');
-                cleanup = onCleanup(@() H5F.close(fid)); %#ok<NASGU>
+                cleanup = onCleanup(@() H5F.close(fid));
                 link_info = H5L.get_info(fid, path, 'H5P_DEFAULT');
                 if link_info.type == H5ML.get_constant_value('H5L_TYPE_SOFT')
                     target_path = H5L.get_val(fid, path, 'H5P_DEFAULT');
@@ -174,7 +174,7 @@ classdef nwb
                 return
             end
             value = info.Attributes(idx).Value;
-            if iscell(value) && numel(value) == 1
+            if iscell(value) && isscalar(value)
                 value = value{1};
             end
             if isa(value, 'uint8') || isa(value, 'int8')
@@ -342,89 +342,198 @@ classdef nwb
             end
         end
 
-        function np_file = to_npal(file, is_video)
-            %CONVERTNWB Convert an NWB file to NeuroPAL format.
-            %
-            % nwb_file = the NWB file to convert
-            % np_file = the NeuroPAL format file
-
-            if nargin < 2
-                app = Program.app;
-                is_video = Program.Validation.agnostic_vol_check();
+        function layout = image_layout(image_info)
+            source_dims = double(image_info.dims(:).');
+            if numel(source_dims) ~= 4 || any(source_dims < 1)
+                error('DataHandling:Helpers:NWB:UnsupportedImageDimensions', ...
+                    'Expected a four-dimensional MultiChannelVolume; found %s.', ...
+                    mat2str(source_dims));
             end
 
-            f = nwbRead(file);                                              % Get reader object.
-
-            if is_video
-                module = f.acquisition.get('CalciumImageSeries');
-                dim_permutation = [4 3 2 1 5];
+            % Preserve the orientation behavior of the established loader.
+            % Normal NDX files are [Y X Z C]. Some older exports are
+            % [C Z Y X] and require the historical [3 4 2 1] permutation.
+            if source_dims(4) == min(source_dims)
+                layout.source_z_axis = 3;
+                layout.permutation = 1:4;
+                layout.output_dims = source_dims;
             else
-                module = f.acquisition.get('NeuroPALImageRaw');
-                dim_permutation = [1 1 1 1 1];
+                layout.source_z_axis = 2;
+                layout.permutation = [3 4 2 1];
+                layout.output_dims = source_dims(layout.permutation);
+            end
+            layout.source_dims = source_dims;
+            layout.output_z_count = layout.output_dims(3);
+        end
+
+        function report = stream_image_to_mat(nwb_file, image_info, np_file, metadata)
+            %STREAM_IMAGE_TO_MAT Transactionally copy an NWB image volume.
+            % Reads bounded HDF5 hyperslabs, checkpoints each committed
+            % z-range, resumes matching partial files, and atomically exposes
+            % the completed MAT file only after validation.
+
+            layout = DataHandling.Helpers.nwb.image_layout(image_info);
+            sample = h5read(nwb_file, image_info.data_path, ...
+                ones(1, numel(layout.source_dims)), ...
+                ones(1, numel(layout.source_dims)));
+            output_class = class(sample);
+            bytes_per_element = DataHandling.Helpers.large_file.bytes_per_element(output_class);
+            raw_output_bytes = prod(layout.output_dims) * bytes_per_element;
+            partial_file = DataHandling.Helpers.large_file.partial_path(np_file);
+
+            expected_state = struct( ...
+                'schema_version', 1, ...
+                'source', DataHandling.Helpers.large_file.source_signature(nwb_file), ...
+                'data_path', image_info.data_path, ...
+                'source_dims', layout.source_dims, ...
+                'output_dims', layout.output_dims, ...
+                'output_class', output_class, ...
+                'completed_z', 0, ...
+                'chunk_count', 0, ...
+                'status', 'partial');
+
+            resumed = false;
+            state = expected_state;
+            if exist(partial_file, 'file') == 2
+                resumed = DataHandling.Helpers.nwb.can_resume_image_conversion( ...
+                    partial_file, expected_state);
+                if resumed
+                    saved = load(partial_file, 'conversion_state');
+                    state = saved.conversion_state;
+                else
+                    delete(partial_file);
+                end
             end
 
-            dims = module.data.internal.dims([dim_permutation]);
+            existing_bytes = 0;
+            if resumed
+                details = dir(partial_file);
+                existing_bytes = details.bytes;
+            end
+            DataHandling.Helpers.large_file.assert_sufficient_disk_space( ...
+                partial_file, raw_output_bytes, existing_bytes);
 
-            nx = dims(2);                                                       % Get width.
-            ny = dims(1);                                                       % Get height.
-            nz = dims(3);                                                       % Get depth.
-            nc = dims(5);                                                       % Get channel count.
-
-            if is_video
-                nt = dims(6);                                                    % Get frame count.
+            if ~resumed
+                conversion_state = state;
+                save(partial_file, '-struct', 'metadata', '-v7.3');
+                save(partial_file, 'conversion_state', '-append');
+                target = matfile(partial_file, 'Writable', true);
+                last_index = num2cell(layout.output_dims);
+                target.data(last_index{:}) = cast(0, output_class);
             else
-                nt = 1;
+                target = matfile(partial_file, 'Writable', true);
             end
 
-            bit_depth = module.data.dataType;
-
-            data = [];                                                          % Initialize data as proportionate zero array.
-
-            info = struct('file', {file});                                      % Initialize info struct.
-            info.scale = module.imaging_volume.deref(f).grid_spacing.load();    % Set image scale
-            info.scale = info.scale(:)';
-
-            channels = DataHandling.Helpers.nwb.get_channel_names(f, module);   % Get channel names.
-            channels = Program.Handlers.channels.parse_info(channels);          % Get channel indices from names.
-
-            if isprop(module, 'RGBW_channels')
-                info.RGBW = module.RGBW_channels.load();
-                info.RGBW = info.RGBW(:)';
-            else
-                info.RGBW = channels(1:4);                                      % Set RGBW indices.
+            memory_budget = DataHandling.Helpers.large_file.memory_budget_bytes();
+            plane_elements = prod(layout.source_dims) / ...
+                layout.source_dims(layout.source_z_axis);
+            working_bytes_per_plane = plane_elements * bytes_per_element * 2.5;
+            chunk_z = max(1, floor(memory_budget / working_bytes_per_plane));
+            chunk_z = min(chunk_z, layout.output_z_count);
+            if isfield(image_info, 'chunk_size') && ~isempty(image_info.chunk_size) && ...
+                    numel(image_info.chunk_size) >= layout.source_z_axis
+                storage_chunk_z = max(1, image_info.chunk_size(layout.source_z_axis));
+                if storage_chunk_z <= chunk_z
+                    chunk_z = max(storage_chunk_z, ...
+                        floor(chunk_z / storage_chunk_z) * storage_chunk_z);
+                end
             end
 
-            info.DIC = channels(5);                                             % Set DIC if present, else set to 0.
-            info.GFP = channels(6);                                             % Set GFP is present, else set to 0.
-            info.bit_depth = bit_depth;
-            
-            % Determine the gamma.
-            info.gamma = Program.Handlers.channels.config{'default_gamma'};     % Set gamma to default since we can't get it from ND2 hashtable.
-            
-            % Initialize the user preferences.
-            prefs.RGBW = info.RGBW;
-            prefs.DIC = info.DIC;
-            prefs.GFP = info.GFP;
-            prefs.gamma = info.gamma;
-            prefs.rotate.horizontal = false;
-            prefs.rotate.vertical = false;
-            prefs.z_center = ceil(nz / 2);
-            prefs.is_Z_LR = true;
-            prefs.is_Z_flip = true;
-            
-            % Initialize the worm info.
-            worm.body = strrep(module.imaging_volume.deref(f).reference_frame, 'Worm ', '');
-            worm.age = f.general_subject.growth_stage;
-            worm.sex = Program.Validation.parse_sex(f.general_subject.sex);
-            worm.strain = f.general_subject.strain;
-            worm.notes = f.general_subject.description;
-            
-            % Save the ND2 file to our MAT file format.
-            np_file = strrep(file, 'nd2', 'mat');
-            version = Program.information.version;
-            save(np_file, 'version', 'data', 'info', 'prefs', 'worm', '-v7.3');
+            handle = Program.Handlers.dialogue.active();
+            try
+                if ~isempty(handle) && isvalid(handle) && isprop(handle, 'Cancelable')
+                    handle.Cancelable = 'on';
+                end
+            catch
+            end
 
-            DataHandling.Helpers.nwb.write_data(np_file, module.data, [ny nx nz nc nt]);
+            cancel_after = str2double(getenv('NEUROPAL_IO_CANCEL_AFTER_CHUNKS'));
+            if ~isfinite(cancel_after) || cancel_after < 1
+                cancel_after = inf;
+            end
+
+            start_z = state.completed_z + 1;
+            for z_start = start_z:chunk_z:layout.output_z_count
+                if DataHandling.Helpers.large_file.cancel_requested()
+                    error('DataHandling:LargeFile:Cancelled', ...
+                        'Conversion cancelled. Progress is saved in %s.', partial_file);
+                end
+
+                z_end = min(z_start + chunk_z - 1, layout.output_z_count);
+                source_start = ones(1, numel(layout.source_dims));
+                source_count = layout.source_dims;
+                source_start(layout.source_z_axis) = z_start;
+                source_count(layout.source_z_axis) = z_end - z_start + 1;
+                chunk = h5read(nwb_file, image_info.data_path, source_start, source_count);
+                if ~isequal(layout.permutation, 1:4)
+                    chunk = permute(chunk, layout.permutation);
+                end
+                target.data(:, :, z_start:z_end, :) = chunk;
+
+                state.completed_z = z_end;
+                state.chunk_count = state.chunk_count + 1;
+                target.conversion_state = state;
+                Program.Handlers.dialogue.set_value(z_end / layout.output_z_count);
+                Program.Handlers.dialogue.step(sprintf( ...
+                    'Converted NWB slices %d-%d of %d', ...
+                    z_start, z_end, layout.output_z_count));
+
+                if state.chunk_count >= cancel_after
+                    error('DataHandling:LargeFile:Cancelled', ...
+                        'Conversion cancelled after a test checkpoint. Progress is saved in %s.', ...
+                        partial_file);
+                end
+            end
+
+            details = whos(target, 'data');
+            if isempty(details) || ~isequal(double(details.size), layout.output_dims) || ...
+                    ~strcmp(details.class, output_class)
+                error('DataHandling:LargeFile:VerificationFailed', ...
+                    'The streamed output failed size or type verification.');
+            end
+
+            state.status = 'complete';
+            target.conversion_state = state;
+            clear target
+            DataHandling.Helpers.large_file.promote(partial_file, np_file);
+
+            report = struct( ...
+                'output_file', np_file, ...
+                'resumed', resumed, ...
+                'chunks_written', state.chunk_count, ...
+                'chunk_z', chunk_z, ...
+                'output_dims', layout.output_dims, ...
+                'output_class', output_class, ...
+                'raw_output_bytes', raw_output_bytes);
+        end
+
+        function tf = can_resume_image_conversion(partial_file, expected)
+            tf = false;
+            try
+                saved = load(partial_file, 'conversion_state');
+                if ~isfield(saved, 'conversion_state')
+                    return
+                end
+                actual = saved.conversion_state;
+                fields = {'schema_version', 'source', 'data_path', 'source_dims', ...
+                    'output_dims', 'output_class'};
+                for index = 1:numel(fields)
+                    field = fields{index};
+                    if ~isfield(actual, field) || ...
+                            ~isequaln(actual.(field), expected.(field))
+                        return
+                    end
+                end
+                reader = matfile(partial_file);
+                details = whos(reader, 'data');
+                tf = ~isempty(details) && ...
+                    isequal(double(details.size), expected.output_dims) && ...
+                    strcmp(details.class, expected.output_class) && ...
+                    actual.completed_z >= 0 && ...
+                    actual.completed_z <= expected.output_dims(3);
+            catch
+                tf = false;
+            end
         end
 
         function obj = get_plane(varargin)
@@ -454,37 +563,5 @@ classdef nwb
             names = string(names);
         end
 
-        function write_data(np_file, data_pipe, dims)
-            Program.Handlers.dialogue.add_task('Writing data...');
-            np_write = matfile(np_file, "Writable", true);
-
-            nx = dims(2);                                                       % Get width.
-            ny = dims(1);                                                       % Get height.
-            nz = dims(3);                                                       % Get depth.
-            nc = dims(5);                                                       % Get channel count.
-            nt = dims(6);                            
-
-            np_write.data = zeros( ...
-                ny, nx, ...
-                nz, nc, nt, ...
-                Program.config.defaults{'class'});
-
-            if nt > 1
-                for t=1:nt
-                    Program.Handlers.dialogue.set_value(t/nt);
-                    this_frame = data_pipe(:, :, :, :, t);
-                    np_write.data(:, :, :, :, t) = DataHandling.Types.to_standard(this_frame);
-                end
-                
-            else
-                for z=1:nz
-                    Program.Handlers.dialogue.set_value(z/nz);
-                    this_slice = data_pipe(:, :, z, :)
-                    np_write.data(:, :, z, :) = DataHandling.Types.to_standard(this_slice);
-                end
-            end
-
-            Program.Handlers.dialogue.resolve();
-        end
     end
 end

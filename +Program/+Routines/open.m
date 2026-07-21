@@ -64,7 +64,7 @@ function open(path)
             return
         end
     else
-        [~, name, fmt] = fileparts(path);
+        [~, name] = fileparts(path);
         filename = path;
 
         % Load the file.
@@ -88,7 +88,11 @@ function open(path)
     catch ME
         Program.Helpers.debug_event('OpenFile', ...
             'Cannot read "%s": %s', filename, getReport(ME, 'extended', 'hyperlinks', 'off'));
-        if any(strcmp(ME.identifier, ...
+        if strcmp(ME.identifier, 'DataHandling:LargeFile:Cancelled')
+            uialert(app.CELL_ID, ...
+                {ME.message, 'Reopen the source file to resume from the saved checkpoint.'}, ...
+                'Conversion Paused', 'Icon', 'info');
+        elseif any(strcmp(ME.identifier, ...
                 {'DataHandling:NeuroPALImage:ND2VideoInImageLoader', ...
                  'DataHandling:ND2:VideoNotImage'}))
             uialert(app.CELL_ID, ...
@@ -146,6 +150,7 @@ function open(path)
         app.image_prefs.gamma = app.image_gamma;
     else
         app.image_gamma = prefs.gamma;
+    end
 
     % Load the image scale and info.
     app.image_um_scale = info.scale;
@@ -180,7 +185,7 @@ function open(path)
         try
             app.DICDropDown.Value = app.DICDropDown.Items{prefs.DIC};
         catch
-            app.DICDropDown.Value = '5';
+            app.DICDropDown.Value = app.DICDropDown.Items{end};
         end
     end
     app.DICCheckBox.Value = false;
@@ -190,7 +195,7 @@ function open(path)
         try
             app.GFPDropDown.Value = app.GFPDropDown.Items{prefs.GFP};
         catch
-            app.GFPDropDown.Value = '6';
+            app.GFPDropDown.Value = app.GFPDropDown.Items{end};
         end
     end
     app.GFPCheckBox.Value = false;
@@ -211,12 +216,6 @@ function open(path)
     % Enable the image GUI.
     Program.GUIHandling.gui_lock(app, 'enable', 'identification_tab');
     Program.GUIHandling.gui_lock(app, 'disable', 'neuron_gui');
-
-    % Determine the image scale.
-    scale = ones(1,3);
-    if ~isempty(info.scale)
-        scale = info.scale;
-    end
 
     % Did we detect neurons?
     app.id_file = id_file;
@@ -272,9 +271,12 @@ function open(path)
     end
 
     % Setup the max projection.
+    Program.Helpers.ensure_main_image_axes(app);
     daspect(app.XY,[1 1 1]);
     daspect(app.MaxProjection,[1 1 1]);
     axis(app.MaxProjection, 'off');
+    Program.Helpers.fill_axes_parent(app.XY);
+    Program.Helpers.fill_axes_parent(app.MaxProjection);
 
     % Label the image.
     app.XY.Title.Interpreter = 'none';
