@@ -7,8 +7,8 @@ arguments
     scale_um_xyz double
     options.Labels = strings(0, 1)
     options.PythonExecutable (1,1) string = ""
-    options.RepoDir (1,1) string = "/Users/adamg/neuroPAL/GAT-NeuroPAL"
-    options.CheckpointPath (1,1) string = "/Users/adamg/neuroPAL/artifacts/anshita_transformer"
+    options.RepoDir (1,1) string = ""
+    options.CheckpointPath (1,1) string = ""
     options.BatchSize (1,1) double = 32
     options.NumWorkers (1,1) double = 0
     options.PreprocessWorkers (1,1) double = 0
@@ -40,7 +40,7 @@ if exist(output_dir, 'dir') ~= 7
     mkdir(output_dir);
 end
 
-cleanup = onCleanup(@() local_cleanup(output_dir, options.KeepArtifacts)); %#ok<NASGU>
+cleanup = onCleanup(@() local_cleanup(output_dir, options.KeepArtifacts));
 local_progress(options.ProgressFcn, 'Staging app volume request for transformer auto-ID...');
 
 request_path = fullfile(output_dir, 'transformer_stage_request.mat');
@@ -57,17 +57,17 @@ if isempty(python_executable)
     error('Wrapper:NoPython', 'Could not resolve Python. Set NEUROPAL_TRANSFORMER_PYTHON or pass PythonExecutable.');
 end
 
-repo_dir = char(options.RepoDir);
+[repo_dir, checkpoint_path] = Wrapper.resolveTransformerAssets( ...
+    options.RepoDir, options.CheckpointPath);
 script_path = fullfile(repo_dir, 'run_app_volume_inference.py');
 if exist(script_path, 'file') ~= 2
     error('Wrapper:MissingTransformerVolumeScript', 'run_app_volume_inference.py not found: %s', script_path);
 end
-checkpoint_path = char(options.CheckpointPath);
 if exist(checkpoint_path, 'file') ~= 2 && exist(checkpoint_path, 'dir') ~= 7
     error('Wrapper:MissingTransformerCheckpoint', ...
         ['Transformer checkpoint path not found: %s\n\n' ...
          'Set the transformer checkpoint path to a run directory containing best_model.pt, ' ...
-         'or pass CheckpointPath to Wrapper.runTransformerAutoIDFromVolume.'], checkpoint_path);
+         'Set NEUROPAL_GAT_CHECKPOINT or choose the checkpoint in method settings.'], checkpoint_path);
 end
 
 command_parts = { ...

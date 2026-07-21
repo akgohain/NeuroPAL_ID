@@ -16,11 +16,12 @@ classdef TransformerAutoId
                 options.QualityThreshold (1,1) double = 0.3
                 options.Device (1,1) string = ""
                 options.DatasetID (1,1) string = "000981"
-                options.CheckpointPath (1,1) string = "/Users/adamg/neuroPAL/artifacts/anshita_transformer"
+                options.CheckpointPath (1,1) string = ""
             end
 
             progress = Methods.TransformerAutoId.openProgressDialog(app);
             cleanup = onCleanup(@() Methods.TransformerAutoId.closeProgressDialog(progress));
+            [~, checkpoint_path] = Wrapper.resolveTransformerAssets("", options.CheckpointPath);
 
             nwb_path = Methods.TransformerAutoId.resolveNWBPath(app, options.NWBPath);
             if strlength(nwb_path) > 0
@@ -37,7 +38,7 @@ classdef TransformerAutoId
                     'QualityThreshold', options.QualityThreshold, ...
                     'Device', options.Device, ...
                     'DatasetID', options.DatasetID, ...
-                    'CheckpointPath', options.CheckpointPath, ...
+                    'CheckpointPath', checkpoint_path, ...
                     'ProgressFcn', @(message) Methods.TransformerAutoId.updateProgress(progress, message));
             else
                 Methods.TransformerAutoId.updateProgress(progress, ...
@@ -56,7 +57,7 @@ classdef TransformerAutoId
                     'QualityThreshold', options.QualityThreshold, ...
                     'Device', options.Device, ...
                     'DatasetID', options.DatasetID, ...
-                    'CheckpointPath', options.CheckpointPath, ...
+                    'CheckpointPath', checkpoint_path, ...
                     'ProgressFcn', @(message) Methods.TransformerAutoId.updateProgress(progress, message));
             end
 
@@ -85,6 +86,10 @@ classdef TransformerAutoId
                 end
             catch
             end
+        end
+
+        function checkpoint_path = defaultCheckpointPath()
+            [~, checkpoint_path] = Wrapper.resolveTransformerAssets();
         end
 
         function applyPredictions(app, predictions)

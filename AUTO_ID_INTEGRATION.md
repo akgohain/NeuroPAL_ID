@@ -39,6 +39,11 @@ not sufficient: it also needs a portable adapter, obtainable weights/assets,
 bounded resource behavior, actionable dependency checks, and a verified result
 import path.
 
+The GAT adapter resolves assets from explicit settings first, then
+`NEUROPAL_GAT_REPO`, `NEUROPAL_GAT_CHECKPOINT` (or the legacy transformer
+environment variable), and finally workspace-relative locations. No
+machine-specific absolute path is part of the default contract.
+
 ## What is scaffolded next
 
 1. **Spotiflow NeuroPAL detector** — best single held-out detector in the

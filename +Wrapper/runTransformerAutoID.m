@@ -4,8 +4,8 @@ function predictions = runTransformerAutoID(nwb_path, options)
 arguments
     nwb_path (1,1) string
     options.PythonExecutable (1,1) string = ""
-    options.RepoDir (1,1) string = "/Users/adamg/neuroPAL/GAT-NeuroPAL"
-    options.CheckpointPath (1,1) string = "/Users/adamg/neuroPAL/artifacts/anshita_transformer"
+    options.RepoDir (1,1) string = ""
+    options.CheckpointPath (1,1) string = ""
     options.BatchSize (1,1) double = 32
     options.NumWorkers (1,1) double = 0
     options.PreprocessWorkers (1,1) double = 0
@@ -24,17 +24,17 @@ if exist(nwb_path, 'file') ~= 2
     error('Wrapper:MissingNWB', 'NWB file not found: %s', nwb_path);
 end
 local_progress(options.ProgressFcn, 'Checking transformer files...');
-repo_dir = char(options.RepoDir);
+[repo_dir, checkpoint_path] = Wrapper.resolveTransformerAssets( ...
+    options.RepoDir, options.CheckpointPath);
 script_path = fullfile(repo_dir, 'run_inference.py');
 if exist(script_path, 'file') ~= 2
     error('Wrapper:MissingTransformerRepo', 'run_inference.py not found: %s', script_path);
 end
-checkpoint_path = char(options.CheckpointPath);
 if exist(checkpoint_path, 'file') ~= 2 && exist(checkpoint_path, 'dir') ~= 7
     error('Wrapper:MissingTransformerCheckpoint', ...
         ['Transformer checkpoint path not found: %s\n\n' ...
          'Set the transformer checkpoint path to a run directory containing best_model.pt, ' ...
-         'or pass CheckpointPath to Wrapper.runTransformerAutoID.'], checkpoint_path);
+         'Set NEUROPAL_GAT_CHECKPOINT or choose the checkpoint in method settings.'], checkpoint_path);
 end
 local_validate_checkpoint(checkpoint_path);
 
@@ -46,7 +46,7 @@ end
 local_progress(options.ProgressFcn, 'Staging NWB for transformer preprocessing...');
 test_dir = tempname;
 mkdir(test_dir);
-cleanup = onCleanup(@() local_cleanup(test_dir)); %#ok<NASGU>
+cleanup = onCleanup(@() local_cleanup(test_dir));
 [~, name, ext] = fileparts(nwb_path);
 dataset_id = char(strtrim(options.DatasetID));
 if isempty(dataset_id)
