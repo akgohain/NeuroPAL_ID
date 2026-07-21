@@ -615,12 +615,48 @@ classdef GUIHandling
                     neuron_count, max(auto_id_count, user_id_count));
             end
 
+            setup_methods = {};
+            setup_details = {};
+            if has_image && isfield(controls, 'detect_dropdown') && isvalid(controls.detect_dropdown) && ...
+                    strcmp(char(string(controls.detect_dropdown.Value)), 'spotiflow_supervised')
+                params = Program.GUIHandling.main_method_params(app, 'detect');
+                readiness = Methods.MethodBundle.inspect('spotiflow_supervised', ...
+                    Program.GUIHandling.param_value(params, 'bundle_path', ''));
+                controls.detect_dropdown.Tooltip = readiness.summary;
+                if ~readiness.ready
+                    setup_methods{end + 1} = 'Spotiflow';
+                    setup_details{end + 1} = readiness.summary;
+                end
+            end
+            if neuron_count > 0 && isfield(controls, 'id_dropdown') && isvalid(controls.id_dropdown) && ...
+                    strcmpi(char(string(controls.id_dropdown.Value)), 'CRF Cell-ID 2.0')
+                params = Program.GUIHandling.main_method_params(app, 'id');
+                readiness = Methods.MethodBundle.inspect('crf_cellid_2', ...
+                    Program.GUIHandling.param_value(params, 'bundle_path', ''));
+                controls.id_dropdown.Tooltip = readiness.summary;
+                if ~readiness.ready
+                    setup_methods{end + 1} = 'CRF-ID';
+                    setup_details{end + 1} = readiness.summary;
+                end
+            end
+
+            if isscalar(setup_methods)
+                status = sprintf('%s bundle required  |  Settings...', setup_methods{1});
+            elseif numel(setup_methods) > 1
+                status = sprintf('%s need setup', strjoin(setup_methods, ' + '));
+            end
+
             if isfield(controls, 'workflow_status') && ...
                     ~isempty(controls.workflow_status) && isvalid(controls.workflow_status)
                 controls.workflow_status.Text = status;
                 controls.workflow_status.FontWeight = 'bold';
                 controls.workflow_status.HorizontalAlignment = 'left';
                 controls.workflow_status.FontColor = [0.12 0.29 0.48];
+                if isempty(setup_details)
+                    controls.workflow_status.Tooltip = '';
+                else
+                    controls.workflow_status.Tooltip = strjoin(setup_details, newline);
+                end
             end
             if isprop(app, 'UserNeuronIDsListBoxLabel') && isvalid(app.UserNeuronIDsListBoxLabel)
                 candidate_count = 0;
@@ -1025,6 +1061,7 @@ classdef GUIHandling
             end
             table.Data = data;
             setappdata(app.CELL_ID, sprintf('main_%s_params', char(string(group))), params);
+            Program.GUIHandling.update_main_id_workflow_state(app);
 
             if nargin >= 5 && ~isempty(fig) && isvalid(fig)
                 close(fig);
@@ -1109,6 +1146,12 @@ classdef GUIHandling
                         struct('key', 'p_lo', 'label', 'Stretch lo', 'value', 0.5, 'limits', [0 100], 'integer', false, 'enabled', true), ...
                         struct('key', 'p_hi', 'label', 'Stretch hi', 'value', 99.5, 'limits', [0 100], 'integer', false, 'enabled', true), ...
                         struct('key', 'depth_sanity_ratio_cap', 'label', 'Depth cap', 'value', 2.0, 'limits', [0.1 20], 'integer', false, 'enabled', true)};
+                case "spotiflow_supervised"
+                    specs = { ...
+                        struct('key', 'bundle_path', 'label', 'Bundle', 'value', Methods.MethodBundle.resolve('spotiflow_supervised', ''), 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'folder'), ...
+                        struct('key', 'probability_threshold', 'label', 'Min conf', 'value', -1, 'limits', [-1 1], 'integer', false, 'enabled', true), ...
+                        struct('key', 'minimum_distance', 'label', 'Min dist', 'value', 1, 'limits', [1 50], 'integer', true, 'enabled', true), ...
+                        struct('key', 'device', 'label', 'Device', 'value', 'auto', 'limits', [], 'integer', false, 'enabled', true, 'allowed', {{'auto', 'cpu', 'cuda', 'mps'}})};
                 otherwise
                     specs = { ...
                         struct('key', 'stride', 'label', 'Stride', 'value', Methods.NNDetect.stride, 'limits', [16 512], 'integer', true, 'enabled', false), ...
@@ -1128,6 +1171,9 @@ classdef GUIHandling
                         struct('key', 'mc_samples', 'label', 'MC', 'value', 20, 'limits', [1 100], 'integer', true, 'enabled', true), ...
                         struct('key', 'min_neighbors', 'label', 'Min nbr', 'value', 2, 'limits', [0 20], 'integer', true, 'enabled', true), ...
                         struct('key', 'batch_size', 'label', 'Batch', 'value', 32, 'limits', [1 512], 'integer', true, 'enabled', true)};
+                case "crf cell-id 2.0"
+                    specs = { ...
+                        struct('key', 'bundle_path', 'label', 'Bundle', 'value', Methods.MethodBundle.resolve('crf_cellid_2', ''), 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'folder')};
                 otherwise
                     specs = { ...
                         struct('key', 'top_k', 'label', 'Top K', 'value', 5, 'limits', [1 20], 'integer', true, 'enabled', true), ...
@@ -1338,6 +1384,7 @@ classdef GUIHandling
 
             controls = Program.GUIHandling.main_detect_id_controls(app);
             Program.GUIHandling.refresh_main_method_params(app, controls);
+            Program.GUIHandling.update_main_id_workflow_state(app);
         end
 
         function handle_main_id_run(app, src, event)
@@ -1367,6 +1414,10 @@ classdef GUIHandling
                     Program.GUIHandling.run_transformer_auto_id(app);
                     return
                 end
+                if strcmpi(char(id_method), 'CRF Cell-ID 2.0')
+                    Program.GUIHandling.run_crfid2_auto_id(app);
+                    return
+                end
 
                 Program.GUIHandling.invoke_gui_callback(callbacks.auto, src, event);
                 Program.GUIHandling.update_main_id_workflow_state(app);
@@ -1393,7 +1444,7 @@ classdef GUIHandling
                 end
 
                 backend = Program.GUIPreferences.get_detection_backend();
-                if any(strcmp(backend, {'cellpose', 'yolo'}))
+                if any(strcmp(backend, {'cellpose', 'yolo', 'spotiflow_supervised'}))
                     Program.GUIHandling.run_modern_auto_detector(app, backend);
                     return
                 end
@@ -1490,6 +1541,17 @@ classdef GUIHandling
                             'OutputDir', Program.GUIHandling.yolo_output_dir(app), ...
                             'KeepArtifacts', true, ...
                             'LogFcn', @(message) Program.GUIHandling.auto_detect_log(app, '%s', message));
+                    case 'spotiflow_supervised'
+                        Program.GUIHandling.auto_detect_log(app, ...
+                            'Dispatching Spotiflow NeuroPAL detector.');
+                        [sp, app.mp_params] = Methods.SpotiflowDetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                            'ColorReadoutData', readout_rgbw, ...
+                            'BundlePath', Program.GUIHandling.param_value(params, 'bundle_path', Methods.MethodBundle.resolve('spotiflow_supervised', '')), ...
+                            'ProbabilityThreshold', Program.GUIHandling.param_value(params, 'probability_threshold', -1), ...
+                            'MinimumDistance', Program.GUIHandling.param_value(params, 'minimum_distance', 1), ...
+                            'Device', Program.GUIHandling.param_value(params, 'device', "auto"), ...
+                            'OutputDir', Program.GUIHandling.method_output_dir(app, 'spotiflow'), ...
+                            'KeepArtifacts', true);
                     otherwise
                         Program.GUIHandling.auto_detect_log(app, ...
                             'ABORT unknown backend="%s".', char(string(backend)));
@@ -1826,6 +1888,24 @@ classdef GUIHandling
             end
         end
 
+        function run_crfid2_auto_id(app)
+            params = Program.GUIHandling.main_method_params(app, 'id');
+            try
+                Methods.CRFCellID2.run(app, ...
+                    'BundlePath', Program.GUIHandling.param_value(params, 'bundle_path', Methods.MethodBundle.resolve('crf_cellid_2', '')), ...
+                    'OutputDir', Program.GUIHandling.method_output_dir(app, 'crfid2'), ...
+                    'KeepArtifacts', true);
+                Program.GUIHandling.save_auto_detect_id_state(app);
+                Program.GUIHandling.update_main_id_workflow_state(app);
+                Program.GUIHandling.safe_uialert(app, ...
+                    'CRF Cell-ID 2.0 completed successfully.', ...
+                    'Auto-ID Complete', 'Icon', 'success');
+            catch ME
+                Program.GUIHandling.safe_uialert(app, Program.GUIHandling.method_error_message(ME), ...
+                    'Auto-ID Failed', 'Icon', 'error');
+            end
+        end
+
         function center_main_z_on_neurons(app)
             try
                 if isempty(app.image_neurons) || app.image_neurons.num_neurons() < 1
@@ -1896,6 +1976,15 @@ classdef GUIHandling
                 case 'Wrapper:TransformerUnavailable'
                     message = sprintf(['Transformer auto-ID could not start cleanly.\n\n%s\n\n' ...
                         'Check NEUROPAL_TRANSFORMER_PYTHON and the checkpoint path.'], ME.message);
+                case 'Wrapper:SpotiflowBundleUnavailable'
+                    message = sprintf(['Spotiflow is wired but its model bundle is incomplete.\n\n%s\n\n' ...
+                        'Open detection Settings and select a folder containing method_bundle.json and the checkpoint.'], ME.message);
+                case 'Wrapper:SpotiflowUnavailable'
+                    message = sprintf(['Spotiflow could not start.\n\n%s\n\n' ...
+                        'Set NEUROPAL_SPOTIFLOW_PYTHON to the packaged Spotiflow environment.'], ME.message);
+                case 'Wrapper:CRFID2BundleUnavailable'
+                    message = sprintf(['CRF Cell-ID 2.0 is wired but its bundle is incomplete.\n\n%s\n\n' ...
+                        'Open auto-ID Settings and select the completed CRF-ID 2.0 bundle.'], ME.message);
                 otherwise
                     report = getReport(ME, 'basic', 'hyperlinks', 'off');
                     if ~isempty(report)
@@ -2042,6 +2131,20 @@ classdef GUIHandling
 
         function output_dir = yolo_output_dir(app)
             root_dir = fullfile(fileparts(fileparts(mfilename('fullpath'))), '..', 'artifacts', 'gui_yolo');
+            try
+                source_name = string(app.image_file);
+                [~, source_name] = fileparts(source_name);
+            catch
+                source_name = "image";
+            end
+            safe_name = regexprep(char(source_name), '[^A-Za-z0-9_.-]', '_');
+            stamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
+            output_dir = string(fullfile(root_dir, sprintf('%s_%s', safe_name, stamp)));
+        end
+
+        function output_dir = method_output_dir(app, method_name)
+            root_dir = fullfile(fileparts(fileparts(mfilename('fullpath'))), '..', ...
+                'artifacts', ['gui_', char(string(method_name))]);
             try
                 source_name = string(app.image_file);
                 [~, source_name] = fileparts(source_name);
@@ -2301,6 +2404,7 @@ classdef GUIHandling
             Program.GUIPreferences.save();
             Program.GUIHandling.update_detection_menu_text(app, backend);
             Program.GUIHandling.refresh_main_method_params(app);
+            Program.GUIHandling.update_main_id_workflow_state(app);
         end
 
         function update_detection_menu_text(app, backend)
@@ -2321,6 +2425,8 @@ classdef GUIHandling
                 case 'cellpose'
                     app.ToggleNeuronDetectionMenu.Text = 'Use YOLO-Detect Neurons';
                 case 'yolo'
+                    app.ToggleNeuronDetectionMenu.Text = 'Use MP-Detect Neurons';
+                case 'spotiflow_supervised'
                     app.ToggleNeuronDetectionMenu.Text = 'Use MP-Detect Neurons';
             end
         end

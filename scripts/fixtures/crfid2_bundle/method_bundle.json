@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "method_id": "crf_cellid_2",
+  "display_name": "CRF Cell-ID 2.0 test fixture",
+  "configuration": {
+    "entrypoint": "run_neuropal_id_request"
+  },
+  "artifacts": [
+    {"role": "atlas", "path": "atlas.fixture", "required": true},
+    {"role": "unary_model", "path": "unary_model.fixture", "required": true},
+    {"role": "adapter", "path": "run_neuropal_id_request.m", "required": true}
+  ]
+}

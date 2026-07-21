@@ -31,30 +31,46 @@ set of neuron centers rather than rerun detection behind the user's back.
 | Detection | Matching Pursuit | MATLAB-only fallback and continuity path. |
 | Detection | Legacy neural network | Compatibility fallback. |
 | Detection | Cellpose custom model | Advanced adapter for users who already have compatible local weights. |
+| Detection | Spotiflow NeuroPAL | Complete app adapter and bundle slot; selectable now and becomes runnable when its checkpoint/environment bundle is supplied. |
 | Identity | Anshita GAT | Primary learned auto-ID adapter. The geometry benchmark reports top-5 0.9382. |
 | Identity | Atlas likelihood | Explicit legacy MATLAB fallback, not presented as the benchmark winner. |
+| Identity | CRF Cell-ID 2.0 | Complete request/import transaction and bundle slot; selectable now and becomes runnable when the selected atlas, unary model, and adapter are supplied. |
 
-Only runnable registry entries appear in the GUI. A method being benchmarked is
-not sufficient: it also needs a portable adapter, obtainable weights/assets,
-bounded resource behavior, actionable dependency checks, and a verified result
-import path.
+Runnable adapters appear in the GUI. Checkpoint-backed adapters may be visible
+before their large assets are installed, but the tab marks them as requiring a
+bundle and blocks inference with actionable setup guidance. A method being
+benchmarked is not sufficient: it also needs a portable adapter, a validated
+bundle contract, bounded resource behavior, actionable dependency checks, and
+a verified result import path.
 
 The GAT adapter resolves assets from explicit settings first, then
 `NEUROPAL_GAT_REPO`, `NEUROPAL_GAT_CHECKPOINT` (or the legacy transformer
 environment variable), and finally workspace-relative locations. No
 machine-specific absolute path is part of the default contract.
 
-## What is scaffolded next
+## Checkpoint-independent scaffolding completed
 
-1. **Spotiflow NeuroPAL detector** — best single held-out detector in the
-   benchmark (F1@5um 0.8125). Package its selected checkpoint and preprocessing
-   as a volume-to-centroid adapter before making it selectable.
-2. **CRF Cell-ID 2.0** — strongest locked identity row (top-1 0.8128, top-5
-   0.9550). The adapter must package the selected atlas/unary configuration and
-   remove cluster- and checkout-specific paths.
-3. **Accurate detection ensemble** — Spotiflow backbone plus YOLO/nnU-Net
-   consensus rescue. The locked benchmark reports F1@6um 0.9233. This should be
-   an optional high-resource profile, not the default desktop path.
+1. **Spotiflow NeuroPAL detector** — the volume staging, benchmark-compatible
+   RGBW preprocessing, checkpoint invocation, centroid import, settings,
+   progress, error handling, and large-volume-safe raw interchange are complete.
+   The selected checkpoint and a Spotiflow 0.6.5 environment are the remaining
+   external inputs.
+2. **CRF Cell-ID 2.0** — the app now exports reviewed YXZ centroids, physical XYZ
+   coordinates, RGBW values, scale, and bundle configuration to a stable request.
+   It validates the adapter's ranked output and applies it transactionally. The
+   selected atlas/unary assets and production adapter implementation remain to be
+   placed in the bundle.
+3. **Accurate detection ensemble** — the locked Spotiflow-backbone plus
+   YOLO/nnU-Net consensus-rescue fusion rule is implemented and contract-tested.
+   It is intentionally not selectable yet: full in-app orchestration still needs
+   the nnU-Net inference adapter and all three expert bundles. The locked
+   benchmark reports F1@6um 0.9233.
+
+Each method uses `method_bundles/<method_id>/method_bundle.json`. The committed
+example manifests document artifact roles and configuration; large checkpoints
+stay outside Git. A bundle can instead be selected in the method Settings dialog
+or resolved through the environment variables documented in
+`method_bundles/README.md`.
 
 Current Cellpose-SAM/DINO, nnU-Net, micro-SAM, Omnipose, and image-first methods
 remain benchmark or specialist options until their environment and artifact
