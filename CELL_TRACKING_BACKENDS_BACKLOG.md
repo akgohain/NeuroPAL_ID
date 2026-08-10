@@ -50,7 +50,8 @@ Retain optional label masks and native output as sidecars. GEFF is the preferred
 - [x] Define and test versioned request and canonical observation contracts.
 - [x] Validate bounds, unique track/frame observations, confidence, provenance, consistent parents, missing parents, and lineage cycles.
 - [ ] Introduce a MATLAB job controller with start, progress, structured logs, cancellation, timeout, failure reporting, and resume support.
-- [ ] Serialize the validated request/result contracts as worker JSON/CSV manifests.
+- [x] Serialize requests and canonical observations as transactional JSON/CSV worker workspaces.
+- [x] Publish the completion manifest last so crashed workers cannot expose partial results as complete.
 - Run workers as external processes so environments remain isolated and jobs can be cancelled reliably.
 - Make result import transactional: validate dimensions, axes, frame bounds, and IDs before mutating app state.
 
