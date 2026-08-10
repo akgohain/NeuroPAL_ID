@@ -17,6 +17,8 @@ has_checkpoint = ~isempty(checkpoint_file) && isfile(checkpoint_file);
 has_results = ~isempty(results_file) && isfile(results_file);
 has_live_annotations = video_annotation_count(app) > 0;
 has_annotations = has_live_annotations || (has_annotations_file && has_worldlines_file);
+backend = selected_backend(app);
+backend_readiness = Tracking.BackendRegistry.inspect(backend.id);
 
 if has_video
     file_text = compact_path(source_file);
@@ -27,7 +29,11 @@ if has_video
     channels_text_value = source_channels_text(app);
     scale_text_value = source_scale_text(app, source_dir);
     memory_text_value = memory_text(app);
-    next_text = next_action_text(has_annotations, has_checkpoint, has_results);
+    if backend.runnable
+        next_text = next_action_text(has_annotations, has_checkpoint, has_results);
+    else
+        next_text = sprintf('Next: finish %s worker integration', char(backend.name));
+    end
 else
     file_text = 'No video loaded';
     dataset_file_text = file_text;
@@ -51,6 +57,7 @@ set_label(app, 'zephir_dataset_format', format_text_value, [0.10 0.10 0.10]);
 set_label(app, 'zephir_dataset_channels', channels_text_value, [0.10 0.10 0.10]);
 set_label(app, 'zephir_dataset_scale', scale_text_value, [0.10 0.10 0.10]);
 set_label(app, 'zephir_dataset_memory', memory_text_value, [0.10 0.10 0.10]);
+set_backend_readiness(app, backend, backend_readiness);
 set_empty_state(app, has_video);
 
 has_neuropal_neurons = neuro_pal_neurons_available(app);
@@ -61,13 +68,52 @@ set_component_state(app.InsertNeuroPALNeuronsButton, bool_state(has_video && has
 set_component_state(app.InsertlastIDdFrameButton, bool_state(has_video && has_live_annotations));
 set_component_state(app.RecommendFramesButton, bool_state(has_video));
 set_component_state(app.SaveAnnotationsButton, bool_state(has_video && has_live_annotations));
-set_component_state(app.TrackNeuronsButton, bool_state(has_video && has_annotations));
+if backend.runnable
+    app.TrackNeuronsButton.Text = sprintf('Run %s', char(backend.name));
+    app.TrackNeuronsButton.Tooltip = ...
+        'Run ZephIR from saved sparse annotations, or resume from an existing checkpoint.';
+    set_component_state(app.TrackNeuronsButton, bool_state(has_video && has_annotations));
+else
+    app.TrackNeuronsButton.Text = sprintf('%s adapter pending', char(backend.name));
+    app.TrackNeuronsButton.Tooltip = backend_readiness.summary;
+    set_component_state(app.TrackNeuronsButton, 'off');
+end
 set_component_state(app.ExtractActivityButton, bool_state(has_video && has_checkpoint));
 set_component_state(app.ManipulateNeuronsButton, bool_state(has_video && has_live_annotations));
 set_component_state(app.AutosegmentFrameButton, 'off');
 
 app.TrackingButton.Visible = bool_state(~has_video);
 app.TrackingButton.Enable = 'on';
+end
+
+function set_backend_readiness(app, backend, readiness)
+if backend.runnable
+    text = sprintf('%s integrated and ready.', char(backend.name));
+elseif isempty(readiness.runtime)
+    text = sprintf('%s: worker + segmentation pending.', char(backend.name));
+else
+    text = sprintf('%s: runtime found; adapter pending.', char(backend.name));
+end
+set_label(app, 'tracking-backend-readiness', text, [0.38 0.42 0.46]);
+label = findobj(app.VideoTrackingTab, 'Tag', 'tracking-backend-readiness');
+if ~isempty(label) && isvalid(label(1))
+    label(1).Tooltip = readiness.summary;
+end
+end
+
+function backend = selected_backend(app)
+backend_id = 'zephir';
+selector = findobj(app.VideoTrackingTab, 'Tag', 'tracking-backend-dropdown');
+if ~isempty(selector) && isvalid(selector(1))
+    backend_id = char(string(selector(1).Value));
+elseif isappdata(app.CELL_ID, 'tracking_backend')
+    backend_id = char(string(getappdata(app.CELL_ID, 'tracking_backend')));
+end
+try
+    backend = Tracking.BackendRegistry.find(backend_id);
+catch
+    backend = Tracking.BackendRegistry.find('zephir');
+end
 end
 
 function set_empty_state(app, has_video)

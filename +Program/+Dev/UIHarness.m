@@ -139,6 +139,15 @@ classdef UIHarness
                         scenario.snapshots, snapshot);
                 end
 
+                if strcmpi(scenario_name, 'video-loaded')
+                    variants = Program.Dev.UIHarness.capture_tracking_backend_variants( ...
+                        app, output_dir, scenario_name, requested_size);
+                    for variant_index = 1:numel(variants)
+                        scenario.snapshots = Program.Dev.UIHarness.append_snapshot( ...
+                            scenario.snapshots, variants(variant_index));
+                    end
+                end
+
                 % Exercise and preserve the taller processing-sidebar state.
                 % This catches scroll/overflow defects hidden by the compact
                 % default without making a person click through the app.
@@ -183,6 +192,55 @@ classdef UIHarness
                 end
             end
             clear restore;
+        end
+
+        function snapshots = capture_tracking_backend_variants( ...
+                app, output_dir, scenario_name, requested_size)
+            snapshots = struct([]);
+            selector = findobj(app.VideoTrackingTab, 'Tag', 'tracking-backend-dropdown');
+            if isempty(selector) || ~isvalid(selector(1)) || ...
+                    isempty(app.DefaultTabGroup) || ~isvalid(app.DefaultTabGroup) || ...
+                    isempty(app.CreditTab) || ~isvalid(app.CreditTab)
+                return
+            end
+            selector = selector(1);
+            original_backend = char(string(selector.Value));
+            original_workflow_tab = app.DefaultTabGroup.SelectedTab;
+            restore = onCleanup(@() Program.Dev.UIHarness.restore_tracking_variant( ...
+                app, selector, original_backend, original_workflow_tab));
+
+            app.TabGroup.SelectedTab = app.VideoTrackingTab;
+            app.DefaultTabGroup.SelectedTab = app.CreditTab;
+            backend_ids = {'zephir', 'ultrack'};
+            for index = 1:numel(backend_ids)
+                backend_id = backend_ids{index};
+                selector.Value = backend_id;
+                setappdata(app.CELL_ID, 'tracking_backend', backend_id);
+                Program.GUI.update_zephir_video_tab(app);
+                drawnow;
+                snapshot = Program.Dev.UIHarness.capture_snapshot( ...
+                    app, output_dir, scenario_name, app.VideoTrackingTab, ...
+                    requested_size, [backend_id, '-run']);
+                snapshots = Program.Dev.UIHarness.append_snapshot(snapshots, snapshot);
+            end
+            clear restore
+        end
+
+        function restore_tracking_variant(app, selector, backend, workflow_tab)
+            try
+                if ~isempty(selector) && isvalid(selector)
+                    selector.Value = backend;
+                end
+                if ~isempty(app) && isvalid(app) && ~isempty(app.CELL_ID) && isvalid(app.CELL_ID)
+                    setappdata(app.CELL_ID, 'tracking_backend', backend);
+                    if ~isempty(workflow_tab) && isvalid(workflow_tab)
+                        app.DefaultTabGroup.SelectedTab = workflow_tab;
+                    end
+                    Program.GUI.update_zephir_video_tab(app);
+                end
+                drawnow;
+            catch
+            end
         end
 
         function snapshot = capture_snapshot(app, output_dir, scenario_name, ...

@@ -7,7 +7,7 @@ if nargin < 1 || isempty(app) || ~isvalid(app)
     return
 end
 
-layout_version = 21;
+layout_version = 22;
 if isappdata(app.CELL_ID, 'zephir_video_ui_setup') && ...
         getappdata(app.CELL_ID, 'zephir_video_ui_setup') && ...
         isappdata(app.CELL_ID, 'zephir_video_ui_layout_version') && ...
@@ -563,7 +563,7 @@ hide_if_valid(app.GridLayout14_3);
 
 grid = tagged_grid(app.CreditTab, 'zephir-run-tab-grid');
 grid.ColumnWidth = {360, '1x'};
-grid.RowHeight = {126, 78, '1x'};
+grid.RowHeight = {174, 78, '1x'};
 grid.ColumnSpacing = 8;
 grid.RowSpacing = 8;
 grid.Padding = [8 8 8 8];
@@ -574,13 +574,14 @@ quick.Layout.Column = 1;
 quick.FontWeight = 'bold';
 quick_grid = tagged_grid(quick, 'zephir-run-preset-grid');
 quick_grid.ColumnWidth = {'1x', '1x'};
-quick_grid.RowHeight = {22, 54};
+quick_grid.RowHeight = {24, 22, 48, 24};
 quick_grid.Padding = [8 4 8 6];
 quick_grid.RowSpacing = 2;
 
 configure_gpu_auto(app);
-move_pair(app.AllowRotationsSwitchLabel, app.AllowRotationsSwitch, quick_grid, 1);
-move_pair(app.MotionPredictionSwitchLabel, app.MotionPredictionSwitch, quick_grid, 2);
+setup_tracking_backend_selector(app, quick_grid);
+move_pair(app.AllowRotationsSwitchLabel, app.AllowRotationsSwitch, quick_grid, 1, 2, 3);
+move_pair(app.MotionPredictionSwitchLabel, app.MotionPredictionSwitch, quick_grid, 2, 2, 3);
 
 run_panel = tagged_panel(grid, 'zephir-run-execute-panel', 'Execute tracking');
 run_panel.Layout.Row = 2;
@@ -602,6 +603,49 @@ app.AdvSetTab.Layout.Column = 2;
 app.AdvSetTab.AutoResizeChildren = 'on';
 compact_advanced_general_tab(app);
 delete_stale_run_panels(grid);
+end
+
+function setup_tracking_backend_selector(app, grid)
+label = tagged_label(grid, 'tracking-backend-label');
+label.Layout.Row = 1;
+label.Layout.Column = 1;
+label.Text = 'Backend';
+label.FontSize = 11;
+label.FontWeight = 'bold';
+label.WordWrap = 'off';
+
+dropdown = tagged_dropdown(grid, 'tracking-backend-dropdown');
+dropdown.Layout.Row = 1;
+dropdown.Layout.Column = 2;
+[names, ids] = Tracking.BackendRegistry.uiChoices();
+dropdown.Items = names;
+dropdown.ItemsData = ids;
+selected = 'zephir';
+if isappdata(app.CELL_ID, 'tracking_backend')
+    candidate = char(string(getappdata(app.CELL_ID, 'tracking_backend')));
+    if any(strcmp(ids, candidate))
+        selected = candidate;
+    end
+end
+dropdown.Value = selected;
+dropdown.ValueChangedFcn = @(src, event)handle_tracking_backend_changed(app, src.Value);
+set_tooltip(dropdown, 'Choose a tracking backend. Unintegrated backends remain disabled with readiness guidance.');
+
+status = tagged_label(grid, 'tracking-backend-readiness');
+status.Layout.Row = 4;
+status.Layout.Column = [1 2];
+status.FontSize = 10;
+status.FontColor = [0.38 0.42 0.46];
+status.WordWrap = 'off';
+status.Text = '';
+end
+
+function handle_tracking_backend_changed(app, backend)
+if isempty(app) || ~isvalid(app) || isempty(app.CELL_ID) || ~isvalid(app.CELL_ID)
+    return
+end
+setappdata(app.CELL_ID, 'tracking_backend', char(string(backend)));
+Program.GUI.update_zephir_video_tab(app);
 end
 
 function review_tab = setup_review_tab(app)
@@ -866,6 +910,15 @@ else
 end
 end
 
+function dropdown = tagged_dropdown(parent, tag)
+dropdown = findobj(parent, 'Tag', tag);
+if isempty(dropdown) || ~isvalid(dropdown(1))
+    dropdown = uidropdown(parent, 'Tag', tag);
+else
+    dropdown = dropdown(1);
+end
+end
+
 function label = tagged_label(parent, tag)
 label = findobj(parent, 'Tag', tag);
 if isempty(label) || ~isvalid(label(1))
@@ -945,13 +998,19 @@ button.FontSize = 13;
 button.Visible = 'on';
 end
 
-function move_pair(label, control, parent, col)
+function move_pair(label, control, parent, col, label_row, control_row)
+if nargin < 5
+    label_row = 1;
+end
+if nargin < 6
+    control_row = 2;
+end
 label.Parent = parent;
-label.Layout.Row = 1;
+label.Layout.Row = label_row;
 label.Layout.Column = col;
 label.HorizontalAlignment = 'center';
 control.Parent = parent;
-control.Layout.Row = 2;
+control.Layout.Row = control_row;
 control.Layout.Column = col;
 end
 

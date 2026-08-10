@@ -4,7 +4,9 @@
 
 Add Higher-Order Cell Tracking Transformer (HOCT) and Ultrack as primary cell-tracking backends alongside ZephIR, without coupling the MATLAB UI to any backend's Python API or output format.
 
-This work is deferred while local storage is constrained. Do not install the tracker environments or model caches until adequate disk headroom is available.
+Checkpoint-independent integration is now active. Do not install tracker model
+caches casually; keep each runtime isolated and verify disk headroom through the
+development gate before downloading weights.
 
 ## Product model
 
@@ -44,8 +46,11 @@ Retain optional label masks and native output as sidecars. GEFF is the preferred
 
 ### 1. Backend-neutral tracking jobs
 
-- Introduce a MATLAB job controller with start, progress, structured logs, cancellation, timeout, failure reporting, and resume support.
-- Define versioned JSON input/result manifests.
+- [x] Add a stable backend registry and expose ZephIR, Ultrack, and HOCT in the tracking tab with honest readiness states.
+- [x] Define and test versioned request and canonical observation contracts.
+- [x] Validate bounds, unique track/frame observations, confidence, provenance, consistent parents, missing parents, and lineage cycles.
+- [ ] Introduce a MATLAB job controller with start, progress, structured logs, cancellation, timeout, failure reporting, and resume support.
+- [ ] Serialize the validated request/result contracts as worker JSON/CSV manifests.
 - Run workers as external processes so environments remain isolated and jobs can be cancelled reliably.
 - Make result import transactional: validate dimensions, axes, frame bounds, and IDs before mutating app state.
 
@@ -100,11 +105,12 @@ Retain optional label masks and native output as sidecars. GEFF is the preferred
 | `uv` runtime manager | Available |
 | Python 3.11+ tracker environment | Deferred/not installed |
 | 4D segmentation masks | Major missing dependency |
-| Backend-neutral tracking UI | Not implemented |
-| Lineage/confidence representation | Needs extension |
+| Backend-neutral tracking UI | Selector and readiness states implemented; workers remain disabled |
+| Versioned tracking contracts | Implemented and synthetic-tested |
+| Lineage/confidence representation | Canonical validation implemented; legacy import remains pending |
 | Ground-truth trajectories | Not available locally |
 | Commercial solver | Gurobi license expired |
-| Storage headroom | Blocking at time of review (~2.3 GiB free) |
+| Storage headroom | No longer an immediate blocker in the 2026-08-10 audit; continue preflighting before installs |
 
 ## Upstream references
 
