@@ -49,7 +49,7 @@ Retain optional label masks and native output as sidecars. GEFF is the preferred
 - [x] Add a stable backend registry and expose ZephIR, Ultrack, and HOCT in the tracking tab with honest readiness states.
 - [x] Define and test versioned request and canonical observation contracts.
 - [x] Validate bounds, unique track/frame observations, confidence, provenance, consistent parents, missing parents, and lineage cycles.
-- [ ] Introduce a MATLAB job controller with start, progress, structured logs, cancellation, timeout, failure reporting, and resume support.
+- [~] Job lifecycle state, monotonic progress, structured JSONL logs, cancellation requests, and failure states are implemented transactionally. External process launch, timeout enforcement, and resumable backend workers remain pending.
 - [x] Serialize requests and canonical observations as transactional JSON/CSV worker workspaces.
 - [x] Publish the completion manifest last so crashed workers cannot expose partial results as complete.
 - Run workers as external processes so environments remain isolated and jobs can be cancelled reliably.
@@ -108,7 +108,7 @@ Retain optional label masks and native output as sidecars. GEFF is the preferred
 | 4D segmentation masks | Major missing dependency |
 | Backend-neutral tracking UI | Selector and readiness states implemented; workers remain disabled |
 | Versioned tracking contracts | Implemented and synthetic-tested |
-| Lineage/confidence representation | Canonical validation implemented; legacy import remains pending |
+| Lineage/confidence representation | Canonical validation and lossless legacy-state adapter implemented |
 | Ground-truth trajectories | Not available locally |
 | Commercial solver | Gurobi license expired |
 | Storage headroom | No longer an immediate blocker in the 2026-08-10 audit; continue preflighting before installs |

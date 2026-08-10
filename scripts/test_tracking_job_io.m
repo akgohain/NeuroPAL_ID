@@ -24,6 +24,15 @@ assert(exist(fullfile(workspace, 'request.json'), 'file') == 2);
 assert(exist(fullfile(workspace, 'state.json'), 'file') == 2);
 staged_request = jsondecode(fileread(fullfile(workspace, 'request.json')));
 assert(isfield(staged_request, 'source_signature'));
+state = Tracking.JobIO.readState(workspace);
+assert(strcmp(state.status, 'staged') && state.progress == 0);
+state = Tracking.JobIO.updateState(workspace, 'running', 0.25, 'Segmenting.');
+assert(strcmp(state.status, 'running') && state.progress == 0.25);
+Tracking.JobIO.appendLog(workspace, 'info', 'segmentation', 'Frame batch ready.', ...
+    struct('frames', [1, 2]));
+assert(exist(fullfile(workspace, 'events.jsonl'), 'file') == 2);
+local_assert_error(@() Tracking.JobIO.updateState( ...
+    workspace, 'running', 0.2), 'Tracking:JobIO:ProgressRegression');
 local_assert_error(@() Tracking.JobIO.stage(request), 'Tracking:JobIO:WorkspaceExists');
 
 video_info = struct('nt', 5, 'nz', 4, 'ny', 10, 'nx', 12);
@@ -46,6 +55,10 @@ assert(exist(fullfile(workspace, 'result.json'), 'file') == 2);
 assert(isequal(loaded.track_id, observations.track_id));
 assert(double(loaded_manifest.observation_count) == height(observations));
 assert(strcmp(loaded_request.backend, 'ultrack'));
+state = Tracking.JobIO.readState(workspace);
+assert(strcmp(state.status, 'complete') && state.progress == 1);
+local_assert_error(@() Tracking.JobIO.updateState( ...
+    workspace, 'running', 1), 'Tracking:JobIO:InvalidStateTransition');
 local_assert_error(@() Tracking.JobIO.writeResult( ...
     workspace, observations, video_info), 'Tracking:JobIO:ResultExists');
 
@@ -59,6 +72,24 @@ local_assert_error(@() Tracking.JobIO.writeResult( ...
     invalid_workspace, invalid, video_info), 'Tracking:JobContract:OutOfBounds');
 assert(exist(fullfile(invalid_workspace, 'result.json'), 'file') ~= 2);
 assert(exist(fullfile(invalid_workspace, 'observations.csv'), 'file') ~= 2);
+
+cancel_workspace = fullfile(root, 'job-cancel');
+cancel_request = request;
+cancel_request.output_dir = cancel_workspace;
+Tracking.JobIO.stage(cancel_request);
+cancelled = Tracking.JobIO.requestCancellation(cancel_workspace);
+assert(strcmp(cancelled.status, 'cancelled'));
+assert(Tracking.JobIO.cancellationRequested(cancel_workspace));
+
+running_cancel_workspace = fullfile(root, 'job-running-cancel');
+running_cancel_request = request;
+running_cancel_request.output_dir = running_cancel_workspace;
+Tracking.JobIO.stage(running_cancel_request);
+Tracking.JobIO.updateState(running_cancel_workspace, 'running', 0.4, 'Tracking.');
+cancelling = Tracking.JobIO.requestCancellation(running_cancel_workspace);
+assert(strcmp(cancelling.status, 'cancelling'));
+Tracking.JobIO.updateState(running_cancel_workspace, 'cancelled', 0.4, 'Stopped.');
+assert(Tracking.JobIO.cancellationRequested(running_cancel_workspace));
 
 manifest_path = fullfile(workspace, 'result.json');
 manifest_data = jsondecode(fileread(manifest_path));

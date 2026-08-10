@@ -34,6 +34,10 @@ classdef JobIO
                     'backend', request.backend, ...
                     'status', 'staged', ...
                     'created_at', Tracking.JobIO.timestamp(), ...
+                    'updated_at', Tracking.JobIO.timestamp(), ...
+                    'progress', 0, ...
+                    'message', 'Tracking job staged.', ...
+                    'error', '', ...
                     'request_file', 'request.json');
                 Tracking.JobIO.writeJsonExclusive(state_path, state);
             catch ME
@@ -101,6 +105,13 @@ classdef JobIO
                 rethrow(ME)
             end
             clear cleanup
+            try
+                Tracking.JobIO.updateState(workspace, 'complete', 1, ...
+                    'Tracking result is ready.');
+            catch ME
+                warning('Tracking:JobIO:StateUpdateFailed', ...
+                    'Result completed, but state.json could not be updated: %s', ME.message);
+            end
         end
 
         function [observations, manifest, request] = readResult(workspace, video_info)
@@ -149,6 +160,136 @@ classdef JobIO
                 end
             end
         end
+
+        function state = readState(workspace)
+            workspace = char(string(workspace));
+            state_path = fullfile(workspace, 'state.json');
+            if exist(state_path, 'file') ~= 2
+                error('Tracking:JobIO:MissingState', ...
+                    'Tracking workspace is missing state.json: %s', workspace);
+            end
+            try
+                state = jsondecode(fileread(state_path));
+            catch ME
+                error('Tracking:JobIO:InvalidState', ...
+                    'Could not parse tracking state: %s', ME.message);
+            end
+            required = {'schema_version', 'backend', 'status', 'updated_at', ...
+                'progress', 'message', 'error', 'request_file'};
+            missing = required(~isfield(state, required));
+            if ~isempty(missing) || double(state.schema_version) ~= 1
+                error('Tracking:JobIO:InvalidState', ...
+                    'Tracking state is missing required fields or has an unsupported schema.');
+            end
+            Tracking.BackendRegistry.find(state.backend);
+            status = char(lower(string(state.status)));
+            if ~any(strcmp(status, Tracking.JobIO.statuses()))
+                error('Tracking:JobIO:InvalidState', ...
+                    'Unknown tracking job status: %s', status);
+            end
+            progress = double(state.progress);
+            if ~isscalar(progress) || ~isfinite(progress) || progress < 0 || progress > 1
+                error('Tracking:JobIO:InvalidState', ...
+                    'Tracking progress must lie in [0,1].');
+            end
+            state.status = status;
+            state.progress = progress;
+        end
+
+        function state = updateState(workspace, status, progress, message, error_detail)
+            if nargin < 3 || isempty(progress)
+                progress = NaN;
+            end
+            if nargin < 4
+                message = '';
+            end
+            if nargin < 5
+                error_detail = '';
+            end
+            workspace = char(string(workspace));
+            status = char(lower(strtrim(string(status))));
+            state = Tracking.JobIO.readState(workspace);
+            if ~Tracking.JobIO.transitionAllowed(state.status, status)
+                error('Tracking:JobIO:InvalidStateTransition', ...
+                    'Tracking state cannot transition from %s to %s.', ...
+                    state.status, status);
+            end
+            if isnan(progress)
+                progress = state.progress;
+            end
+            progress = double(progress);
+            if ~isscalar(progress) || ~isfinite(progress) || progress < 0 || progress > 1
+                error('Tracking:JobIO:InvalidProgress', ...
+                    'Tracking progress must lie in [0,1].');
+            end
+            if progress < state.progress && ~strcmp(status, 'failed')
+                error('Tracking:JobIO:ProgressRegression', ...
+                    'Tracking progress cannot move backwards.');
+            end
+            state.status = status;
+            state.progress = progress;
+            state.updated_at = Tracking.JobIO.timestamp();
+            state.message = char(string(message));
+            state.error = char(string(error_detail));
+
+            state_path = fullfile(workspace, 'state.json');
+            temp_path = [tempname(workspace), '.json'];
+            cleanup = onCleanup(@() Tracking.JobIO.deleteFiles({temp_path}));
+            Tracking.JobIO.writeJsonExclusive(temp_path, state);
+            [ok, move_message] = movefile(temp_path, state_path, 'f');
+            if ~ok
+                error('Tracking:JobIO:StateWriteFailed', ...
+                    'Could not update tracking state: %s', move_message);
+            end
+            clear cleanup
+        end
+
+        function state = requestCancellation(workspace, message)
+            if nargin < 2 || isempty(message)
+                message = 'Cancellation requested.';
+            end
+            current = Tracking.JobIO.readState(workspace);
+            if strcmp(current.status, 'staged')
+                target = 'cancelled';
+            else
+                target = 'cancelling';
+            end
+            state = Tracking.JobIO.updateState( ...
+                workspace, target, current.progress, message);
+        end
+
+        function tf = cancellationRequested(workspace)
+            state = Tracking.JobIO.readState(workspace);
+            tf = any(strcmp(state.status, {'cancelling', 'cancelled'}));
+        end
+
+        function appendLog(workspace, level, event, message, data)
+            if nargin < 5
+                data = struct();
+            end
+            workspace = char(string(workspace));
+            if exist(workspace, 'dir') ~= 7
+                error('Tracking:JobIO:MissingWorkspace', ...
+                    'Tracking workspace does not exist: %s', workspace);
+            end
+            allowed_levels = ["debug", "info", "warning", "error"];
+            level = lower(strtrim(string(level)));
+            if ~isscalar(level) || ~any(level == allowed_levels)
+                error('Tracking:JobIO:InvalidLogLevel', ...
+                    'Tracking log level must be debug, info, warning, or error.');
+            end
+            entry = struct('timestamp', Tracking.JobIO.timestamp(), ...
+                'level', char(level), 'event', char(string(event)), ...
+                'message', char(string(message)), 'data', data);
+            log_path = fullfile(workspace, 'events.jsonl');
+            fid = fopen(log_path, 'a');
+            if fid < 0
+                error('Tracking:JobIO:LogWriteFailed', ...
+                    'Could not append tracking log: %s', log_path);
+            end
+            cleanup = onCleanup(@() fclose(fid));
+            fprintf(fid, '%s\n', jsonencode(entry));
+        end
     end
 
     methods (Static, Access = private)
@@ -174,6 +315,29 @@ classdef JobIO
         function path = resolveArtifact(workspace, relative_path)
             relative_path = Tracking.JobIO.safeRelativePath(relative_path);
             path = fullfile(workspace, relative_path);
+        end
+
+        function values = statuses()
+            values = {'staged', 'running', 'cancelling', 'cancelled', ...
+                'failed', 'complete'};
+        end
+
+        function tf = transitionAllowed(from, to)
+            if strcmp(from, to)
+                tf = any(strcmp(from, {'running', 'cancelling'}));
+                return
+            end
+            switch from
+                case 'staged'
+                    allowed = {'running', 'cancelled', 'failed', 'complete'};
+                case 'running'
+                    allowed = {'cancelling', 'cancelled', 'failed', 'complete'};
+                case 'cancelling'
+                    allowed = {'cancelled', 'failed'};
+                otherwise
+                    allowed = {};
+            end
+            tf = any(strcmp(to, allowed));
         end
 
         function relative_path = safeRelativePath(relative_path)
