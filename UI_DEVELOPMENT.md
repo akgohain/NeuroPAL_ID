@@ -14,6 +14,24 @@ standalone visual prototypes. The loop is:
 6. Ask for human review only when the workflow or visual hierarchy changes.
    Spacing, clipping, alignment, and resize regressions belong to this loop.
 
+Run the automated gate after a coherent change:
+
+```sh
+scripts/run_dev_cycle fast
+```
+
+Before a milestone commit, run the complete real-app, video, and large-NWB
+matrix:
+
+```sh
+scripts/run_dev_cycle full
+```
+
+Fast mode runs drift detection, Python compilation, focused Code Analyzer
+checks, method contracts, tracking contracts, loader-path tests, and deterministic
+failure injection. Full mode adds all-tab image/video screenshots and the real
+NWB cancellation/corruption/resume audit.
+
 ## Capture the actual application
 
 Unloaded state only:
@@ -111,6 +129,7 @@ The NeuroPAL ID tab now presents an explicit open → detect → auto-ID → rev
 workflow and sources its visible methods from `Methods.MethodRegistry`. See
 `AUTO_ID_INTEGRATION.md` for the benchmark-to-product promotion gate.
 
-The next app-side priorities are transactional detection/identity imports,
-Spotiflow adapter packaging, failure-injection coverage, and richer log/runtime
-diagnostics.
+The next app-side priorities are the Ultrack/HOCT worker processes, chunked 4D
+segmentation caches, transactional tracking-result import, and richer
+cross-backend runtime diagnostics. Spotiflow and CRF-ID now have checkpoint
+bundle slots and validated app adapters.

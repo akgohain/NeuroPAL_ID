@@ -49,20 +49,25 @@ classdef NeuroPALImage
             import DataHandling.*;
 
             % Is the user accidentally trying to open the ID file?
-            id_file_ext = '_ID.mat';
-            if endsWith(file, id_file_ext)
-                file = strrep(file, id_file_ext, '.mat');
+            [file_dir, file_stem, file_ext] = fileparts(file);
+            if strcmpi(file_ext, '.mat') && endsWith(file_stem, '_ID')
+                file_stem = extractBefore(string(file_stem), strlength(string(file_stem)) - 2);
+                file = fullfile(file_dir, [char(file_stem), '.mat']);
             end
             
             % Get the file extension.
-            [~, ~, ext] = fileparts(file);
+            [file_dir, file_stem, ext] = fileparts(file);
             if isempty(ext)
                 error('Unknown image format: "%s"', file);
             end
             ext = lower(ext);
 
             % Determine the NeuroPAL filename.
-            np_file = strrep(file, ext, '.mat');
+            if strcmpi(ext, '.mat')
+                np_file = file;
+            else
+                np_file = fullfile(file_dir, [file_stem, '.mat']);
+            end
 
             if strcmp(ext, '.nd2')
                 nt = DataHandling.Helpers.nd2.get_timepoints(file);
@@ -79,7 +84,8 @@ classdef NeuroPALImage
                 conversion_cleanup = onCleanup(@() Program.Handlers.dialogue.resolve());
                 switch lower(ext)
                     case '.mat' % NeuroPAL format
-                        error('File not found: "%s"', file);
+                        error('DataHandling:NeuroPALImage:MissingFile', ...
+                            'File not found: "%s"', file);
                     case '.czi' % Zeiss format
                         NeuroPALImage.convertCZI(file);
                     case '.nd2' % Nikon format
@@ -103,7 +109,8 @@ classdef NeuroPALImage
             
             % Did we manage to convert the file?
             if ~exist(np_file,'file')
-                error('Cannot read/convert: "%"', np_file);
+                error('DataHandling:NeuroPALImage:ConversionMissing', ...
+                    'Cannot read or convert: "%s"', np_file);
             end
             
             % Load the file.
@@ -282,10 +289,11 @@ classdef NeuroPALImage
             mp.min_eig_thresh = 0.1;
             sp = [];
             neurons = [];
-            id_file = strrep(image_file, '.mat', '_ID.mat');
+            [image_dir, image_stem] = fileparts(image_file);
+            id_file = fullfile(image_dir, [image_stem, '_ID.mat']);
             
             % First, try to load from NWB file if it exists and companion ID file doesn't
-            nwb_file = strrep(image_file, '.mat', '.nwb');
+            nwb_file = fullfile(image_dir, [image_stem, '.nwb']);
             if exist(nwb_file, 'file') && ~exist(id_file, 'file')
                 if DataHandling.Helpers.nwb.has_neuropal_segmentation(nwb_file)
                     Program.Helpers.debug_event('NWB', ...
