@@ -1,4 +1,4 @@
-function get_slice(~, ~, ~)
+function get_slice(~, view, ~)
     %% Draw the neurons in this z-slice.
 
     app = Program.app;

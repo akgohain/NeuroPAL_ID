@@ -261,6 +261,9 @@ classdef UIHarness
 
             components = Program.Dev.UIHarness.component_manifest(app);
             issues = Program.Dev.UIHarness.audit_components(components);
+            render_issues = Program.Dev.UIHarness.audit_rendered_images( ...
+                app, scenario_name, tab);
+            issues = [issues, render_issues];
             manifest_path = fullfile(output_dir, [base_name '.json']);
             Program.Dev.UIHarness.write_json(manifest_path, struct( ...
                 'scenario', scenario_name, ...
@@ -387,6 +390,37 @@ classdef UIHarness
                             position(3), Program.Dev.UIHarness.ellipsize(component.text))); %#ok<AGROW>
                     end
                 end
+            end
+        end
+
+        function issues = audit_rendered_images(app, scenario_name, tab)
+            issues = struct('severity', {}, 'rule', {}, 'component', {}, 'message', {});
+            if strcmpi(scenario_name, 'unloaded') || ...
+                    ~strcmpi(char(string(tab.Title)), 'NeuroPAL ID') || ...
+                    isempty(app.image_data) || isempty(app.XY) || ~isvalid(app.XY)
+                return;
+            end
+
+            expected_size = double(size(app.image_data, [1, 2]));
+            image_handles = findobj(app.XY, 'Type', 'Image');
+            has_image_slice = false;
+            for image_index = 1:numel(image_handles)
+                try
+                    cdata = image_handles(image_index).CData;
+                    cdata_size = size(cdata);
+                    if numel(cdata_size) >= 2 && ...
+                            isequal(double(cdata_size(1:2)), expected_size)
+                        has_image_slice = true;
+                        break;
+                    end
+                catch
+                end
+            end
+            if ~has_image_slice
+                issues(end + 1) = Program.Dev.UIHarness.issue( ...
+                    'error', 'missing_main_image_slice', 'XY', ...
+                    sprintf(['Loaded NeuroPAL view has no rendered image matching ' ...
+                    'the expected %d x %d slice.'], expected_size(1), expected_size(2)));
             end
         end
 
