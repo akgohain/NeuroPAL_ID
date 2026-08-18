@@ -6,6 +6,10 @@ assert(isequal(size(detect_names), size(detect_ids)));
 assert(any(strcmp(detect_ids, 'yolo')));
 assert(any(strcmp(detect_ids, 'spotiflow_supervised')));
 assert(~any(strcmp(detect_ids, 'detection_moe')));
+spotiflow = Methods.MethodRegistry.find('spotiflow_supervised');
+assert(strcmp(spotiflow.name, 'Spotiflow NeuroPAL v1'));
+assert(strcmp(spotiflow.status, 'recommended_portable'));
+assert(contains(spotiflow.evidence, '0.9233'));
 
 [id_names, id_ids] = Methods.MethodRegistry.uiChoices('identity');
 assert(any(strcmp(id_names, 'Anshita GAT')));
