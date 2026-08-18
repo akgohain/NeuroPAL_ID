@@ -1,16 +1,25 @@
 {
   "schema_version": 1,
   "method_id": "spotiflow_supervised",
-  "display_name": "Spotiflow NeuroPAL",
-  "source_revision": "spotiflow-0.6.5",
+  "display_name": "Spotiflow NeuroPAL v1",
+  "source_revision": "Yemini-Lab/GAT-NeuroPAL@46e7ef4e67519cce7bb13d13bc215ebb9147541c",
   "configuration": {
+    "source_revision": "Yemini-Lab/GAT-NeuroPAL@46e7ef4e67519cce7bb13d13bc215ebb9147541c",
     "which": "last",
     "input_mode": "rgbw",
     "normalizer_mode": "per-channel",
-    "probability_threshold": -1,
-    "minimum_distance": 1
+    "views": ["identity", "flip-x", "flip-y", "flip-xy"],
+    "merge_radius_um": 2.0,
+    "candidate_probability": 0.02,
+    "operating_score_threshold": 0.185,
+    "support_power": 1.0,
+    "minimum_distance": 1,
+    "subpixel": true,
+    "peak_mode": "fast",
+    "deterministic": true
   },
   "artifacts": [
-    {"role": "checkpoint", "path": "checkpoint", "required": true}
+    {"role": "checkpoint", "path": "checkpoint", "required": true},
+    {"role": "model_manifest", "path": "spotiflow_neuropal_v1_model.json", "required": true}
   ]
 }

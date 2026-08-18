@@ -24,10 +24,18 @@ launching inference. Large weights should remain outside Git.
 4. Select the method. The workflow banner and dropdown tooltip report whether
    the bundle is ready before inference starts.
 
-The manifests are deliberately checkpoint-agnostic. Replacing a checkpoint or
-atlas should require only a new bundle directory/manifest, not changes to GUI
-callbacks or result import code.
+Most manifests are deliberately checkpoint-agnostic. The recommended
+`spotiflow_supervised` bundle is intentionally stricter: its three model files
+are checked against the frozen SHA-256 manifest from
+`Yemini-Lab/GAT-NeuroPAL` PR #1. To install it, copy the example manifest to
+`method_bundle.json`, create `checkpoint/`, and place `last.pt`, `config.yaml`,
+and `train_config.yaml` there. A different checkpoint requires a deliberately
+different model manifest rather than silently masquerading as the frozen v1
+detector.
 
-`detection_moe` already has a tested canonical fusion layer, but it remains
-hidden until the nnU-Net inference adapter can produce the same prediction CSV
-contract as Spotiflow and YOLO.
+`detection_moe` retains the tested Spotiflow/YOLO/nnU-Net consensus-rescue
+fusion layer, but it remains hidden until the nnU-Net inference adapter can
+produce the same prediction CSV contract as Spotiflow and YOLO. The frozen
+four-view Spotiflow detector is the current cross-dataset default: the upstream
+nested leave-dataset-out comparison favored it over fixed consensus and the
+nonlinear router.

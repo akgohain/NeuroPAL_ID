@@ -9,7 +9,7 @@ classdef SpotiflowDetect
                 scale_um_xyz double
                 options.BundlePath (1,1) string = ""
                 options.PythonExecutable (1,1) string = ""
-                options.ProbabilityThreshold (1,1) double = -1
+                options.ProbabilityThreshold (1,1) double = NaN
                 options.MinimumDistance (1,1) double = 1
                 options.Device (1,1) string = "auto"
                 options.OutputDir (1,1) string = ""
@@ -35,6 +35,15 @@ classdef SpotiflowDetect
                 'k', 0, ...
                 'source_title', char(string(titlestr)), ...
                 'bundle_path', char(options.BundlePath));
+            if isfield(response, 'policy')
+                params.policy = response.policy;
+            end
+            if isfield(response, 'source_revision')
+                params.source_revision = response.source_revision;
+            end
+            if isfield(response, 'model_manifest_sha256')
+                params.model_manifest_sha256 = response.model_manifest_sha256;
+            end
             if isfield(response, 'predictions_csv')
                 params.predictions_csv = response.predictions_csv;
             end

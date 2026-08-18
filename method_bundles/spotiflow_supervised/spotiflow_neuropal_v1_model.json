@@ -1,0 +1,18 @@
+{
+  "format": "Spotiflow.from_folder",
+  "spotiflow_version": "0.6.5",
+  "checkpoint_filename": "last.pt",
+  "checkpoint_sha256": "9f194781ad4310d12ffae98064c996c24010ac4f6269d7924a026f47e3b3287b",
+  "checkpoint_size_bytes": 142113033,
+  "config_filename": "config.yaml",
+  "config_sha256": "08f08b3c4e17712230bdd1bf64b912b4839992dcb843d83a909733707dcf7cc2",
+  "train_config_filename": "train_config.yaml",
+  "train_config_sha256": "8d9b3843c0e4c73b65249d16143db7602b95f64a2edf619dae551bf31ffb201d",
+  "training": {
+    "initialization": "scratch",
+    "epochs": 240,
+    "seed": 42,
+    "input_channels": "RGBW",
+    "selection_split": "validation"
+  }
+}

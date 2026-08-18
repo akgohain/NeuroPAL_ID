@@ -6,7 +6,7 @@ arguments
     scale_um_xyz double
     options.BundlePath (1,1) string = ""
     options.PythonExecutable (1,1) string = ""
-    options.ProbabilityThreshold (1,1) double = -1
+    options.ProbabilityThreshold (1,1) double = NaN
     options.MinimumDistance (1,1) double = 1
     options.Device (1,1) string = "auto"
     options.OutputDir (1,1) string = ""
@@ -19,6 +19,7 @@ if ~readiness.ready
     error('Wrapper:SpotiflowBundleUnavailable', '%s', readiness.summary);
 end
 checkpoint_path = Methods.MethodBundle.artifact(readiness, 'checkpoint');
+model_manifest_path = Methods.MethodBundle.artifact(readiness, 'model_manifest');
 config = readiness.manifest.configuration;
 if exist(checkpoint_path, 'dir') ~= 7
     error('Wrapper:SpotiflowBundleUnavailable', ...
@@ -37,10 +38,11 @@ if ~strcmpi(char(string(local_config(config, 'input_mode', 'rgbw'))), 'rgbw')
     error('Wrapper:SpotiflowBundleUnavailable', ...
         'This app adapter only supports Spotiflow bundles with input_mode "rgbw".');
 end
-if options.ProbabilityThreshold < -1 || options.ProbabilityThreshold > 1 || ...
+if (~isnan(options.ProbabilityThreshold) && ...
+        (options.ProbabilityThreshold < 0 || options.ProbabilityThreshold > 1)) || ...
         options.MinimumDistance < 1
     error('Wrapper:SpotiflowInvalidOptions', ...
-        'ProbabilityThreshold must be -1 or in [0,1], and MinimumDistance must be at least 1.');
+        'ProbabilityThreshold must be NaN or in [0,1], and MinimumDistance must be at least 1.');
 end
 
 python_executable = local_pick_python(options.PythonExecutable);
@@ -65,6 +67,11 @@ response_path = fullfile(output_dir, 'response.json');
 predictions_path = fullfile(output_dir, 'predictions.csv');
 local_write_volume(volume_path, volume);
 
+operating_threshold = options.ProbabilityThreshold;
+if isnan(operating_threshold)
+    operating_threshold = double(local_config(config, 'operating_score_threshold', 0.185));
+end
+
 request = struct( ...
     'volume_raw', volume_path, ...
     'volume_shape_yxzc', double(size(volume)), ...
@@ -72,10 +79,20 @@ request = struct( ...
     'volume_order', 'F', ...
     'scale_um_xyz', scale, ...
     'checkpoint', checkpoint_path, ...
+    'model_manifest', model_manifest_path, ...
     'which', local_config(config, 'which', 'last'), ...
     'normalizer_mode', local_config(config, 'normalizer_mode', 'per-channel'), ...
-    'probability_threshold', options.ProbabilityThreshold, ...
+    'views', {local_cellstr(local_config(config, 'views', ...
+        {'identity', 'flip-x', 'flip-y', 'flip-xy'}))}, ...
+    'merge_radius_um', double(local_config(config, 'merge_radius_um', 2.0)), ...
+    'candidate_probability', double(local_config(config, 'candidate_probability', 0.02)), ...
+    'operating_score_threshold', operating_threshold, ...
+    'support_power', double(local_config(config, 'support_power', 1.0)), ...
     'minimum_distance', round(options.MinimumDistance), ...
+    'subpixel', logical(local_config(config, 'subpixel', true)), ...
+    'peak_mode', char(string(local_config(config, 'peak_mode', 'fast'))), ...
+    'deterministic', logical(local_config(config, 'deterministic', true)), ...
+    'source_revision', char(string(local_config(config, 'source_revision', 'unknown'))), ...
     'device', char(options.Device), ...
     'output_csv', predictions_path);
 local_write_json(request_path, request);
@@ -95,6 +112,12 @@ if status ~= 0
     end
     error('Wrapper:SpotiflowCommandFailed', 'Spotiflow failed (%d):\n%s', status, output);
 end
+if exist(response_path, 'file') ~= 2
+    error('Wrapper:MissingSpotiflowResponse', ...
+        'Spotiflow did not write its response: %s', response_path);
+end
+response = jsondecode(fileread(response_path));
+end
 
 function local_write_volume(path_value, volume)
 fid = fopen(path_value, 'w');
@@ -108,18 +131,21 @@ if count ~= numel(volume)
         'Only wrote %d of %d volume values to %s.', count, numel(volume), path_value);
 end
 end
-if exist(response_path, 'file') ~= 2
-    error('Wrapper:MissingSpotiflowResponse', ...
-        'Spotiflow did not write its response: %s', response_path);
-end
-response = jsondecode(fileread(response_path));
-end
 
 function value = local_config(config, field_name, default_value)
 value = default_value;
 if isstruct(config) && isfield(config, field_name)
     value = config.(field_name);
 end
+end
+
+function values = local_cellstr(value)
+if iscell(value)
+    values = cellfun(@(item) char(string(item)), value, 'UniformOutput', false);
+else
+    values = cellstr(string(value));
+end
+values = values(:)';
 end
 
 function local_write_json(path_value, value)

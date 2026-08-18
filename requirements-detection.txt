@@ -1,0 +1,2 @@
+# Isolated Python 3.11+ environment for the frozen NeuroPAL detector.
+spotiflow==0.6.5

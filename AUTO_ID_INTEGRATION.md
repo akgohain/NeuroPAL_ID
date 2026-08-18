@@ -4,7 +4,9 @@ This document defines the product boundary between NeuroPAL_ID and the
 experimental methods in
 [`neuropal_id_benchmarking`](https://github.com/akgohain/neuropal_id_benchmarking).
 The initial product mapping was reviewed against benchmark commit
-`c00c85f4e7e99c43d2ac8e6949081b91928e27bc` on 2026-07-21.
+`c00c85f4e7e99c43d2ac8e6949081b91928e27bc` on 2026-07-21. The detector
+selection was refreshed from `Yemini-Lab/GAT-NeuroPAL` PR #1 at commit
+`46e7ef4e67519cce7bb13d13bc215ebb9147541c` on 2026-08-18.
 The benchmark repository remains the source of truth for training, evaluation,
 environment locks, and method selection. This application owns interactive
 inference, review, correction, and persistence.
@@ -27,11 +29,11 @@ set of neuron centers rather than rerun detection behind the user's back.
 
 | Stage | Method | Product role |
 | --- | --- | --- |
-| Detection | YOLO INF2 | Recommended portable learned detector. The benchmark reports held-out F1@5um 0.7117. |
+| Detection | Spotiflow NeuroPAL v1 | Recommended frozen detector. Four-view TTA, complete-linkage fusion, and the validation-selected 0.185 operating threshold are reproduced from GAT-NeuroPAL PR #1. |
+| Detection | YOLO INF2 | Portable learned fallback. The historical benchmark reports held-out F1@5um 0.7117. |
 | Detection | Matching Pursuit | MATLAB-only fallback and continuity path. |
 | Detection | Legacy neural network | Compatibility fallback. |
 | Detection | Cellpose custom model | Advanced adapter for users who already have compatible local weights. |
-| Detection | Spotiflow NeuroPAL | Complete app adapter and bundle slot; selectable now and becomes runnable when its checkpoint/environment bundle is supplied. |
 | Identity | Anshita GAT | Primary learned auto-ID adapter. The geometry benchmark reports top-5 0.9382. |
 | Identity | Atlas likelihood | Explicit legacy MATLAB fallback, not presented as the benchmark winner. |
 | Identity | CRF Cell-ID 2.0 | Complete request/import transaction and bundle slot; selectable now and becomes runnable when the selected atlas, unary model, and adapter are supplied. |
@@ -50,21 +52,26 @@ machine-specific absolute path is part of the default contract.
 
 ## Checkpoint-independent scaffolding completed
 
-1. **Spotiflow NeuroPAL detector** — the volume staging, benchmark-compatible
-   RGBW preprocessing, checkpoint invocation, centroid import, settings,
-   progress, error handling, and large-volume-safe raw interchange are complete.
-   The selected checkpoint and a Spotiflow 0.6.5 environment are the remaining
-   external inputs.
+1. **Spotiflow NeuroPAL v1 detector** — the app reproduces the frozen
+   identity/X/Y/XY reflection views, 2 um complete-linkage merge,
+   confidence-weighted coordinates, support-calibrated score, 0.185 operating
+   threshold, deterministic execution, checkpoint hash verification, centroid
+   import, progress, and provenance contract from GAT-NeuroPAL PR #1. The
+   142 MB checkpoint directory and isolated Spotiflow 0.6.5 environment are the
+   remaining external inputs.
 2. **CRF Cell-ID 2.0** — the app now exports reviewed YXZ centroids, physical XYZ
    coordinates, RGBW values, scale, and bundle configuration to a stable request.
    It validates the adapter's ranked output and applies it transactionally. The
    selected atlas/unary assets and production adapter implementation remain to be
    placed in the bundle.
-3. **Accurate detection ensemble** — the locked Spotiflow-backbone plus
+3. **Accurate detection ensemble** — the historical Spotiflow-backbone plus
    YOLO/nnU-Net consensus-rescue fusion rule is implemented and contract-tested.
    It is intentionally not selectable yet: full in-app orchestration still needs
    the nnU-Net inference adapter and all three expert bundles. The locked
-   benchmark reports F1@6um 0.9233.
+   benchmark reports F1@6um 0.9233. It is retained as an experimental route,
+   not the default: upstream nested leave-dataset-out validation favored the
+   frozen four-view Spotiflow detector over fixed consensus and the nonlinear
+   router.
 
 Each method uses `method_bundles/<method_id>/method_bundle.json`. The committed
 example manifests document artifact roles and configuration; large checkpoints
