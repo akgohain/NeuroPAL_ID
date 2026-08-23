@@ -60,6 +60,21 @@ classdef neurons
             end
         end
 
+        function save_id_file()
+            % Save the current identities without crossing the app's
+            % private-method boundary from an external package routine.
+            app = Program.app;
+            if isempty(app.id_file) || isempty(app.image_neurons)
+                return
+            end
+
+            version = Program.ProgramInfo.version;
+            mp_params = app.mp_params;
+            mp_params.k = length(app.image_neurons.neurons);
+            neurons = app.image_neurons;
+            save(app.id_file, 'version', 'neurons', 'mp_params');
+        end
+
         function reset()
             app = Program.app;
 

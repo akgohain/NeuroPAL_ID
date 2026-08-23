@@ -776,7 +776,13 @@ classdef GUIHandling
         end
 
         function open_main_image_from_empty_state(~)
-            Program.Routines.open();
+            try
+                Program.Routines.open();
+            catch ME
+                Program.Helpers.debug_event('OpenFileCallback', ...
+                    '%s', getReport(ME, 'extended', 'hyperlinks', 'off'));
+                rethrow(ME)
+            end
         end
 
         function row = ensure_sidebar_control_row(parent_grid, tag, row_index, column_width)

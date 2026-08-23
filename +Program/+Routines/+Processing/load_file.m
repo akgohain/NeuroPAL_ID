@@ -212,7 +212,7 @@ function load_file(mode, path)
                 check = uiconfirm(app.CELL_ID, "We recommend starting by cropping your image to ensure that there is no superfluous space taking up memory. Do you want to do so now?", "NeuroPAL_ID", "Options", ["Yes", "No, skip cropping."]);
                 switch check
                     case "Yes"
-                        app.ProcCropImageButtonPushed([]);
+                        Program.GUIHandling.crop_routine(app);
                         Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
                     case "No, skip cropping."
                         Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');

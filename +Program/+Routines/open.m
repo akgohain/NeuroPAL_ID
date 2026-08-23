@@ -7,13 +7,14 @@ function open(path)
         return;
     end
     app.is_opening_file = true;
+    opening_guard = onCleanup(@() local_finish_open(app));
     
     % Unselect any neurons.
     Program.Handlers.neurons.unselect_neuron();
     if ~isempty(app.id_file) && exist(app.id_file, 'file')
         source = dbstack();
-        if ~contains(source(2).name, 'pass_to_main')
-            app.SaveIDToFile();
+        if numel(source) < 2 || ~contains(source(2).name, 'pass_to_main')
+            Program.Handlers.neurons.save_id_file();
         end
     end
 
@@ -288,13 +289,12 @@ function open(path)
         'XLim', [0, size(app.image_data, 2)], ...
         'YLim', [0, size(app.image_data, 1)]);
 
-    % Select no neurons.
+    % The supported handler above has already unselected the previous
+    % neuron. Clear the index again after replacing image_neurons, without
+    % calling the app's private UnselectNeuron method from this package.
     app.selected_neuron = [];
 
     % Draw everything.
-    if nargin==0
-        app.UnselectNeuron();
-    end
     app.UserNeuronIDsListBox.Items = {};
     app.UserNeuronIDsListBox.ItemsData = [];
     app.UserNeuronIDsListBox.Value = {};
@@ -325,6 +325,7 @@ function open(path)
     
     % Done.
     app.is_opening_file = false;
+    clear opening_guard
     app.data_flags.('NeuroPAL_Volume') = 1;
 
     set(app.VolumeDropDown, 'Enable', 'on');
@@ -339,4 +340,14 @@ function open(path)
     set(app.ProcessingButton, 'Visible', 'off');
     Program.GUIHandling.update_main_id_workflow_state(app);
     drawnow;
+end
+
+function local_finish_open(app)
+% Never leave the open guard latched after a callback error.
+try
+    if ~isempty(app) && isvalid(app)
+        app.is_opening_file = false;
+    end
+catch
+end
 end
