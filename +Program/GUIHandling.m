@@ -391,9 +391,10 @@ classdef GUIHandling
                         app.Panel_17.Visible = 'off';
                     end
                 end
-                app.NeuronRankPanel.Title = 'Detection and identity';
+                app.NeuronRankPanel.Title = '';
+                app.NeuronRankPanel.BorderType = 'none';
                 app.NeuronListBoxPanel.Title = 'Identity coverage';
-                sidebar_grid.RowHeight = {26, 96, 96, 72, 22, '1x'};
+                sidebar_grid.RowHeight = {26, 96, 96, 0, 22, '1x'};
                 sidebar_grid.RowSpacing = 3;
                 sidebar_grid.Padding = [0 0 0 0];
                 app.UserNeuronIDsListBoxLabel.Layout.Row = 5;
@@ -420,7 +421,7 @@ classdef GUIHandling
             end
 
             Program.GUIHandling.move_label_to_grid(app, 'NeuronsLabel', ...
-                detect_row, 1, '1  Detect neurons');
+                detect_row, 1, 'Auto-detect');
             app.NeuronsLabel.Layout.Row = 1;
             app.NeuronsLabel.Layout.Column = [1 3];
             app.NeuronsLabel.HorizontalAlignment = 'left';
@@ -463,7 +464,7 @@ classdef GUIHandling
             detect_settings_button.Layout.Row = 3;
             detect_settings_button.Layout.Column = 3;
 
-            Program.GUIHandling.move_label_to_grid(app, 'AutoLabel', id_row, 1, '2  Assign identities');
+            Program.GUIHandling.move_label_to_grid(app, 'AutoLabel', id_row, 1, 'Auto-ID');
             app.AutoLabel.Layout.Row = 1;
             app.AutoLabel.Layout.Column = [1 3];
             app.AutoLabel.HorizontalAlignment = 'left';
@@ -510,26 +511,26 @@ classdef GUIHandling
             id_settings_button.Layout.Row = 3;
             id_settings_button.Layout.Column = 3;
 
-            manual_row = Program.GUIHandling.ensure_sidebar_control_row( ...
-                sidebar_grid, 'MainManualIDControlRow', 4, {72, '1x', 68});
-            manual_row.RowHeight = {22, 30};
-            app.UserLabel.Parent = manual_row;
-            app.UserLabel.Text = '3  Review and correct';
+            header_grid = app.GridLayout24_2;
+            app.UserLabel.Parent = header_grid;
+            app.UserLabel.Text = 'Review:';
             app.UserLabel.FontWeight = 'bold';
             app.UserLabel.HorizontalAlignment = 'left';
             app.UserLabel.Layout.Row = 1;
-            app.UserLabel.Layout.Column = [1 3];
-            app.IDEditField.Parent = manual_row;
-            app.IDEditField.Layout.Row = 2;
-            app.IDEditField.Layout.Column = [1 2];
+            app.UserLabel.Layout.Column = 9;
+            app.IDEditField.Parent = header_grid;
+            app.IDEditField.Layout.Row = 1;
+            app.IDEditField.Layout.Column = 10;
             app.IDEditField.Placeholder = 'Neuron ID';
-            app.UserIDButton.Parent = manual_row;
-            app.UserIDButton.Layout.Row = 2;
-            app.UserIDButton.Layout.Column = 3;
+            app.UserIDButton.Parent = header_grid;
+            app.UserIDButton.Layout.Row = 1;
+            app.UserIDButton.Layout.Column = 11;
             app.UserIDButton.Text = 'Assign';
 
+            old_manual_row = findobj(sidebar_grid, 'Tag', 'MainManualIDControlRow');
+            delete(old_manual_row);
+
             app.AutoIDAllButton.Visible = 'off';
-            Program.GUIHandling.position_main_user_id_controls_after(app, []);
 
             controls = struct( ...
                 'detect_dropdown', detect_dropdown, ...
@@ -538,7 +539,6 @@ classdef GUIHandling
                 'id_crop_checkbox', id_crop_checkbox, ...
                 'detect_settings_button', detect_settings_button, ...
                 'id_settings_button', id_settings_button, ...
-                'manual_row', manual_row, ...
                 'workflow_status', app.NeuronRankedConfidenceLabel);
             controls_parent = app.AutoDetectButton.Parent;
             setappdata(controls_parent, 'main_detect_id_controls', controls);
@@ -629,7 +629,7 @@ classdef GUIHandling
                 end
             end
             if neuron_count > 0 && isfield(controls, 'id_dropdown') && isvalid(controls.id_dropdown) && ...
-                    strcmpi(char(string(controls.id_dropdown.Value)), 'CRF Cell-ID 2.0')
+                    any(strcmpi(char(string(controls.id_dropdown.Value)), {'CRF', 'CRF Cell-ID 2.0'}))
                 params = Program.GUIHandling.main_method_params(app, 'id');
                 readiness = Methods.MethodBundle.inspect('crf_cellid_2', ...
                     Program.GUIHandling.param_value(params, 'bundle_path', ''));
@@ -849,7 +849,7 @@ classdef GUIHandling
             if isfield(controls, 'detect_dropdown') && ~isempty(controls.detect_dropdown) && isvalid(controls.detect_dropdown)
                 detect_backend = string(controls.detect_dropdown.Value);
             end
-            id_method = "Anshita GAT";
+            id_method = "GAT";
             if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
                 id_method = string(controls.id_dropdown.Value);
             end
@@ -879,7 +879,7 @@ classdef GUIHandling
                     specs = Program.GUIHandling.main_detect_param_specs(app, method);
                     title = sprintf('Auto-detect Parameters: %s', char(string(method)));
                 otherwise
-                    method = "Anshita GAT";
+                    method = "GAT";
                     if isfield(controls, 'id_dropdown') && ~isempty(controls.id_dropdown) && isvalid(controls.id_dropdown)
                         method = string(controls.id_dropdown.Value);
                     end
@@ -1177,7 +1177,7 @@ classdef GUIHandling
                         struct('key', 'mc_samples', 'label', 'MC', 'value', 20, 'limits', [1 100], 'integer', true, 'enabled', true), ...
                         struct('key', 'min_neighbors', 'label', 'Min nbr', 'value', 2, 'limits', [0 20], 'integer', true, 'enabled', true), ...
                         struct('key', 'batch_size', 'label', 'Batch', 'value', 32, 'limits', [1 512], 'integer', true, 'enabled', true)};
-                case "crf cell-id 2.0"
+                case {"crf", "crf cell-id 2.0"}
                     specs = { ...
                         struct('key', 'bundle_path', 'label', 'Bundle', 'value', Methods.MethodBundle.resolve('crf_cellid_2', ''), 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'folder')};
                 otherwise
@@ -1420,7 +1420,7 @@ classdef GUIHandling
                     Program.GUIHandling.run_transformer_auto_id(app);
                     return
                 end
-                if strcmpi(char(id_method), 'CRF Cell-ID 2.0')
+                if any(strcmpi(char(id_method), {'CRF', 'CRF Cell-ID 2.0'}))
                     Program.GUIHandling.run_crfid2_auto_id(app);
                     return
                 end
