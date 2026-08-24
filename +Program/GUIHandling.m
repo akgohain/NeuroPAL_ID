@@ -615,8 +615,10 @@ classdef GUIHandling
                     neuron_count, max(auto_id_count, user_id_count));
             end
 
-            setup_methods = {};
-            setup_details = {};
+            if isfield(controls, 'detect_dropdown') && isvalid(controls.detect_dropdown)
+                Program.GUIHandling.set_method_dropdown_item_label( ...
+                    controls.detect_dropdown, 'spotiflow_supervised', 'Spotiflow');
+            end
             if has_image && isfield(controls, 'detect_dropdown') && isvalid(controls.detect_dropdown) && ...
                     strcmp(char(string(controls.detect_dropdown.Value)), 'spotiflow_supervised')
                 params = Program.GUIHandling.main_method_params(app, 'detect');
@@ -624,9 +626,14 @@ classdef GUIHandling
                     Program.GUIHandling.param_value(params, 'bundle_path', ''));
                 controls.detect_dropdown.Tooltip = readiness.summary;
                 if ~readiness.ready
-                    setup_methods{end + 1} = 'Spotiflow';
-                    setup_details{end + 1} = readiness.summary;
+                    Program.GUIHandling.set_method_dropdown_item_label( ...
+                        controls.detect_dropdown, 'spotiflow_supervised', ...
+                        'Spotiflow (setup required)');
                 end
+            end
+            if isfield(controls, 'id_dropdown') && isvalid(controls.id_dropdown)
+                Program.GUIHandling.set_method_dropdown_item_label( ...
+                    controls.id_dropdown, 'CRF', 'CRF');
             end
             if neuron_count > 0 && isfield(controls, 'id_dropdown') && isvalid(controls.id_dropdown) && ...
                     any(strcmpi(char(string(controls.id_dropdown.Value)), {'CRF', 'CRF Cell-ID 2.0'}))
@@ -635,15 +642,9 @@ classdef GUIHandling
                     Program.GUIHandling.param_value(params, 'bundle_path', ''));
                 controls.id_dropdown.Tooltip = readiness.summary;
                 if ~readiness.ready
-                    setup_methods{end + 1} = 'CRF-ID';
-                    setup_details{end + 1} = readiness.summary;
+                    Program.GUIHandling.set_method_dropdown_item_label( ...
+                        controls.id_dropdown, 'CRF', 'CRF (setup required)');
                 end
-            end
-
-            if isscalar(setup_methods)
-                status = sprintf('%s bundle required  |  Settings...', setup_methods{1});
-            elseif numel(setup_methods) > 1
-                status = sprintf('%s need setup', strjoin(setup_methods, ' + '));
             end
 
             if isfield(controls, 'workflow_status') && ...
@@ -652,11 +653,7 @@ classdef GUIHandling
                 controls.workflow_status.FontWeight = 'bold';
                 controls.workflow_status.HorizontalAlignment = 'left';
                 controls.workflow_status.FontColor = [0.12 0.29 0.48];
-                if isempty(setup_details)
-                    controls.workflow_status.Tooltip = '';
-                else
-                    controls.workflow_status.Tooltip = strjoin(setup_details, newline);
-                end
+                controls.workflow_status.Tooltip = '';
             end
             if isprop(app, 'UserNeuronIDsListBoxLabel') && isvalid(app.UserNeuronIDsListBoxLabel)
                 candidate_count = 0;
@@ -7650,6 +7647,36 @@ classdef GUIHandling
                 dropdown.Items = items;
             end
             dropdown.Value = value;
+        end
+
+        function set_method_dropdown_item_label(dropdown, method_key, label)
+            if isempty(dropdown) || ~isvalid(dropdown)
+                return
+            end
+
+            items = cellstr(string(dropdown.Items));
+            has_item_data = isprop(dropdown, 'ItemsData') && ...
+                numel(dropdown.ItemsData) == numel(items) && ~isempty(dropdown.ItemsData);
+            if has_item_data
+                item_data = string(dropdown.ItemsData);
+                item_index = find(strcmpi(item_data, string(method_key)), 1);
+                was_selected = strcmpi(string(dropdown.Value), string(method_key));
+            else
+                base_items = regexprep(string(items), ' \(setup required\)$', '');
+                item_index = find(strcmpi(base_items, string(method_key)), 1);
+                was_selected = ~isempty(item_index) && ...
+                    strcmpi(base_items(item_index), ...
+                        regexprep(string(dropdown.Value), ' \(setup required\)$', ''));
+            end
+            if isempty(item_index)
+                return
+            end
+
+            items{item_index} = char(string(label));
+            dropdown.Items = items;
+            if ~has_item_data && was_selected
+                dropdown.Value = items{item_index};
+            end
         end
 
     end
