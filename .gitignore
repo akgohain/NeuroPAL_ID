@@ -207,3 +207,6 @@ test.mlapp
 rotation_debug.mat
 /External_Dependencies
 /wip_merge
+
+# Local App Designer recovery copies
+/visualize_light.mlapp.bak_before_*
