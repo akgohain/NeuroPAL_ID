@@ -104,7 +104,7 @@ function initialize()
                 app.ToggleNeuronDetectionMenu.Text = 'Use YOLO-Detect Neurons';
             case 'yolo'
                 app.ToggleNeuronDetectionMenu.Text = 'Use MP-Detect Neurons';
-            case 'spotiflow_supervised'
+            case {'spotiflow_supervised', 'detection_moe'}
                 app.ToggleNeuronDetectionMenu.Text = 'Use MP-Detect Neurons';
         end
         Program.GUIHandling.install_cellpose_mask_button(app);

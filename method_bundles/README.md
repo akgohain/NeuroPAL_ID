@@ -33,9 +33,7 @@ and `train_config.yaml` there. A different checkpoint requires a deliberately
 different model manifest rather than silently masquerading as the frozen v1
 detector.
 
-`detection_moe` retains the tested Spotiflow/YOLO/nnU-Net consensus-rescue
-fusion layer, but it remains hidden until the nnU-Net inference adapter can
-produce the same prediction CSV contract as Spotiflow and YOLO. The frozen
-four-view Spotiflow detector is the current cross-dataset default: the upstream
-nested leave-dataset-out comparison favored it over fixed consensus and the
-nonlinear router.
+`detection_moe` now uses the nonlinear fold-00 MoE adapter. Install the verified
+handoff with `scripts/install_moe_bundle.py`; see [MOE_INTEGRATION.md](../MOE_INTEGRATION.md)
+for model/source requirements, CPU validation results, and app usage. The older
+`Wrapper.runDetectionEnsemble` CSV consensus utility remains separate.

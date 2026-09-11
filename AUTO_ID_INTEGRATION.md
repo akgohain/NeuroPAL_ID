@@ -11,6 +11,16 @@ The benchmark repository remains the source of truth for training, evaluation,
 environment locks, and method selection. This application owns interactive
 inference, review, correction, and persistence.
 
+## September 2026 nonlinear MoE integration
+
+The app now includes an experimental nonlinear MoE adapter for the coherent
+fold-00 handoff from GAT-NeuroPAL PR #2 at
+`2276e61dedf9671740c1a36fab7d6d976b86de37`. This supersedes the ensemble
+scaffolding status below, which describes the earlier consensus implementation.
+See [MOE_INTEGRATION.md](MOE_INTEGRATION.md) for setup and measured validation.
+The earlier cross-dataset model-selection notes describe a different study;
+fold 00 has not been selected as a production model.
+
 ## Product workflow
 
 The first tab follows one explicit sequence:

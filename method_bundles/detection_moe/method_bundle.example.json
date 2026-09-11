@@ -1,18 +1,63 @@
 {
   "schema_version": 1,
   "method_id": "detection_moe",
-  "display_name": "Accurate detection ensemble",
-  "source_revision": "benchmark-selection-20260716",
+  "display_name": "MoE",
+  "source_revision": "2276e61dedf9671740c1a36fab7d6d976b86de37",
   "configuration": {
-    "spotiflow_threshold": 0.30,
-    "yolo_threshold": 0.30,
-    "nnunet_threshold": 0.30,
-    "agreement_radius_um": 3.0,
-    "isolation_radius_um": 2.5
+    "python_executable": "",
+    "device": "cpu",
+    "dataset_id": "unknown"
   },
   "artifacts": [
-    {"role": "spotiflow_bundle", "path": "spotiflow", "required": true},
-    {"role": "yolo_bundle", "path": "yolo", "required": true},
-    {"role": "nnunet_bundle", "path": "nnunet", "required": true}
+    {
+      "role": "spotiflow",
+      "path": "models/spotiflow/last.pt",
+      "required": true
+    },
+    {
+      "role": "yolo",
+      "path": "models/yolo/best.pt",
+      "required": true
+    },
+    {
+      "role": "heatmap3d",
+      "path": "models/heatmap3d/model.pth",
+      "required": true
+    },
+    {
+      "role": "appearance_gate",
+      "path": "models/appearance_gate/image_gate.joblib",
+      "required": true
+    },
+    {
+      "role": "nonlinear_router",
+      "path": "models/nonlinear_router/estimators.joblib",
+      "required": true
+    },
+    {
+      "role": "source",
+      "path": "source/GAT-NeuroPAL",
+      "required": true
+    },
+    {
+      "role": "yolo_source",
+      "path": "app_support/yolo_inf2",
+      "required": true
+    },
+    {
+      "role": "checksums",
+      "path": "SHA256SUMS",
+      "required": true
+    },
+    {
+      "role": "router_policy",
+      "path": "provenance/router.json",
+      "required": true
+    },
+    {
+      "role": "features",
+      "path": "configuration/ordered_features.json",
+      "required": true
+    }
   ]
 }

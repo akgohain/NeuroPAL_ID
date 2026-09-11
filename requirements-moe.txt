@@ -1,0 +1,17 @@
+# Tested CPU environment for the fold-00 nonlinear MoE integration.
+# Install in a dedicated Python 3.11 environment, not MATLAB's legacy env.
+numpy==2.3.5
+pandas==3.0.3
+scipy==1.17.1
+torch==2.12.1
+spotiflow==0.6.5
+ultralytics==8.4.80
+scikit-learn==1.6.0
+joblib==1.5.3
+dynamic-network-architectures==0.4.4
+nnunetv2==2.8.0
+h5py==3.16.0
+pynwb==4.2.0
+tifffile==2026.3.3
+scikit-image==0.26.0
+opencv-python==4.13.0.92

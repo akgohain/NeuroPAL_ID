@@ -323,6 +323,8 @@ classdef GUIPreferences < handle
                     backend = 'cellpose';
                 case {'yolo', 'yolov8'}
                     backend = 'yolo';
+                case {'detection_moe', 'moe'}
+                    backend = 'detection_moe';
                 case {'spotiflow', 'spotiflow_supervised'}
                     backend = 'spotiflow_supervised';
                 otherwise

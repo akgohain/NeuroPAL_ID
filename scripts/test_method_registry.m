@@ -5,7 +5,7 @@ function test_method_registry()
 assert(isequal(size(detect_names), size(detect_ids)));
 assert(any(strcmp(detect_ids, 'yolo')));
 assert(any(strcmp(detect_ids, 'spotiflow_supervised')));
-assert(~any(strcmp(detect_ids, 'detection_moe')));
+assert(any(strcmp(detect_ids, 'detection_moe')));
 spotiflow = Methods.MethodRegistry.find('spotiflow_supervised');
 assert(strcmp(spotiflow.name, 'Spotiflow'));
 assert(strcmp(spotiflow.status, 'recommended_portable'));

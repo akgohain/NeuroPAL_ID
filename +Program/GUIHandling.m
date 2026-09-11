@@ -591,33 +591,18 @@ classdef GUIHandling
             end
 
             neuron_count = 0;
-            auto_id_count = 0;
-            user_id_count = 0;
             try
                 if ~isempty(app.image_neurons)
                     neuron_count = app.image_neurons.num_neurons();
-                    auto_id_count = app.image_neurons.num_auto_id_neurons();
-                    user_id_count = sum(arrayfun(@(neuron) ...
-                        ~isempty(strtrim(char(string(neuron.annotation)))), ...
-                        app.image_neurons.neurons));
                 end
             catch
-            end
-
-            if ~has_image
-                status = 'Open an image to begin';
-            elseif neuron_count == 0
-                status = 'Next: detect neurons';
-            elseif auto_id_count == 0 && user_id_count == 0
-                status = sprintf('%d detected  |  Next: assign identities', neuron_count);
-            else
-                status = sprintf('%d detected  |  %d identified  |  Review remaining', ...
-                    neuron_count, max(auto_id_count, user_id_count));
             end
 
             if isfield(controls, 'detect_dropdown') && isvalid(controls.detect_dropdown)
                 Program.GUIHandling.set_method_dropdown_item_label( ...
                     controls.detect_dropdown, 'spotiflow_supervised', 'Spotiflow');
+                Program.GUIHandling.set_method_dropdown_item_label( ...
+                    controls.detect_dropdown, 'detection_moe', 'MoE');
             end
             if has_image && isfield(controls, 'detect_dropdown') && isvalid(controls.detect_dropdown) && ...
                     strcmp(char(string(controls.detect_dropdown.Value)), 'spotiflow_supervised')
@@ -630,6 +615,14 @@ classdef GUIHandling
                         controls.detect_dropdown, 'spotiflow_supervised', ...
                         'Spotiflow (setup required)');
                 end
+            end
+            if has_image && isfield(controls, 'detect_dropdown') && isvalid(controls.detect_dropdown) && ...
+                    strcmp(char(string(controls.detect_dropdown.Value)), 'detection_moe')
+                params = Program.GUIHandling.main_method_params(app, 'detect');
+                readiness = Methods.MethodBundle.inspect('detection_moe', ...
+                    Program.GUIHandling.param_value(params, 'bundle_path', ''));
+                controls.detect_dropdown.Tooltip = [readiness.summary, ...
+                    ' Select the real dataset in Settings; use unknown for new acquisitions.'];
             end
             if isfield(controls, 'id_dropdown') && isvalid(controls.id_dropdown)
                 Program.GUIHandling.set_method_dropdown_item_label( ...
@@ -649,7 +642,8 @@ classdef GUIHandling
 
             if isfield(controls, 'workflow_status') && ...
                     ~isempty(controls.workflow_status) && isvalid(controls.workflow_status)
-                controls.workflow_status.Text = status;
+                controls.workflow_status.Text = '';
+                controls.workflow_status.Visible = 'off';
                 controls.workflow_status.FontWeight = 'bold';
                 controls.workflow_status.HorizontalAlignment = 'left';
                 controls.workflow_status.FontColor = [0.12 0.29 0.48];
@@ -1149,6 +1143,12 @@ classdef GUIHandling
                         struct('key', 'p_lo', 'label', 'Stretch lo', 'value', 0.5, 'limits', [0 100], 'integer', false, 'enabled', true), ...
                         struct('key', 'p_hi', 'label', 'Stretch hi', 'value', 99.5, 'limits', [0 100], 'integer', false, 'enabled', true), ...
                         struct('key', 'depth_sanity_ratio_cap', 'label', 'Depth cap', 'value', 2.0, 'limits', [0.1 20], 'integer', false, 'enabled', true)};
+                case "detection_moe"
+                    specs = { ...
+                        struct('key', 'bundle_path', 'label', 'Bundle', 'value', Methods.MethodBundle.resolve('detection_moe', ''), 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'folder'), ...
+                        struct('key', 'python_executable', 'label', 'Python', 'value', '', 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'file'), ...
+                        struct('key', 'dataset_id', 'label', 'Dataset', 'value', 'unknown', 'limits', [], 'integer', false, 'enabled', true, 'allowed', {{'unknown', '000541', '000692', '000714', '000715', '000981'}}), ...
+                        struct('key', 'device', 'label', 'Device', 'value', 'cpu', 'limits', [], 'integer', false, 'enabled', true, 'allowed', {{'cpu', 'cuda', 'auto'}})};
                 case "spotiflow_supervised"
                     specs = { ...
                         struct('key', 'bundle_path', 'label', 'Bundle', 'value', Methods.MethodBundle.resolve('spotiflow_supervised', ''), 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'folder'), ...
@@ -1447,7 +1447,7 @@ classdef GUIHandling
                 end
 
                 backend = Program.GUIPreferences.get_detection_backend();
-                if any(strcmp(backend, {'cellpose', 'yolo', 'spotiflow_supervised'}))
+                if any(strcmp(backend, {'cellpose', 'yolo', 'spotiflow_supervised', 'detection_moe'}))
                     Program.GUIHandling.run_modern_auto_detector(app, backend);
                     return
                 end
@@ -1467,6 +1467,8 @@ classdef GUIHandling
                 return
             end
 
+            previous_neurons = app.image_neurons;
+            previous_params = app.mp_params;
             body = app.BodyDropDown.Value;
             num_neurons = app.neuron_info.numNeurons(body);
             Program.GUIHandling.auto_detect_log(app, ...
@@ -1500,7 +1502,20 @@ classdef GUIHandling
                     'User confirmed overwrite.');
             end
 
-            rgbw = Program.GUIHandling.main_detection_channel_indices(app);
+            if strcmp(backend, 'detection_moe')
+                % Display toggles must not remove channels from the four-channel model.
+                rgbw = double(app.image_prefs.RGBW(:)');
+                if numel(rgbw) ~= 4 || any(~isfinite(rgbw)) || ...
+                        any(rgbw < 1 | rgbw > size(app.image_data,4) | mod(rgbw,1) ~= 0) || ...
+                        numel(unique(rgbw)) ~= 4
+                    Program.GUIHandling.safe_uialert(app, ...
+                        'MoE requires four distinct assigned RGBW channels. Check image channel metadata.', ...
+                        'MoE Channel Mapping', 'Icon', 'error');
+                    return
+                end
+            else
+                rgbw = Program.GUIHandling.main_detection_channel_indices(app);
+            end
             data_rgbw = app.image_data(:, :, :, rgbw);
             readout_rgbw = Methods.Preprocess.zscore_frame(data_rgbw);
             params = Program.GUIHandling.main_method_params(app, 'detect');
@@ -1544,6 +1559,18 @@ classdef GUIHandling
                             'OutputDir', Program.GUIHandling.yolo_output_dir(app), ...
                             'KeepArtifacts', true, ...
                             'LogFcn', @(message) Program.GUIHandling.auto_detect_log(app, '%s', message));
+                    case 'detection_moe'
+                        [sp, moe_params] = Methods.MoEDetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                            'ColorReadoutData', readout_rgbw, ...
+                            'BundlePath', Program.GUIHandling.param_value(params, 'bundle_path', ''), ...
+                            'PythonExecutable', Program.GUIHandling.param_value(params, 'python_executable', ''), ...
+                            'DatasetID', Program.GUIHandling.param_value(params, 'dataset_id', 'unknown'), ...
+                            'Device', Program.GUIHandling.param_value(params, 'device', 'cpu'), ...
+                            'OutputDir', Program.GUIHandling.method_output_dir(app, 'moe'), ...
+                            'KeepArtifacts', true);
+                        if ~isempty(sp)
+                            prepared_moe_neurons = Neurons.Image(sp, app.worm.body, 'scale', app.image_um_scale');
+                        end
                     case 'spotiflow_supervised'
                         Program.GUIHandling.auto_detect_log(app, ...
                             'Dispatching frozen four-view Spotiflow NeuroPAL v1 detector.');
@@ -1574,6 +1601,12 @@ classdef GUIHandling
                 Program.GUIHandling.supervoxel_positions_summary(sp), ...
                 Program.GUIHandling.struct_summary(app.mp_params));
             if isempty(sp)
+                if strcmp(backend, 'detection_moe')
+                    Program.GUIHandling.safe_uialert(app, ...
+                        'No neurons found. Existing annotations were preserved.', ...
+                        'Detection Complete', 'Icon', 'info');
+                    return
+                end
                 detail = Program.GUIHandling.auto_detect_empty_detail(app.mp_params);
                 Program.GUIHandling.auto_detect_log(app, ...
                     'ABORT detector returned empty sp. detail="%s"', strtrim(detail));
@@ -1599,13 +1632,20 @@ classdef GUIHandling
                 Program.GUIHandling.auto_detect_log(app, ...
                     'Constructing Neurons.Image with %s.', ...
                     Program.GUIHandling.supervoxel_positions_summary(sp));
-                app.image_neurons = Neurons.Image(sp, app.worm.body, 'scale', app.image_um_scale');
+                if strcmp(backend, 'detection_moe')
+                    app.image_neurons = prepared_moe_neurons;
+                    app.mp_params = moe_params;
+                else
+                    app.image_neurons = Neurons.Image(sp, app.worm.body, 'scale', app.image_um_scale');
+                end
                 Program.GUIHandling.auto_detect_log(app, ...
                     'Neurons.Image constructed: count=%d.', app.image_neurons.num_neurons());
 
                 Program.GUIHandling.auto_detect_log(app, ...
                     'Calling removeNearbyNeurons...');
-                Methods.Utils.removeNearbyNeurons(app.image_neurons, 2, 2);
+                if ~strcmp(backend, 'detection_moe')
+                    Methods.Utils.removeNearbyNeurons(app.image_neurons, 2, 2);
+                end
                 Program.GUIHandling.auto_detect_log(app, ...
                     'After removeNearbyNeurons: count=%d.', app.image_neurons.num_neurons());
 
@@ -1644,6 +1684,10 @@ classdef GUIHandling
                     Program.GUIHandling.graphics_child_count(app.XY), ...
                     Program.GUIHandling.graphics_child_count(app.MaxProjection));
             catch ME
+                if strcmp(backend, 'detection_moe')
+                    app.image_neurons = previous_neurons;
+                    app.mp_params = previous_params;
+                end
                 Program.GUIHandling.auto_detect_log(app, ...
                     'ERROR post-detect propagation threw %s: %s', ME.identifier, ME.message);
                 Program.GUIHandling.safe_uialert(app, Program.GUIHandling.method_error_message(ME), ...
@@ -2433,7 +2477,7 @@ classdef GUIHandling
                     app.ToggleNeuronDetectionMenu.Text = 'Use YOLO-Detect Neurons';
                 case 'yolo'
                     app.ToggleNeuronDetectionMenu.Text = 'Use MP-Detect Neurons';
-                case 'spotiflow_supervised'
+                case {'spotiflow_supervised', 'detection_moe'}
                     app.ToggleNeuronDetectionMenu.Text = 'Use MP-Detect Neurons';
             end
         end
