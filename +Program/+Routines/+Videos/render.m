@@ -1,44 +1,46 @@
-function render(t, z, x, y)
-    app = Program.app;
+function render(t, z, x, y, app)
+    %RENDER Refresh the video projections and annotation overlays.
+    if nargin < 5 || isempty(app), app = Program.app; end
 
-    if nargin == 0
+    if nargin < 1 || isempty(t)
         t = round(app.tSlider.Value);
-    elseif app.OverlaylastIDdframeCheckBox_2.Value
+    end
+    if app.OverlaylastIDdframeCheckBox_2.Value
         earlier_frames = app.id_frames(app.id_frames < app.tSlider.Value);
-        t = max(earlier_frames);
+        if ~isempty(earlier_frames), t = max(earlier_frames); end
     end
    
-    if ~exist ('z', 'var')
+    if nargin < 2 || isempty(z)
         z = round(app.hor_zSlider.Value);
     end
     
-    if ~exist('y', 'var')
+    if nargin < 4 || isempty(y)
         y = round(app.xSlider.Value);
     end
     
-    if ~exist ('x', 'var')
+    if nargin < 3 || isempty(x)
         x = round(app.video_info.ny-app.ySlider.Value);
     end
     
     Program.Validation.frame_in_bounds(t);
     Program.Validation.slice_in_bounds(z);
-    render = app.retrieveVideoRenderViews(t, z, x, y, app.OverlayFrameMIPCheckBox.Value);
+    render = Program.Helpers.video_render_views(app, t, z, x, y, app.OverlayFrameMIPCheckBox.Value);
 
     proj = fieldnames(render);
     for p=1:length(proj)
         projection = proj{p};
-        arr = squeeze(render.(projection));
+        arr = render.(projection);
 
         if strcmp(projection, 'yz')
             arr = permute(arr, [2, 1, 3]);
         end
 
-        render.(projection) = app.scaleVideoProjection(arr);
+        render.(projection) = Program.Helpers.scale_video_projection(app,arr);
     end
     
-    xy_img = app.setVideoImage(app.xyAxes, render.xy, 'npal_video_xy');
-    xz_img = app.setVideoImage(app.xzAxes, render.yz, 'npal_video_xz');
-    yz_img = app.setVideoImage(app.yzAxes, render.xz, 'npal_video_yz');
+    xy_img = Program.Helpers.set_video_image(app.xyAxes, render.xy, 'npal_video_xy');
+    xz_img = Program.Helpers.set_video_image(app.xzAxes, render.yz, 'npal_video_xz');
+    yz_img = Program.Helpers.set_video_image(app.yzAxes, render.xz, 'npal_video_yz');
 
     Program.Helpers.sl_sync();
     

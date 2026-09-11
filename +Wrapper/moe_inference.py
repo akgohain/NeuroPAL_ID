@@ -3,12 +3,14 @@
 
 Research functions are imported from the verified bundle; fitting/evaluation
 entry points are never invoked. Each neural expert runs in a separate process.
+Launch CLI commands through resource_control.py for memory and cancellation monitoring.
 """
 from __future__ import annotations
 import argparse
 import importlib.metadata
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -18,6 +20,8 @@ import time
 
 import numpy as np
 import pandas as pd
+
+from resource_control import JobLease, available_memory_bytes
 
 SPACING = np.array([0.4, 0.4, 1.5])
 COLUMNS = ['animal_id','pred_id','x_vox','y_vox','z_vox','x_um','y_um','z_um','score']
@@ -133,15 +137,17 @@ def heatmap3d(bundle, volume, animal, device, output):
     return stamp(frame,animal,'nnunet')
 
 
-def run_command(command, log, timeout=3600):
+def run_command(command, log, timeout=3600, env=None):
     with log.open('w') as handle:
         process = subprocess.Popen([str(x) for x in command], stdout=handle,
-                                   stderr=subprocess.STDOUT, start_new_session=os.name != 'nt')
+                                   stderr=subprocess.STDOUT, start_new_session=os.name != 'nt', env=env)
         try:
             code = process.wait(timeout=timeout)
             if code: raise subprocess.CalledProcessError(code, command)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-            tail = log.read_text(errors='replace')[-5000:]
+            with log.open('rb') as source_log:
+                source_log.seek(max(0, log.stat().st_size-5000))
+                tail = source_log.read().decode(errors='replace')
             raise RuntimeError(f'Inference failed; see {log}\n{tail}') from exc
         finally:
             if process.poll() is None:
@@ -176,7 +182,12 @@ def route(bundle, volume, proposals, animal, dataset, output):
     from scripts.run_detection_moe_image_gate import normalize_volume, sample_features, feature_names
     from scripts.experiment_detection_moe_nonlinear import _base_design, add_volume_context
     from scripts.experiment_detection_moe_calibrated_stack import build_candidates, CandidateConfig
-    if not sum(len(frame) for frame in proposals.values()): return pd.DataFrame(columns=COLUMNS)
+    count = sum(len(frame) for frame in proposals.values())
+    if not count: return pd.DataFrame(columns=COLUMNS)
+    limit = float(os.environ.get('NEUROPAL_ROUTER_MIB', '512')) * 2**20
+    estimated = count*count*32 + count*4096
+    if not math.isfinite(limit) or limit <= 0 or estimated > limit:
+        raise MemoryError(f'Routing {count} proposals requires an estimated {estimated/2**20:.0f} MiB; budget is {limit/2**20:g} MiB')
     if importlib.metadata.version('scikit-learn') != '1.6.0':
         raise RuntimeError('This fitted bundle requires scikit-learn 1.6.0; install requirements-moe.txt')
     gate = joblib.load(bundle/'models/appearance_gate/image_gate.joblib')
@@ -217,26 +228,67 @@ def route(bundle, volume, proposals, animal, dataset, output):
     return result
 
 
+def preflight_request(request):
+    supplied = request['volume_shape_yxzc']
+    if len(supplied) != 4 or any(isinstance(x, bool) or int(x) != x or x < 1 for x in supplied) or supplied[3] != 4:
+        raise ValueError('Expected positive integer YXZC dimensions with four RGBW channels')
+    shape = tuple(int(x) for x in supplied)
+    spacing = np.asarray(request['scale_um_xyz'], dtype=float)
+    if spacing.shape != (3,) or not np.isfinite(spacing).all() or np.any(spacing <= 0):
+        raise ValueError('Voxel spacing must contain three finite positive micron values')
+    dtype = np.dtype(request.get('volume_dtype','float32'))
+    if dtype.kind not in 'uif' or dtype.itemsize > 8:
+        raise ValueError('Unsupported image dtype')
+    raw_bytes = math.prod(shape)*dtype.itemsize
+    if Path(request['volume_raw']).stat().st_size != raw_bytes:
+        raise ValueError('Raw image file size does not match its dimensions and dtype')
+    target = np.array([shape[1],shape[0],shape[2]], dtype=float)*spacing/SPACING
+    limit = float(os.environ.get('NEUROPAL_MOE_WORKSPACE_MIB','4096'))*2**20
+    if not np.isfinite(target).all() or not math.isfinite(limit) or limit <= 0:
+        raise ValueError('Invalid processed dimensions or memory budget')
+    processed = math.prod(max(1,math.ceil(x)) for x in target)*4*4
+    # Include preprocessing temporaries and a conservative model workspace.
+    estimated = raw_bytes*4 + processed*12 + 1536*2**20
+    if estimated > limit:
+        raise MemoryError(f'MoE requires an estimated {estimated/2**20:.0f} MiB; workspace budget is {limit/2**20:g} MiB')
+    return shape, spacing, estimated
+
+
+def prepare(request):
+    shape, spacing, _ = preflight_request(request)
+    source = setup(request['bundle'])
+    raw = np.memmap(request['volume_raw'], dtype=request.get('volume_dtype','float32'), mode='r', shape=shape, order='F')
+    volume = preprocess(raw.transpose(1,0,2,3), spacing, source, request.get('dataset_id','unknown'))
+    np.save(Path(request['output_dir'])/'volume.npy', volume)
+
+
 def run(request, response_path):
+    with JobLease('MoE inference') as lease:
+        return _run(request, Path(response_path), lease)
+
+
+def _run(request, response_path, lease):
     bundle = Path(request['bundle']).resolve()
-    source = setup(bundle,verify=True)
+    setup(bundle,verify=True)
     output = Path(request['output_dir']).resolve()
     output.mkdir(parents=True,exist_ok=True)
     response_path.unlink(missing_ok=True)
     started = time.monotonic()
-    shape = tuple(int(x) for x in request['volume_shape_yxzc'])
-    spacing = np.asarray(request['scale_um_xyz'],dtype=float)
-    raw = np.fromfile(request['volume_raw'],dtype=np.dtype(request.get('volume_dtype','float32'))).reshape(shape,order='F')
-    xyzc = raw.transpose(1,0,2,3)
-    validate_volume(xyzc,spacing)
+    shape, spacing, estimated = preflight_request(request)
+    available = available_memory_bytes()
+    if available is not None and estimated + 512*2**20 > available:
+        raise MemoryError(f'MoE needs an estimated {estimated/2**20:.0f} MiB plus reserve; current machine headroom is {available/2**20:.0f} MiB')
     dataset = str(request.get('dataset_id','unknown'))
     from scripts.run_detection_moe_image_gate import DATASETS
     if dataset not in (*DATASETS,'unknown'): raise ValueError('Dataset must be a supported DANDI ID or unknown')
     animal = str(request.get('animal_id','app_volume'))
-    progress('Preprocessing RGBW volume without annotations')
-    volume = preprocess(xyzc,spacing,source,dataset)
+    progress(f'Preprocessing RGBW volume; estimated workspace {estimated/2**20:.0f} MiB')
     volume_path = output/'volume.npy'
-    np.save(volume_path,volume)
+    prepared_request = output/'preprocessing_request.json'
+    prepared_request.write_text(json.dumps(request))
+    run_command([sys.executable, Path(__file__).resolve(), 'prepare', '--request', prepared_request],
+                output/'preprocessing.log', timeout=float(request.get('expert_timeout_seconds',3600)),
+                env=lease.environment())
     device = request.get('device','cpu')
     if device == 'auto':
         import torch
@@ -248,13 +300,15 @@ def run(request, response_path):
         interpreter = request.get('interpreters',{}).get(method,sys.executable)
         run_command([interpreter,Path(__file__).resolve(),'expert','--bundle',bundle,'--volume',volume_path,
                      '--animal',animal,'--device',device,'--method',method,'--output',output],output/f'{method}.log',
-                     timeout=float(request.get('expert_timeout_seconds',3600)))
+                     timeout=float(request.get('expert_timeout_seconds',3600)), env=lease.environment())
         proposals[method] = pd.read_csv(output/f'{method}.csv')
     progress('Applying appearance gate and nonlinear routers')
+    volume = np.load(volume_path, mmap_mode='r')
     result = route(bundle,volume,proposals,animal,dataset,output)
+    del volume
     result.to_csv(output/'predictions_processed.csv',index=False)
     points = result[['x_um','y_um','z_um']].to_numpy(float)/spacing
-    if len(points) and (not np.isfinite(points).all() or np.any(points < 0) or np.any(points >= np.array(xyzc.shape[:3]))):
+    if len(points) and (not np.isfinite(points).all() or np.any(points < 0) or np.any(points >= np.array([shape[1],shape[0],shape[2]]))):
         raise ValueError('Detector returned centers outside the original image')
     centroids = points[:,[1,0,2]]+1
     response = dict(method_id='detection_moe',num_centroids=len(result),centroids_yxz=centroids.tolist(),
@@ -279,20 +333,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command',required=True)
     p = sub.add_parser('run'); p.add_argument('--request',type=Path,required=True); p.add_argument('--response',type=Path,required=True)
+    p = sub.add_parser('prepare'); p.add_argument('--request',type=Path,required=True)
     p = sub.add_parser('expert')
     for name in ('bundle','volume','output'): p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--animal',required=True); p.add_argument('--device',default='cpu'); p.add_argument('--method',choices=['spotiflow','yolo','nnunet'],required=True)
     args = parser.parse_args()
     if args.command == 'run': run(json.loads(args.request.read_text()),args.response)
     else:
-        setup(args.bundle)
-        import torch
-        torch.set_num_threads(4)
-        volume = np.load(args.volume)
-        if args.method == 'spotiflow': frame = spotiflow(args.bundle,volume,args.animal,args.device)
-        elif args.method == 'nnunet': frame = heatmap3d(args.bundle,volume,args.animal,args.device,args.output)
-        else: frame = yolo(args.bundle,args.volume,args.animal,args.device,args.output)
-        frame.to_csv(args.output/f'{args.method}.csv',index=False)
-        print(f'{args.method}: {len(frame)} predictions',flush=True)
+        with JobLease('MoE ' + args.command):
+            if args.command == 'prepare':
+                prepare(json.loads(args.request.read_text()))
+                return
+            setup(args.bundle)
+            import torch
+            torch.set_num_threads(4)
+            volume = None if args.method == 'yolo' else np.load(args.volume, mmap_mode='r')
+            if args.method == 'spotiflow': frame = spotiflow(args.bundle,volume,args.animal,args.device)
+            elif args.method == 'nnunet': frame = heatmap3d(args.bundle,volume,args.animal,args.device,args.output)
+            else: frame = yolo(args.bundle,args.volume,args.animal,args.device,args.output)
+            frame.to_csv(args.output/f'{args.method}.csv',index=False)
+            print(f'{args.method}: {len(frame)} predictions',flush=True)
 
 if __name__ == '__main__': main()

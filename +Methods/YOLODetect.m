@@ -23,6 +23,7 @@ classdef YOLODetect
                 options.KeepArtifacts (1,1) logical = false
                 options.WeightsPath (1,1) string = ""
                 options.PythonExecutable (1,1) string = ""
+                options.JobToken (1,1) string = ""
                 options.ColorReadoutData = []
                 options.LogFcn = []
             end
@@ -34,10 +35,13 @@ classdef YOLODetect
                 options.BoxMinPx, options.BoxMaxPx, char(options.OutputDir), options.KeepArtifacts);
 
             progress = Methods.YOLODetect.openProgressDialog();
-            cleanup = onCleanup(@() Methods.YOLODetect.closeProgressDialog(progress)); %#ok<NASGU>
+            cleanup = onCleanup(@() Methods.YOLODetect.closeProgressDialog(progress));
             Methods.YOLODetect.updateProgress(progress, 'Preparing YOLO input...');
 
+            if ~isempty(progress), progress.Cancelable = 'on'; end
             response = Wrapper.runYoloCentroids(data, scale_um_xyz, ...
+                'JobToken', options.JobToken, ...
+                'CancelFcn', @() Methods.MLProgress.cancelled(progress), ...
                 'Conf', options.Conf, ...
                 'ImgSize', options.ImgSize, ...
                 'BoxMinPx', options.BoxMinPx, ...

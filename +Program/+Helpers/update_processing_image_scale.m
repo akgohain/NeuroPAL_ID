@@ -1,8 +1,11 @@
-function scale = update_processing_image_scale(app, actions, original_dims)
+function scale = update_processing_image_scale(app, actions, original_dims, commit)
 % Keep physical display scale coherent when processing changes volume size.
 
 if nargin < 1 || isempty(app)
     app = Program.app;
+end
+if nargin < 4
+    commit = true;
 end
 
 scale = app.image_um_scale;
@@ -16,8 +19,10 @@ end
 scale(~isfinite(scale) | scale <= 0) = 1;
 
 if nargin < 2 || isempty(actions) || nargin < 3 || isempty(original_dims)
-    app.image_um_scale = scale;
-    scale = local_store_scale(app, scale);
+    if commit
+        app.image_um_scale = scale;
+        scale = local_store_scale(app, scale);
+    end
     return
 end
 
@@ -63,8 +68,10 @@ for n = 1:numel(actions)
     dims = next_dims;
 end
 
-app.image_um_scale = scale;
-scale = local_store_scale(app, scale);
+if commit
+    app.image_um_scale = scale;
+    scale = local_store_scale(app, scale);
+end
 end
 
 function new_scale = local_preserve_extent_scale(old_scale, old_n, new_n)

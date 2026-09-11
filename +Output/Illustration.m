@@ -10,6 +10,51 @@ classdef Illustration
     
    % Public methods.
     methods (Static)
+        function deleteFigure(fig)
+            %DELETEFIGURE Release an export figure after success or failure.
+            if isgraphics(fig)
+                delete(fig);
+            end
+        end
+
+        function projection = readProjection(data, z_indices)
+            %READPROJECTION Stream an export slab or read an existing RGB stack.
+            if ~isstruct(data)
+                projection = squeeze(max(data(:, :, z_indices, :), [], 3));
+                return
+            end
+            projection = [];
+            for z = z_indices
+                plane = data.read_slice(z);
+                if isempty(projection)
+                    projection = plane;
+                else
+                    projection = max(projection, plane);
+                end
+            end
+        end
+
+        function color = readNeuronColor(data, position, half_size)
+            %READNEURONCOLOR Read only the display patch around one neuron.
+            if ~isstruct(data)
+                color = squeeze(median(Methods.Utils.subcube( ...
+                    data(:, :, :, 1:3), position, half_size), 1:3));
+                return
+            end
+            rows = max(1, position(1)-half_size(1)):min(data.dims(1), position(1)+half_size(1));
+            cols = max(1, position(2)-half_size(2)):min(data.dims(2), position(2)+half_size(2));
+            slices = max(1, position(3)-half_size(3)):min(data.dims(3), position(3)+half_size(3));
+            patch = zeros([2 * half_size + 1, 3], 'single');
+            patch_rows = rows - position(1) + half_size(1) + 1;
+            patch_cols = cols - position(2) + half_size(2) + 1;
+            for index = 1:numel(slices)
+                plane = data.read_slice(slices(index));
+                patch_z = slices(index) - position(3) + half_size(3) + 1;
+                patch(patch_rows, patch_cols, patch_z, :) = plane(rows, cols, 1:3);
+            end
+            color = squeeze(median(patch, 1:3));
+        end
+
         function saveIDImage(file, data, neurons, um_scale, is_Z_flip)
             %SAVEIDIMAGE save an image with neuron IDs to a PDF.
             
@@ -17,7 +62,12 @@ classdef Illustration
             import Output.*;
             
             % What is the z limit?
-            max_z = size(data,3);
+            if isstruct(data) && isfield(data, 'read_slice')
+                data_dims = data.dims;
+            else
+                data_dims = size(data);
+            end
+            max_z = data_dims(3);
             max_z_str = num2str(max_z);
             range_z_str = ['(1-' max_z_str ')'];
             range_z_ID_str = ['(0-' max_z_str ')'];
@@ -105,7 +155,7 @@ classdef Illustration
             screen_size = get(0, 'Screensize');
             
             % Compute the scale bar.
-            max_y = size(data,1);
+            max_y = data_dims(1);
             scale_bar_width = 1;
             scale_bar_size = 10;
             scale_bar_str = [num2str(scale_bar_size) ' \mum'];
@@ -139,10 +189,8 @@ classdef Illustration
                 %    Methods.Utils.subcube(image_brightness, ...
                 %    round(neuron_pos(x,:)), cube_size), 'all'), ...
                 %    1:size(neuron_pos,1));
-                image_brightness = data(:,:,:,1:3);
-                neuron_color = arrayfun(@(x) squeeze(median(...
-                    Methods.Utils.subcube(image_brightness, ...
-                    round(neuron_pos(x,:)), cube_size),1:3)), ...
+                neuron_color = arrayfun(@(x) Output.Illustration.readNeuronColor( ...
+                    data, round(neuron_pos(x,:)), cube_size), ...
                     1:size(neuron_pos,1), 'UniformOutput', false);
                 
                 % Determine the neuron names, image coordinates, ID
@@ -172,9 +220,10 @@ classdef Illustration
                 
                 % Draw the image.
                 fig = figure('Visible', 'off', 'NumberTitle', 'off', 'Name', file);
+                figure_cleanup = onCleanup(@() Output.Illustration.deleteFigure(fig));
                 fig.Position(1:2) = [0,screen_size(4)];
-                fig.Position(3:4) = [size(data,2),size(data,1)] * image_size;
-                z_slice = squeeze(max(data(:,:,Z_start:Z_end,:),[],3));
+                fig.Position(3:4) = data_dims([2, 1]) * image_size;
+                z_slice = Output.Illustration.readProjection(data, Z_start:Z_end);
                 if image_size ~= 1
                     z_slice = imresize(z_slice, image_size);
                 end
@@ -298,6 +347,7 @@ classdef Illustration
                 end
                 
                 close(fig);
+                clear figure_cleanup
             end
         end
     end

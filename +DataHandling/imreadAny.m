@@ -134,7 +134,7 @@ image.lasers = nan(numChannels,1);
 image.emissions = nan(numChannels,1);
 
 % Organize the image volume.
-image.data = uint16(nan([image.pixels; numChannels]'));
+image.data = zeros([image.pixels; numChannels]', 'uint16');
 for i=1:size(imageData,1)
     
     % Get the image plane data.

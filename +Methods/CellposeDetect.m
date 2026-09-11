@@ -17,6 +17,7 @@ classdef CellposeDetect
                 options.OutputDir (1,1) string = ""
                 options.KeepArtifacts (1,1) logical = true
                 options.SaveMasksMat (1,1) logical = true
+                options.JobToken (1,1) string = ""
                 options.ColorReadoutData = []
             end
 
@@ -35,11 +36,14 @@ classdef CellposeDetect
 
             Methods.CellposeDetect.confirmInteractiveRun(mode);
             progress = Methods.CellposeDetect.openProgressDialog(mode);
-            progress_cleanup = onCleanup(@() Methods.CellposeDetect.closeProgressDialog(progress)); %#ok<NASGU>
+            progress_cleanup = onCleanup(@() Methods.CellposeDetect.closeProgressDialog(progress));
             Methods.CellposeDetect.updateProgress(progress, 0.05, ...
                 'Preparing Cellpose input volume...');
 
+            if ~isempty(progress), progress.Cancelable = 'on'; end
             response = Wrapper.runCellposeCentroids(data, scale_um_xyz, ...
+                'JobToken', options.JobToken, ...
+                'CancelFcn', @() Methods.MLProgress.cancelled(progress), ...
                 'Mode', mode, ...
                 'PythonExecutable', options.PythonExecutable, ...
                 'ModelPath', options.ModelPath, ...
@@ -103,7 +107,7 @@ classdef CellposeDetect
 
             rgbw = prefs.RGBW(~isnan(prefs.RGBW));
             data_RGBW = data(:,:,:,rgbw);
-            readout_RGBW = Methods.Preprocess.zscore_frame(data_RGBW);
+            readout_RGBW = Methods.ColorReadout(data_RGBW);
             [sp, mp] = Methods.CellposeDetect.detect(file, data_RGBW, info.scale', ...
                 'ColorReadoutData', readout_RGBW);
 
@@ -135,11 +139,19 @@ classdef CellposeDetect
             supervoxels.truncation = zeros(num_centroids, 1);
 
             default_covariance = diag([10, 10, 3]);
+            if isa(data, 'Methods.ColorReadout')
+                colors = data.sample(positions);
+            else
+                indices = sub2ind(volume_size(1:3), positions(:,1), positions(:,2), positions(:,3));
+                colors = zeros(num_centroids, num_channels);
+                for channel = 1:num_channels
+                    colors(:,channel) = double(data(indices+(channel-1)*prod(volume_size(1:3))));
+                end
+            end
             for i = 1:num_centroids
                 supervoxels.covariances(i,:,:) = default_covariance;
 
-                pos = positions(i,:);
-                voxel_color = squeeze(data(pos(1), pos(2), pos(3), :))';
+                voxel_color = colors(i,:);
                 supervoxels.color(i,:) = voxel_color;
                 supervoxels.color_readout(i,:) = voxel_color;
             end

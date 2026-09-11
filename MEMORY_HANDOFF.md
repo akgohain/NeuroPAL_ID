@@ -1,5 +1,10 @@
 # NeuroPAL_ID memory handoff: CZI/MAT image load
 
+> Historical investigation: the snippets below describe an earlier implementation.
+> The current performance changes, measured results, and remaining limits are in
+> [PERFORMANCE.md](PERFORMANCE.md). Main loading no longer builds the eager
+> z-score shown below, and main rendering retains two RGB planes.
+
 ## Context
 
 User observed MATLAB/App memory reaching roughly 9 GB while loading:

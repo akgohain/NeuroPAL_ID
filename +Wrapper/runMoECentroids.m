@@ -12,7 +12,10 @@ arguments
     options.ProgressFcn = []
     options.CancelFcn = []
     options.TimeoutSeconds (1,1) double = 10800
+    options.JobToken (1,1) string = ""
 end
+job = Program.HeavyJob.acquire('MoE inference', options.JobToken);
+job_cleanup = onCleanup(@() delete(job));
 if ~isfinite(options.TimeoutSeconds) || options.TimeoutSeconds <= 0
     error('Wrapper:MoEInvalidTimeout', 'TimeoutSeconds must be finite and positive.');
 end
@@ -61,38 +64,22 @@ file_cleanup = onCleanup(@() fclose(fid));
 fwrite(fid, jsonencode(request), 'char');
 clear file_cleanup
 bridge = fullfile(fileparts(mfilename('fullpath')), 'moe_inference.py');
-command = java.util.ArrayList;
-parts = {python, '-u', bridge, 'run', '--request', request_path, '--response', response_path};
-for i = 1:numel(parts), command.add(java.lang.String(parts{i})); end
-builder = java.lang.ProcessBuilder(command);
-builder.redirectErrorStream(true);
 log_path = fullfile(output, 'inference.log');
-builder.redirectOutput(java.io.File(log_path));
-process = builder.start();
-process_cleanup = onCleanup(@() local_stop(process));
-started = tic;
-last_text = '';
-while process.isAlive()
-    if ~isempty(options.CancelFcn) && options.CancelFcn()
+try
+    [status, detail] = Wrapper.runPythonProcess( ...
+        {python, '-u', bridge, 'run', '--request', request_path, '--response', response_path}, ...
+        'JobToken', job.Token, 'LogPath', log_path, ...
+        'ProgressFcn', options.ProgressFcn, 'CancelFcn', options.CancelFcn, ...
+        'TimeoutSeconds', options.TimeoutSeconds);
+catch ME
+    if strcmp(ME.identifier, 'Wrapper:ProcessCancelled')
         error('Wrapper:MoECancelled', 'Detection canceled; existing annotations were preserved.');
-    end
-    if toc(started) > options.TimeoutSeconds
+    elseif strcmp(ME.identifier, 'Wrapper:ProcessTimeout')
         error('Wrapper:MoETimeout', 'Detection timed out. See %s.', log_path);
     end
-    if exist(log_path, 'file') == 2
-        content = fileread(log_path);
-        tokens = regexp(content, 'NEUROPAL_PROGRESS:([^\r\n]+)', 'tokens');
-        if ~isempty(tokens) && ~strcmp(last_text, tokens{end}{1})
-            last_text = tokens{end}{1};
-            if ~isempty(options.ProgressFcn), options.ProgressFcn(last_text); end
-        end
-    end
-    drawnow limitrate;
-    pause(0.2);
+    rethrow(ME);
 end
-if process.exitValue() ~= 0
-    detail = fileread(log_path);
-    detail = detail(max(1, end-4000):end);
+if status ~= 0
     error('Wrapper:MoEInferenceFailed', 'MoE inference failed. Log: %s\n%s', log_path, detail);
 end
 response = jsondecode(fileread(response_path));
@@ -108,12 +95,6 @@ if size(centers,2) ~= 3 || size(centers,1) ~= numel(scores) || ...
 end
 response.centroids_yxz = centers;
 response.output_dir = output;
-end
-
-function local_stop(process)
-if process.isAlive()
-    process.destroy();
-end
 end
 
 function local_cleanup(path, keep)

@@ -11,8 +11,13 @@ arguments
     options.Device (1,1) string = "auto"
     options.OutputDir (1,1) string = ""
     options.KeepArtifacts (1,1) logical = false
+    options.JobToken (1,1) string = ""
+    options.CancelFcn = []
+    options.TimeoutSeconds (1,1) double = 10800
     options.ProgressFcn = []
 end
+job = Program.HeavyJob.acquire('runSpotiflowCentroids', options.JobToken);
+job_cleanup = onCleanup(@() delete(job));
 
 readiness = Methods.MethodBundle.inspect('spotiflow_supervised', options.BundlePath);
 if ~readiness.ready
@@ -98,10 +103,12 @@ request = struct( ...
 local_write_json(request_path, request);
 
 bridge_path = fullfile(fileparts(mfilename('fullpath')), 'advanced_method_bridge.py');
-command = local_join_quoted({python_executable, bridge_path, 'spotiflow', ...
-    '--request', request_path, '--response', response_path});
+command_parts = {python_executable, bridge_path, 'spotiflow', ...
+    '--request', request_path, '--response', response_path};
 local_progress(options.ProgressFcn, 'Running Spotiflow detector...');
-[status, output] = system(command);
+[status, output] = Wrapper.runPythonProcess(command_parts, ...
+    'JobToken', job.Token, 'ProgressFcn', options.ProgressFcn, ...
+    'CancelFcn', options.CancelFcn, 'TimeoutSeconds', options.TimeoutSeconds);
 local_emit_progress(options.ProgressFcn, output);
 if status ~= 0
     output_lower = lower(output);
@@ -175,10 +182,6 @@ for i = 1:numel(candidates)
         return
     end
 end
-end
-
-function command = local_join_quoted(parts)
-command = strjoin(cellfun(@local_quote, parts, 'UniformOutput', false), ' ');
 end
 
 function value = local_quote(value)

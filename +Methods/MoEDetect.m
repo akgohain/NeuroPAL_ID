@@ -1,5 +1,5 @@
 classdef MoEDetect
-    %MOEDETECT Experimental fold-00 nonlinear ensemble, without annotations.
+    %MOEDETECT Fold-00 nonlinear ensemble, without annotations.
     methods (Static)
         function [supervoxels, params] = detect(titlestr, data, scale_um_xyz, options)
             arguments
@@ -13,11 +13,13 @@ classdef MoEDetect
                 options.OutputDir (1,1) string = ""
                 options.KeepArtifacts (1,1) logical = true
                 options.ColorReadoutData = []
+                options.JobToken (1,1) string = ""
             end
             progress = Methods.MLProgress.open("Nonlinear MoE", "Checking model bundle...");
             if ~isempty(progress), progress.Cancelable = 'on'; end
             cleanup = onCleanup(@() Methods.MLProgress.close(progress));
             response = Wrapper.runMoECentroids(data, scale_um_xyz, ...
+                'JobToken', options.JobToken, ...
                 'BundlePath', options.BundlePath, 'PythonExecutable', options.PythonExecutable, ...
                 'DatasetID', options.DatasetID, 'Device', options.Device, ...
                 'OutputDir', options.OutputDir, 'KeepArtifacts', options.KeepArtifacts, ...

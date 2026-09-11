@@ -1,6 +1,7 @@
-function get_slice(~, view, ~)
+function get_slice(~, view, ~, reset_limits)
     %% Draw the neurons in this z-slice.
 
+    if nargin < 4, reset_limits = false; end
     app = Program.app;
 
     % Sanity check the Z slice value.
@@ -40,20 +41,22 @@ function get_slice(~, view, ~)
         app.ZRightLabel.BackgroundColor = RV_color;
     end
 
-    % Clear the contents of the axis to draw the new Z-slice.
+    % Update the image and replace the annotations for this Z-slice.
     Program.Helpers.ensure_main_image_axes(app);
     ax = app.XY;
-    cla(ax);
     % Create the slice at z for displaying in the axis.
     [xy, ~, z] = Program.Helpers.get_current_display_slice(app, 'main', view);
     Program.Helpers.debug_array_summary('IDSlice', 'xy_slice', xy);
     % Display the current slice in the XY axis.
     Program.Helpers.fill_axes_parent(ax);
-    gui_image = image(xy, 'Parent', ax);
-    Program.Helpers.configure_image_axes_ticks( ...
-        ax, size(xy), app.image_um_scale(1:2), ...
-        'XLim', [0, size(xy, 2)], ...
-        'YLim', [0, size(xy, 1)]);
+    [gui_image, configure_axes] = Program.Helpers.main_slice_image( ...
+        ax, xy, app.image_um_scale(1:2), reset_limits);
+    if configure_axes
+        Program.Helpers.configure_image_axes_ticks( ...
+            ax, size(xy), app.image_um_scale(1:2), ...
+            'XLim', [0, size(xy, 2)], ...
+            'YLim', [0, size(xy, 1)]);
+    end
     Program.Helpers.fill_axes_parent(ax);
     hold(ax, 'on');
     local_draw_cellpose_mask_overlay(app, ax, z);

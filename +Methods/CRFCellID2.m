@@ -9,6 +9,9 @@ classdef CRFCellID2
                 options.OutputDir (1,1) string = ""
                 options.KeepArtifacts (1,1) logical = false
             end
+            job = Program.HeavyJob.acquire('CRF auto-ID');
+            job_cleanup = onCleanup(@() delete(job));
+            input_context = Program.Helpers.main_job_context(app, true);
             if isempty(app.image_neurons) || app.image_neurons.num_neurons() < 1
                 error('Methods:CRFCellID2:NoNeurons', ...
                     'Run auto-detection before CRF Cell-ID 2.0.');
@@ -30,6 +33,7 @@ classdef CRFCellID2
                 'BundlePath', options.BundlePath, ...
                 'OutputDir', options.OutputDir, ...
                 'KeepArtifacts', options.KeepArtifacts);
+            Program.Helpers.assert_main_job_context(app, input_context);
             Methods.TransformerAutoId.applyPredictions(app, predictions);
             Methods.TransformerAutoId.refreshAppUI(app);
         end

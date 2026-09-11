@@ -1,5 +1,7 @@
 function view = render_main_display_view(app, z_gui, existing_view)
-%RENDER_MAIN_DISPLAY_VIEW Render main-view max projection and current slice.
+%RENDER_MAIN_DISPLAY_VIEW Build a bounded cache for the main image viewer.
+% Pixel mutations must invalidate main_display_view_cache or request a full
+% Program.Routines.ID.render; z navigation may reuse the cached projection.
 
 if nargin < 1 || isempty(app)
     app = Program.app;
@@ -10,100 +12,23 @@ end
 if nargin < 3
     existing_view = [];
 end
-
-raw_volume = app.image_data;
-if isempty(raw_volume)
+if isempty(app.image_data)
     view = [];
     return
 end
 
-z_count = size(raw_volume, 3);
-z_gui = min(max(round(double(z_gui)), 1), z_count);
-if isstruct(app.image_prefs) && isfield(app.image_prefs, 'is_Z_flip')
-    is_z_flip = logical(app.image_prefs.is_Z_flip);
-else
-    is_z_flip = false;
-end
-z_data = Program.Helpers.gui_z_to_data_index(z_gui, z_count, is_z_flip);
-
-if local_can_reuse_projection(existing_view, raw_volume)
-    view = existing_view;
-    view.display_slice = squeeze(view.render_volume(:, :, z_data, :));
-    view.z_gui = z_gui;
-    view.z_data = z_data;
-    return
-end
-
+is_z_flip = isstruct(app.image_prefs) && ...
+    isfield(app.image_prefs, 'is_Z_flip') && logical(app.image_prefs.is_Z_flip);
 state = Program.Handlers.channels.main_state(app);
 channels = struct( ...
-    'r', state.r, ...
-    'g', state.g, ...
-    'b', state.b, ...
-    'white', state.white, ...
-    'dic', state.dic, ...
-    'gfp', state.gfp, ...
-    'other', {{}});
-
-threshold_raw = 0;
-render_volume = zeros(size(raw_volume, 1), size(raw_volume, 2), z_count, 3, 'single');
-max_projection = [];
-volume_max = 0;
-rgb_channels = {};
-
-for z = 1:z_count
-    Program.Handlers.dialogue.step(sprintf('Rendering z-slice %d of %d...', z, z_count));
-    [slice_rgb, rgb_channels] = local_compose_slice(raw_volume, channels, z);
-    render_volume(:, :, z, :) = slice_rgb;
-
-    if isempty(max_projection)
-        max_projection = slice_rgb;
-    else
-        max_projection = max(max_projection, slice_rgb);
-    end
-
-    slice_max = double(max(slice_rgb, [], 'all'));
-    if slice_max > volume_max
-        volume_max = slice_max;
-    end
-
+    'r', state.r, 'g', state.g, 'b', state.b, ...
+    'white', state.white, 'dic', state.dic, 'gfp', state.gfp, 'other', {{}});
+source_file = '';
+if isprop(app, 'image_file')
+    source_file = char(string(app.image_file));
 end
-
-render_volume = Program.Helpers.finalize_display_volume( ...
-    render_volume, rgb_channels, threshold_raw, volume_max);
-max_projection = Program.Helpers.finalize_display_volume( ...
-    max_projection, rgb_channels, threshold_raw, volume_max);
-display_slice = squeeze(render_volume(:, :, z_data, :));
-
-view = struct( ...
-    'renderer', 'main_display_view', ...
-    'target', 'main', ...
-    'channels', channels, ...
-    'rgb_channels', {rgb_channels}, ...
-    'threshold_raw', threshold_raw, ...
-    'is_z_flip', is_z_flip, ...
-    'raw_size', size(raw_volume), ...
-    'z_gui', z_gui, ...
-    'z_data', z_data, ...
-    'volume_max', volume_max, ...
-    'render_volume', render_volume, ...
-    'max_projection', max_projection, ...
-    'display_slice', display_slice);
-end
-
-function tf = local_can_reuse_projection(view, raw_volume)
-tf = isstruct(view) && isfield(view, 'renderer') && ...
-    strcmp(char(string(view.renderer)), 'main_display_view') && ...
-    isfield(view, 'max_projection') && ~isempty(view.max_projection) && ...
-    isfield(view, 'render_volume') && ~isempty(view.render_volume) && ...
-    isfield(view, 'raw_size') && isequal(double(view.raw_size), double(size(raw_volume))) && ...
-    isfield(view, 'channels') && isfield(view, 'threshold_raw') && ...
-    isfield(view, 'volume_max') && isfinite(double(view.volume_max));
-end
-
-function [slice_rgb, rgb_channels] = local_compose_slice(raw_volume, channels, z_data)
-raw_slice = raw_volume(:, :, z_data, :);
-if ndims(raw_slice) < 4
-    raw_slice = reshape(raw_slice, size(raw_slice, 1), size(raw_slice, 2), 1, []);
-end
-[slice_rgb, rgb_channels] = Program.Helpers.compose_display_volume(raw_slice, channels);
+source_key = struct('file', source_file, ...
+    'revision', Program.Helpers.main_display_source_revision(app));
+view = Program.Helpers.compose_main_display_view( ...
+    app.image_data, channels, z_gui, is_z_flip, source_key, existing_view, 0);
 end
