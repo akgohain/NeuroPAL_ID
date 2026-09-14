@@ -23,14 +23,17 @@ function [image, metadata] = imreadCZI(filename)
 
 % Open the CZI file.
 try
-    data = bfopen(filename);
+    [reader, reader_cleanup, hashtable] = ...
+        DataHandling.Helpers.bioformats_image.open(filename);
 catch ME
+    if startsWith(ME.identifier, 'DataHandling:')
+        rethrow(ME);
+    end
     [image, metadata] = fallbackToPython(filename, ME);
     return
 end
 
 % Extract the metadata.
-hashtable = data{1,2};
 keys = arrayfun(@char, hashtable.keySet.toArray, 'UniformOutput', false);
 values = cellfun(@(x) hashtable.get(x), keys, 'UniformOutput', false);
 
@@ -212,29 +215,9 @@ for i=1:numChannels
     end
 end
 
-% Organize the image volume.
-%numC = numChannels;
-imageData = data{1,1};
-image.data = zeros([image.pixels; numChannels]', 'uint16');
-for i=1:size(imageData,1)
-    
-    % Get the image plane data.
-    dataStrs = split(imageData{i,2}, ';');
-    zStr = strtrim(dataStrs{end-1});
-    cStr = strtrim(dataStrs{end});
-    
-    % Assemble the image.
-    %z = floor((i - 1) / numC) + 1;
-    %c = mod(i - 1, numC) + 1;
-    %image.data(:,:,z,c) = imageData{i,1}';
-    z = sscanf(zStr,'Z=%f');
-    c = sscanf(cStr,'C=%f');
-    image.data(:,:,z,c) = imageData{i,1}';
-    
-    % Debug the image assembly.
-    % disp(imageData{i,2});
-    % printf('z=%d c=%d', z, c);
-end
+% Organize the image volume one plane at a time.
+image.pixels = double([reader.getSizeX(); reader.getSizeY(); reader.getSizeZ()]);
+image.data = DataHandling.Helpers.bioformats_image.read(reader, filename);
 end
 
 function [image, metadata] = fallbackToPython(filename, originalError)
@@ -253,16 +236,13 @@ end
 output_h5 = [tempname, '.h5'];
 output_json = [tempname, '.json'];
 
-cleanup = onCleanup(@() cleanupTempFiles(output_h5, output_json));
-command = sprintf('"%s" "%s" "%s" "%s" "%s"', ...
-    python_bin, script_path, filename, output_h5, output_json);
-[status, cmdout] = system(command);
+cleanup = onCleanup(@() cleanupTempFiles(output_h5, output_json, [output_h5 '.pixels']));
+[status, cmdout] = Wrapper.runPythonProcess( ...
+    {python_bin, script_path, filename, output_h5, output_json});
 
 if status ~= 0 || ~isfile(output_h5) || ~isfile(output_json)
     error(['Cannot read "%s"!\nBio-Formats failed with:\n%s\n\n' ...
-        'Python fallback failed with:\n%s\n\nInstall the repo Python ' ...
-        'dependencies, including czifile and imagecodecs, or create ' ...
-        './venv and retry.'], ...
+        'Python fallback failed with:\n%s'], ...
         filename, getReport(originalError, 'basic', 'hyperlinks', 'off'), cmdout);
 end
 
@@ -279,7 +259,19 @@ if image.dicChannel == 0
 end
 image.lasers = double(payload.lasers(:));
 image.emissions = double(payload.emissions);
-image.data = permute(h5read(output_h5, '/data'), [4, 3, 2, 1]);
+% Read each output plane without a second full-volume transpose.
+info = h5info(output_h5, '/data');
+dims = double(info.Dataspace.Size);
+DataHandling.Helpers.npal_mat.check_materialization(filename, ...
+    struct('size', dims, 'class', 'decoded', 'bytes', prod(dims) * info.Datatype.Size));
+first = h5read(output_h5, '/data', [1 1 1 1], [1 1 dims(3:4)]);
+image.data = zeros(fliplr(dims), 'like', first);
+for c = 1:dims(1)
+    for z = 1:dims(2)
+        plane = h5read(output_h5, '/data', [c z 1 1], [1 1 dims(3:4)]);
+        image.data(:, :, z, c) = reshape(plane, dims(3:4))';
+    end
+end
 
 metadata = struct( ...
     'keys', {{}}, ...

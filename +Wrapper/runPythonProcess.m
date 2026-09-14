@@ -26,7 +26,7 @@ builder = java.lang.ProcessBuilder(arguments_list);
 builder.environment().put('NEUROPAL_JOB_TOKEN', owner.Token);
 builder.environment().put('NEUROPAL_PARENT_PID', num2str(feature('getpid')));
 settings = {'NEUROPAL_JOB_LOCK', 'NEUROPAL_MAX_JOB_MIB', ...
-    'NEUROPAL_MOE_WORKSPACE_MIB', 'NEUROPAL_ROUTER_MIB'};
+    'NEUROPAL_MOE_WORKSPACE_MIB', 'NEUROPAL_ROUTER_MIB', 'NEUROPAL_IMAGE_MAX_MIB'};
 for i = 1:numel(settings)
     value = getenv(settings{i});
     if ~isempty(value), builder.environment().put(settings{i}, value); end

@@ -11,6 +11,7 @@ test_histmatch_memory;
 test_debug_array_summary;
 test_main_display_view;
 test_npal_mat_source;
+test_import_memory;
 test_nwb_stream_export;
 test_processing_transaction;
 test_nn_streaming;

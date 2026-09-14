@@ -142,10 +142,15 @@ before/after speedup benchmark.
 ## Remaining limits
 
 This is not a fully out-of-core main editor. Main pixel storage is still numeric;
-non-H5 video refresh uses a whole frame. The main MAT payload ceiling does not
-bound the temporary allocations of every original-format converter; Bio-Formats
-and the legacy CZI fallback retain their existing import behavior. NWB/ND2 and
-lazy MAT processing have dedicated bounded paths. Full-volume legacy algorithms
+non-H5 video refresh uses a whole frame. Static Bio-Formats, LIF, VLab H5 and
+Python CZI imports now check decoded dimensions against the image payload ceiling
+before reading pixels. Generic, CZI and legacy ND2 Bio-Formats imports read the
+first series one plane at a time; LIF checks the selected series. Static readers
+require one time point and separate channel planes; Bio-Formats uses its channel
+separator before this check. NWB/ND2 and lazy MAT processing retain their dedicated bounded paths.
+This is a payload admission check, not a total-memory guarantee: codec buffers,
+MATLAB's current image, and later conversion copies still contribute to peak RAM.
+Full-volume legacy algorithms
 and unsupported lazy operations still need separate algorithm-specific work.
 
 Dense per-frame tracking ROI storage remains unchanged. Tracking conversion now
@@ -159,3 +164,27 @@ of processing transactions and the Save false-result branch separately. Real
 Parallel Toolbox pool ownership and legacy NN model execution were not exercised;
 those resource contracts use controlled fixtures. App startup remains about
 25 seconds on this machine.
+
+## Import admission follow-up
+
+- Replaced eager `bfopen` calls in static image readers with metadata inspection
+  and sequential planes. ND2 channel-name lookup now reads metadata only.
+- The Python CZI fallback checks dimensions before decoding, decodes one subblock
+  at a time into a temporary memory map, and writes H5 planes sequentially. MATLAB
+  reads those planes into the final array without a full-volume transpose copy.
+- CZI fallback runs through the worker supervisor and inherits MATLAB's current
+  `NEUROPAL_IMAGE_MAX_MIB` setting. Its temporary pixel file is owned by MATLAB's
+  cleanup handler as well as Python, including when the worker is terminated.
+- LIF preallocates its native array and closes its reader on every exit. The
+  selected series is now passed to `setSeries`, rather than treated as time.
+
+Validation: `scripts/test_import_memory.m` checks admission, synthetic Bio-Formats
+plane assembly, and time-series rejection. `scripts/test_czi_import.py` checks
+rejection before decoding, disk-backed conversion equality and scratch cleanup.
+
+The real CZI fallback fixture (1536 × 466 × 25 × 7, 239 MiB of uint16 pixels)
+loaded in 6.8 seconds. All 175 channel/Z planes matched the previously saved MAT
+exactly, including orientation. A forced fallback also rejected the source under
+MATLAB's reduced image limit. The supervised load-plus-comparison run peaked at
+1,308,336 KiB summed RSS; this is fixture evidence, not an arbitrary-input ceiling.
+Artifacts: `/Users/adamg/neuroPAL/artifacts/performance-sweep/import-hardening/`.

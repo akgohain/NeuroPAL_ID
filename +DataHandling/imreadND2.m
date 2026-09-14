@@ -22,10 +22,10 @@ function [image, metadata] = imreadND2(filename)
 %       hashtable = a Java Hashtable of keys and their values
 
 % Open the ND2 file.
-data = bfopen(filename);
+[reader, reader_cleanup, hashtable] = ...
+    DataHandling.Helpers.bioformats_image.open(filename);
 
 % Extract the metadata.
-hashtable = data{1,2};
 keys = arrayfun(@char, hashtable.keySet.toArray, 'UniformOutput', false);
 values = cellfun(@(x) hashtable.get(x), keys, 'UniformOutput', false);
 
@@ -145,33 +145,7 @@ end
 %     end
 % end
 
-% Organize the image volume.
-%numC = numChannels;
-imageData = data{1,1};
-image.data = uint16(nan([image.pixels; numChannels]'));
-for i=1:size(imageData,1)
-    
-    % Get the image plane data.
-    dataStrs = split(imageData{i,2}, ';');
-    zStr = strtrim(dataStrs{end-1});
-    cStr = strtrim(dataStrs{end});
-    
-    % Assemble the image.
-    %z = floor((i - 1) / numC) + 1;
-    %c = mod(i - 1, numC) + 1;
-    %image.data(:,:,z,c) = imageData{i,1}';
-    z = sscanf(zStr,'Z=%f');
-    c = sscanf(cStr,'C=%f');
-    if isempty(z) || isnan(z)
-        z = 1;
-    end
-    if isempty(c) || isnan(c)
-        c = 1;
-    end
-    image.data(:,:,z,c) = imageData{i,1}';
-    
-    % Debug the image assembly.
-    % disp(imageData{i,2});
-    % printf('z=%d c=%d', z, c);
-end
+% Organize the image volume one plane at a time.
+image.pixels = double([reader.getSizeX(); reader.getSizeY(); reader.getSizeZ()]);
+image.data = DataHandling.Helpers.bioformats_image.read(reader, filename);
 end
