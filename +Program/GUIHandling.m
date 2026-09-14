@@ -560,8 +560,6 @@ classdef GUIHandling
                 return
             end
 
-            Program.GUIHandling.update_processing_empty_state(app);
-            empty_state = Program.GUIHandling.ensure_main_id_empty_state(app);
             has_image = false;
             try
                 has_image = ~isempty(app.image_data);
@@ -572,20 +570,9 @@ classdef GUIHandling
                 content_name = content_names{content_i};
                 if isprop(app, content_name) && ~isempty(app.(content_name)) && ...
                         isvalid(app.(content_name))
-                    app.(content_name).Visible = Program.GUIHandling.on_off(has_image);
+                    app.(content_name).Visible = 'on';
                 end
             end
-            if ~isempty(empty_state) && isvalid(empty_state)
-                empty_state.Visible = Program.GUIHandling.on_off(~has_image);
-                if ~has_image
-                    Program.GUIHandling.set_descendant_enable_state(empty_state, 'on');
-                    try
-                        uistack(empty_state, 'top');
-                    catch
-                    end
-                end
-            end
-
             controls = Program.GUIHandling.main_detect_id_controls(app);
             if isempty(controls)
                 return
@@ -698,52 +685,6 @@ classdef GUIHandling
             end
             if isprop(app, 'UserIDButton') && isvalid(app.UserIDButton)
                 app.UserIDButton.Enable = Program.GUIHandling.on_off(neuron_count > 0);
-            end
-        end
-
-        function panel = ensure_main_id_empty_state(app)
-            panel = findobj(app.IdGridLayout, 'Tag', 'MainIDEmptyState');
-            if ~isempty(panel) && isvalid(panel(1))
-                panel = panel(1);
-                return
-            end
-
-            panel = uipanel(app.IdGridLayout, ...
-                'Tag', 'MainIDEmptyState', ...
-                'BorderType', 'none', ...
-                'BackgroundColor', [0.97 0.97 0.97]);
-            panel.Layout.Row = [2 8];
-            panel.Layout.Column = [1 4];
-            Program.Helpers.empty_view_button(panel, 'Open Image', ...
-                @(~, ~) Program.GUIHandling.open_main_image_from_empty_state(app));
-        end
-
-        function update_processing_empty_state(app)
-            panel = findobj(app.ImageProcessingTab, 'Tag', 'ProcessingEmptyState');
-            if isempty(panel)
-                panel = uipanel(app.ImageProcessingTab, 'Tag', 'ProcessingEmptyState', ...
-                    'BorderType', 'none', 'BackgroundColor', [0.97 0.97 0.97], ...
-                    'Units', 'normalized', 'Position', [0 0 1 1]);
-                Program.Helpers.empty_view_button(panel, 'Open Image', ...
-                    @(~, ~) Program.GUIHandling.open_main_image_from_empty_state(app));
-            end
-            has_source = ~isempty(app.image_data) || ...
-                Program.GUIHandling.processing_video_available(app) || ...
-                Program.GUIHandling.processing_tab_rendered(app);
-            panel.Visible = Program.GUIHandling.on_off(~has_source);
-            app.ProcessingGridLayout.Visible = Program.GUIHandling.on_off(has_source);
-            if ~has_source
-                Program.GUIHandling.set_descendant_enable_state(panel, 'on');
-            end
-        end
-
-        function open_main_image_from_empty_state(~)
-            try
-                Program.Routines.open();
-            catch ME
-                Program.Helpers.debug_event('OpenFileCallback', ...
-                    '%s', getReport(ME, 'extended', 'hyperlinks', 'off'));
-                rethrow(ME)
             end
         end
 
@@ -2987,7 +2928,7 @@ classdef GUIHandling
                 return
             end
 
-            button_names = {'ProcessingButton', 'IdButton'};
+            button_names = {'ProcessingButton', 'IdButton', 'TrackingButton'};
             for n = 1:numel(button_names)
                 name = button_names{n};
                 if ~isprop(app, name) || isempty(app.(name)) || ~isvalid(app.(name))

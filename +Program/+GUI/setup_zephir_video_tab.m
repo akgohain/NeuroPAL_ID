@@ -7,7 +7,7 @@ if nargin < 1 || isempty(app) || ~isvalid(app)
     return
 end
 
-layout_version = 23;
+layout_version = 24;
 if isappdata(app.CELL_ID, 'zephir_video_ui_setup') && ...
         getappdata(app.CELL_ID, 'zephir_video_ui_setup') && ...
         isappdata(app.CELL_ID, 'zephir_video_ui_layout_version') && ...
@@ -32,7 +32,6 @@ remove_header(app, root);
 left_grid = setup_left_workstation(app, root);
 setup_viewer(app, left_grid);
 setup_navigation(app, left_grid);
-setup_empty_state(app, root);
 toggle_button = setup_workflow_toggle(app, root);
 workflow_panel = setup_workflow_tabs(app, root);
 apply_workflow_collapse_state(app, root, workflow_panel, toggle_button);
@@ -40,16 +39,6 @@ setup_video_tracking_copy(app);
 wrap_action_callbacks(app);
 
 Program.GUI.update_zephir_video_tab(app);
-end
-
-function setup_empty_state(app, parent_grid)
-panel = tagged_panel(parent_grid, 'zephir-video-empty-state', '');
-panel.Layout.Row = [1 2];
-panel.Layout.Column = 1;
-panel.BorderType = 'none';
-panel.BackgroundColor = [0.97 0.97 0.97];
-Program.Helpers.empty_view_button(panel, 'Open Video', [], app.TrackingButton);
-set_tooltip(app.TrackingButton, 'Choose a supported time-series recording.');
 end
 
 function grid = setup_left_workstation(~, root)
