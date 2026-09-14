@@ -1,13 +1,21 @@
-function get_slice(~, view, ~, reset_limits)
+function get_slice(~, view, ~, reset_limits, requested_z)
     %% Draw the neurons in this z-slice.
 
     if nargin < 4, reset_limits = false; end
+    if nargin < 5, requested_z = []; end
     app = Program.app;
 
     % Sanity check the Z slice value.
-    z = Program.Helpers.gui_z_to_data_index(app.ZSlider.Value, size(app.image_data, 3), false);
-    app.logEvent('Main',sprintf('Drawing slice %s...', string(z)), 0);
-    app.ZSlider.Value = z;
+    is_preview = ~isempty(requested_z);
+    if ~is_preview
+        requested_z = app.ZSlider.Value;
+        app.logEvent('Main',sprintf('Drawing slice %s...', string(requested_z)), 0);
+    end
+    z = Program.Helpers.gui_z_to_data_index(requested_z, size(app.image_data, 3), false);
+    % A preview must not send an older thumb position back to the browser.
+    if ~is_preview && app.ZSlider.Value ~= z
+        app.ZSlider.Value = z;
+    end
 
     % Is there an image?
     if isempty(app.image_data)
@@ -47,7 +55,7 @@ function get_slice(~, view, ~, reset_limits)
     end
     ax = app.XY;
     % Create the slice at z for displaying in the axis.
-    [xy, ~, z] = Program.Helpers.get_current_display_slice(app, 'main', view);
+    [xy, ~, z] = Program.Helpers.get_current_display_slice(app, 'main', view, requested_z);
     Program.Helpers.debug_array_summary('IDSlice', 'xy_slice', xy);
     % Display the current slice in the XY axis.
     [gui_image, configure_axes] = Program.Helpers.main_slice_image( ...

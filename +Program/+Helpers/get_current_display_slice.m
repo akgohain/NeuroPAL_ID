@@ -1,4 +1,4 @@
-function [frame, z_gui, z_data] = get_current_display_slice(app, target, display_volume)
+function [frame, z_gui, z_data] = get_current_display_slice(app, target, display_volume, requested_z)
 %GET_CURRENT_DISPLAY_SLICE Return the selected plane without materializing RGB stacks.
 
 if nargin < 1 || isempty(app)
@@ -10,6 +10,7 @@ end
 if nargin < 3
     display_volume = [];
 end
+if nargin < 4, requested_z = []; end
 target = lower(string(target));
 
 switch target
@@ -20,7 +21,8 @@ switch target
                 ~strcmp(char(string(display_volume.renderer)), 'main_display_view')
             display_volume = Program.Helpers.main_display_view_cache(app);
         end
-        view = Program.Helpers.render_main_display_view(app, app.ZSlider.Value, display_volume);
+        if isempty(requested_z), requested_z = app.ZSlider.Value; end
+        view = Program.Helpers.render_main_display_view(app, requested_z, display_volume);
         Program.Helpers.main_display_view_cache(app, view);
         if isempty(view)
             frame = [];

@@ -3086,6 +3086,31 @@ classdef GUIHandling
                 Program.GUIHandling.wrap_main_processing_sync_callback( ...
                     app, targets{n, 1}, targets{n, 2});
             end
+            Program.GUIHandling.install_main_slice_preview(app);
+        end
+
+        function install_main_slice_preview(app)
+            key = 'main_slice_preview';
+            if isappdata(app.CELL_ID, key)
+                previous = getappdata(app.CELL_ID, key);
+                if isvalid(previous), return; end
+            end
+            commit = app.ZSlider.ValueChangedFcn;
+            preview = Program.LatestSlicePreview( ...
+                @(z) Program.GUIHandling.preview_main_slice(app, z), ...
+                @(src, event) Program.GUIHandling.invoke_gui_callback(commit, src, event), ...
+                @() Program.Helpers.main_display_source_revision(app), app.CELL_ID);
+            setappdata(app.CELL_ID, key, preview);
+            app.ZSlider.Interruptible = 'off';
+            app.ZSlider.ValueChangingFcn = @(~, event) preview.request(event.Value);
+            app.ZSlider.ValueChangedFcn = @(src, event) preview.finish(src, event);
+        end
+
+        function preview_main_slice(app, z)
+            if isempty(app.image_data) || app.is_opening_file, return; end
+            view = Program.Helpers.main_display_view_cache(app);
+            if ~isempty(view) && isequal(view.z_gui, z), return; end
+            Program.Routines.ID.get_slice(app.ZSlider, [], app.XY, false, z);
         end
 
         function remove_redundant_processing_menus(app)

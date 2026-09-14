@@ -212,3 +212,29 @@ including a release without a preceding drag render. It verifies the final slice
 exact displayed pixels, unchanged projection/source revision, reused graphics,
 and preserved zoom. It is included in the full app test. Profiling artifacts are
 in `/Users/adamg/neuroPAL/artifacts/performance-sweep/slider-latency/`.
+
+## Coalesced main-slider previews
+
+Main-slider drag callbacks now store only the newest requested Z in one owned
+timer. Rendering consumes that value and stops the timer; a release first clears
+pending work and then commits its final value through the existing release path.
+Preview drawing receives an explicit Z and does not write intermediate values
+back to the browser slider. This avoids feeding old thumb positions into newer
+drag interactions. Consecutive requests for the displayed slice are skipped.
+
+Pending requests carry the image revision and are discarded after a source or
+display-settings change. Figure destruction deletes the controller and its timer.
+No image stacks or history queues are added. The original projection cache and
+normal full-redraw behavior remain in place.
+
+The development gate covers bursts, release-before-preview, source invalidation,
+subsequent gestures, and timer cleanup. The real-app slider test additionally
+checks that previewing leaves the committed slider value untouched and that
+pending work cannot replace the final release slice or its exact pixels.
+
+The real-app callback test passed with all 169 saved detections present. Native
+mouse automation was also attempted, but its event trace sometimes reported the
+starting position as the release value instead of the requested endpoint. Thus
+those automated gestures are not evidence of correct physical drag endpoints;
+manual confirmation of the interaction remains useful. Tracing was removed from
+the shipped code after diagnosis.

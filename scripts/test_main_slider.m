@@ -27,6 +27,26 @@ assert(isequal(image_handle.CData, current.display_slice));
 callback(app.ZSlider, struct('Value', z));
 assert(isequal(image_handle, getappdata(app.XY, 'main_slice_image')));
 assert(isequal(Program.Helpers.main_display_source_revision(app), revision));
+
+% Drag previews do not feed intermediate positions back into the slider.
+controller = getappdata(app.CELL_ID, 'main_slice_preview');
+changing = app.ZSlider.ValueChangingFcn;
+for preview_z = [8 17 29 6 14]
+    changing(app.ZSlider, struct('Value', preview_z));
+end
+controller.flush();
+assert(app.ZSlider.Value == z);
+preview = Program.Helpers.main_display_view_cache(app);
+assert(preview.z_gui == 14);
+changing(app.ZSlider, struct('Value', 30));
+callback(app.ZSlider, struct('Value', 16));
+controller.flush();
+pause(0.1);
+assert(app.ZSlider.Value == 16);
+current = Program.Helpers.main_display_view_cache(app);
+assert(current.z_gui == 16);
+assert(isequal(image_handle.CData, current.display_slice));
+assert(isequal(Program.Helpers.main_display_source_revision(app), revision));
 fprintf('MAIN_SLIDER=PASS\n');
 end
 

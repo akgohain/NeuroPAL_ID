@@ -10,6 +10,7 @@ test_color_readout;
 test_histmatch_memory;
 test_debug_array_summary;
 test_main_display_view;
+test_latest_slice_preview;
 test_npal_mat_source;
 test_import_memory;
 test_nwb_stream_export;
