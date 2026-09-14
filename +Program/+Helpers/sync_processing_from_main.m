@@ -59,7 +59,7 @@ cleanup = onCleanup(@() Program.GUIHandling.suspend_processing_zslider_callbacks
 app.proc_zSlider.Value = z_value;
 app.proc_zEditField.Value = z_value;
 app.proc_hor_zSlider.Value = z_value;
-app.proc_vert_zSlider.Value = z_value;
+app.proc_vert_zSlider.Value = sum(app.proc_vert_zSlider.Limits) - z_value;
 
 Program.Helpers.debug_event('ProcSync', ...
     'Inherited main display state: path=%s rgbwdgfp=%s checks=%s gammas=%s z=%d', ...

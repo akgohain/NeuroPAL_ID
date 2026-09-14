@@ -73,16 +73,6 @@ function get_slice(~, view, ~, reset_limits, requested_z)
     local_draw_cellpose_mask_overlay(app, ax, z);
     local_draw_yolo_box_overlay(app, ax, z);
 
-    if strcmp(app.TabGroup.SelectedTab.Title, 'Image Processing') & strcmp(app.VolumeDropDown.Value, 'Colormap')
-        Program.Helpers.fill_axes_parent(app.proc_xyAxes);
-        image(xy, 'Parent', app.proc_xyAxes);
-        Program.Helpers.configure_image_axes_ticks( ...
-            app.proc_xyAxes, size(xy), app.image_um_scale(1:2), ...
-            'XLim', [1, size(xy, 2)], ...
-            'YLim', [1, size(xy, 1)]);
-        Program.Helpers.fill_axes_parent(app.proc_xyAxes);
-    end
-
     % Add the AddNeuron function as mouse click listener.
     if isempty(gui_image.ButtonDownFcn)
         gui_image.ButtonDownFcn = {@app.ImageClicked};

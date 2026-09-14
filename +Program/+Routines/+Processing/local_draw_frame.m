@@ -26,6 +26,8 @@ if isempty(img) || ~isgraphics(img)
 end
 
 img.CData = frame;
+img.XData = [1 frame_size(2)];
+img.YData = [1 frame_size(1)];
 img.Visible = 'on';
 
 previous_size = [];
@@ -110,6 +112,10 @@ end
 
 function local_configure_frame_ticks(app, ax, frame_size, reset_view)
 scale_xy = local_frame_scale(app, ax);
+% Let the grid own the canvas position and preserve physical proportions.
+ax.DataAspectRatio = [1 / scale_xy(1), 1 / scale_xy(2), 1];
+ax.PlotBoxAspectRatioMode = 'auto';
+ax.YDir = 'reverse';
 local_configure_frame_title(app, ax);
 if reset_view
     Program.Helpers.configure_image_axes_ticks( ...

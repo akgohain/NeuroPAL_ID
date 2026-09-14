@@ -4212,7 +4212,7 @@ classdef GUIHandling
         function handle_processing_vertical_zslider_change(app, value, is_live)
             value = Program.GUIHandling.clamp_processing_zslider_value(app, value);
             z_limits = double(app.proc_vert_zSlider.Limits);
-            z_value = min(max(round(z_limits(2) - value), z_limits(1)), z_limits(2));
+            z_value = min(max(round(sum(z_limits) - value), z_limits(1)), z_limits(2));
             Program.GUIHandling.handle_processing_zslider_change(app, z_value, is_live);
         end
 
@@ -4309,7 +4309,7 @@ classdef GUIHandling
             z_limits = double(app.proc_zSlider.Limits);
             z_value = min(max(round(double(z_value)), z_limits(1)), z_limits(2));
             vert_limits = double(app.proc_vert_zSlider.Limits);
-            vert_value = min(max(round(vert_limits(2) - z_value), vert_limits(1)), vert_limits(2));
+            vert_value = min(max(round(sum(vert_limits) - z_value), vert_limits(1)), vert_limits(2));
 
             if app.proc_zSlider.Value ~= z_value
                 app.proc_zSlider.Value = z_value;
@@ -6096,7 +6096,7 @@ classdef GUIHandling
             mip_enabled = logical(app.ProcShowMIPCheckBox.Value);
             slow_preview_enabled = logical(app.ProcPreviewZslowCheckBox.Value);
             target_enable = 'on';
-            if mip_enabled
+            if mip_enabled || isequal(app.proc_zSlider.MajorTicks, 1)
                 target_enable = 'off';
             end
 
