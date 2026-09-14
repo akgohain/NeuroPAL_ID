@@ -3,6 +3,9 @@ function response = runMoECentroids(volume, scale_um_xyz, options)
 arguments
     volume
     scale_um_xyz double
+    options.Backend (1,1) string = "moe"
+    options.InputMode (1,1) string = "rgbw"
+    options.SourceMetadata (1,1) struct = struct()
     options.BundlePath (1,1) string = ""
     options.PythonExecutable (1,1) string = ""
     options.DatasetID (1,1) string = "unknown"
@@ -23,7 +26,12 @@ readiness = Methods.MethodBundle.inspect('detection_moe', options.BundlePath);
 if ~readiness.ready
     error('Wrapper:MoEBundleUnavailable', '%s', readiness.summary);
 end
-if isempty(volume) || size(volume, 4) ~= 4 || ndims(volume) > 4 || any(~isfinite(volume), 'all')
+if ~any(options.InputMode == ["rgbw", "single_channel"])
+    error('Wrapper:MoEInvalidMode', 'Choose rgbw or single_channel.');
+end
+expected_channels = 4;
+if options.InputMode == "single_channel", expected_channels = 1; end
+if isempty(volume) || size(volume, 4) ~= expected_channels || ndims(volume) > 4 || any(~isfinite(volume), 'all')
     error('Wrapper:MoEInvalidVolume', 'MoE requires finite, native-intensity YXZ RGBW image data.');
 end
 scale = double(scale_um_xyz(:)');
@@ -53,7 +61,8 @@ count = fwrite(fid, volume, 'single');
 if count ~= numel(volume), error('Wrapper:MoEWriteFailed', 'Incomplete image export.'); end
 clear file_cleanup
 request = struct('bundle', readiness.bundle_path, 'output_dir', output, ...
-    'volume_raw', raw_path, 'volume_shape_yxzc', [size(volume,1), size(volume,2), size(volume,3), 4], ...
+    'backend', char(options.Backend), 'input_mode', char(options.InputMode), 'source_metadata', options.SourceMetadata, ...
+    'volume_raw', raw_path, 'volume_shape_yxzc', [size(volume,1), size(volume,2), size(volume,3), expected_channels], ...
     'volume_dtype', 'float32', 'scale_um_xyz', scale, ...
     'dataset_id', char(options.DatasetID), 'device', char(options.Device));
 request_path = fullfile(output, 'request.json');

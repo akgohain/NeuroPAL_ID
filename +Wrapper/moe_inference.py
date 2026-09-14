@@ -70,6 +70,21 @@ def validate_volume(volume, spacing):
         raise ValueError('Voxel spacing must contain three finite positive micron values')
 
 
+def prepare_input(volume_xyzc, spacing, input_mode='rgbw'):
+    """Adapt one explicitly selected channel without consuming other channels."""
+    volume = np.asarray(volume_xyzc)
+    if input_mode == 'single_channel':
+        if volume.ndim != 4 or volume.shape[-1] != 1:
+            raise ValueError('Single-channel mode requires exactly one selected source channel')
+        if not np.isfinite(volume).all() or not np.any(volume > 0):
+            raise ValueError('Selected channel has no positive signal or contains nonfinite values')
+        volume = np.repeat(volume, 4, axis=-1)
+    elif input_mode != 'rgbw':
+        raise ValueError('Input mode must be rgbw or single_channel')
+    validate_volume(volume, spacing)
+    return volume
+
+
 def preprocess(volume_xyzc, spacing, source, dataset_id='unknown'):
     """Run image-only SM4-SM9. No ROI loading or annotation-guided cropping."""
     from data import preprocessing as pp
@@ -229,9 +244,12 @@ def route(bundle, volume, proposals, animal, dataset, output):
 
 
 def preflight_request(request):
+    mode = request.get('input_mode', 'rgbw')
+    if mode not in ('rgbw', 'single_channel'): raise ValueError('Unsupported input mode')
+    channels = 1 if mode == 'single_channel' else 4
     supplied = request['volume_shape_yxzc']
-    if len(supplied) != 4 or any(isinstance(x, bool) or int(x) != x or x < 1 for x in supplied) or supplied[3] != 4:
-        raise ValueError('Expected positive integer YXZC dimensions with four RGBW channels')
+    if len(supplied) != 4 or any(isinstance(x, bool) or int(x) != x or x < 1 for x in supplied) or supplied[3] != channels:
+        raise ValueError('Expected positive integer YXZC dimensions matching the selected input mode')
     shape = tuple(int(x) for x in supplied)
     spacing = np.asarray(request['scale_um_xyz'], dtype=float)
     if spacing.shape != (3,) or not np.isfinite(spacing).all() or np.any(spacing <= 0):
@@ -248,7 +266,7 @@ def preflight_request(request):
         raise ValueError('Invalid processed dimensions or memory budget')
     processed = math.prod(max(1,math.ceil(x)) for x in target)*4*4
     # Include preprocessing temporaries and a conservative model workspace.
-    estimated = raw_bytes*4 + processed*12 + 1536*2**20
+    estimated = raw_bytes*(16 if mode == 'single_channel' else 4) + processed*12 + 1536*2**20
     if estimated > limit:
         raise MemoryError(f'MoE requires an estimated {estimated/2**20:.0f} MiB; workspace budget is {limit/2**20:g} MiB')
     return shape, spacing, estimated
@@ -258,7 +276,8 @@ def prepare(request):
     shape, spacing, _ = preflight_request(request)
     source = setup(request['bundle'])
     raw = np.memmap(request['volume_raw'], dtype=request.get('volume_dtype','float32'), mode='r', shape=shape, order='F')
-    volume = preprocess(raw.transpose(1,0,2,3), spacing, source, request.get('dataset_id','unknown'))
+    adapted = prepare_input(raw.transpose(1,0,2,3), spacing, request.get('input_mode','rgbw'))
+    volume = preprocess(adapted, spacing, source, request.get('dataset_id','unknown'))
     np.save(Path(request['output_dir'])/'volume.npy', volume)
 
 
@@ -281,6 +300,8 @@ def _run(request, response_path, lease):
     dataset = str(request.get('dataset_id','unknown'))
     from scripts.run_detection_moe_image_gate import DATASETS
     if dataset not in (*DATASETS,'unknown'): raise ValueError('Dataset must be a supported DANDI ID or unknown')
+    if request.get('input_mode') == 'single_channel' and dataset != 'unknown':
+        raise ValueError('Single-channel detection requires dataset=unknown')
     animal = str(request.get('animal_id','app_volume'))
     progress(f'Preprocessing RGBW volume; estimated workspace {estimated/2**20:.0f} MiB')
     volume_path = output/'volume.npy'
@@ -294,8 +315,10 @@ def _run(request, response_path, lease):
         import torch
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if device not in ('cpu','cuda'): raise ValueError('This MoE adapter supports CPU or CUDA; MPS parity is not validated')
+    backend = request.get('backend','moe')
+    if backend not in ('moe','spotiflow'): raise ValueError('Unknown detector backend')
     proposals = {}
-    for method in ('spotiflow','yolo','nnunet'):
+    for method in (('spotiflow',) if backend == 'spotiflow' else ('spotiflow','yolo','nnunet')):
         progress(f'Running {method} expert')
         interpreter = request.get('interpreters',{}).get(method,sys.executable)
         run_command([interpreter,Path(__file__).resolve(),'expert','--bundle',bundle,'--volume',volume_path,
@@ -304,17 +327,21 @@ def _run(request, response_path, lease):
         proposals[method] = pd.read_csv(output/f'{method}.csv')
     progress('Applying appearance gate and nonlinear routers')
     volume = np.load(volume_path, mmap_mode='r')
-    result = route(bundle,volume,proposals,animal,dataset,output)
+    result = route(bundle,volume,proposals,animal,dataset,output) if backend == 'moe' else proposals['spotiflow']
     del volume
     result.to_csv(output/'predictions_processed.csv',index=False)
     points = result[['x_um','y_um','z_um']].to_numpy(float)/spacing
     if len(points) and (not np.isfinite(points).all() or np.any(points < 0) or np.any(points >= np.array([shape[1],shape[0],shape[2]]))):
         raise ValueError('Detector returned centers outside the original image')
     centroids = points[:,[1,0,2]]+1
-    response = dict(method_id='detection_moe',num_centroids=len(result),centroids_yxz=centroids.tolist(),
+    response = dict(method_id='detection_moe' if backend == 'moe' else 'detection_spotiflow',num_centroids=len(result),centroids_yxz=centroids.tolist(),
                     scores=result.score.to_list(),predictions_csv=str(output/'predictions_processed.csv'),
                     source_revision='2276e61dedf9671740c1a36fab7d6d976b86de37',fold=0,
-                    policy='nonlinear_moe_fold00_experimental',dataset_id=dataset,
+                    policy='nonlinear_moe_fold00' if backend == 'moe' else 'spotiflow_fold00',backend=backend,dataset_id=dataset,
+                    input_mode=request.get('input_mode','rgbw'),
+                    single_channel_unvalidated=request.get('input_mode')=='single_channel',
+                    input_adaptation='repeat_selected_channel_four_times' if request.get('input_mode')=='single_channel' else 'none',
+                    source_metadata=request.get('source_metadata', {}),
                     unknown_dataset_unvalidated=dataset=='unknown',
                     transform=dict(original_spacing_um_xyz=spacing.tolist(),processed_spacing_um_xyz=SPACING.tolist(),
                                    zoom_xyz=(spacing/SPACING).tolist(),crop_start_xyz=[0,0,0],matlab_axis_order='YXZ',index_base=1),

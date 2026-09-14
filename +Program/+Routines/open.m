@@ -46,6 +46,10 @@ function open(path)
 
         filename = [path, name];
         close(d)
+        if Tracking.ReferenceWorkflow.supports(filename)
+            local_open_reference(app, filename);
+            return;
+        end
         try
             proc_code = app.proc_check("image", filename);
         catch ME
@@ -77,6 +81,12 @@ function open(path)
             app.DisplayNeuronActivityMenu.Checked = ~app.DisplayNeuronActivityMenu.Checked;
             app.TabGroup4.SelectedTab = app.MaximumIntensityProjectionTab;
         end
+    end
+
+    if Tracking.ReferenceWorkflow.supports(filename)
+        close(d);
+        local_open_reference(app, filename);
+        return;
     end
 
     progress_cleanup = onCleanup(@() local_close_progress(d));
@@ -363,5 +373,15 @@ try
         app.CELL_ID.Visible = 'on';
     end
 catch
+end
+end
+
+function local_open_reference(app, filename)
+% Report a video import failure without leaving the file opener latched.
+try
+    Tracking.ReferenceWorkflow.open(app, filename);
+catch ME
+    Program.Helpers.debug_event('OpenFile', '%s', getReport(ME, 'extended', 'hyperlinks', 'off'));
+    uialert(app.CELL_ID, ME.message, 'Cannot Open Recording');
 end
 end
