@@ -4,6 +4,7 @@ if nargin < 1, app = Program.app; end
 original_tab = app.TabGroup.SelectedTab;
 cleanup = onCleanup(@() set(app.TabGroup, 'SelectedTab', original_tab));
 app.TabGroup.SelectedTab = app.ImageProcessingTab;
+Program.GUIHandling.install_processing_slider_callbacks(app);
 Program.Helpers.sync_processing_from_main(app);
 Program.Routines.Processing.render();
 drawnow;
@@ -31,5 +32,19 @@ assert(app.proc_zSlider.Value == nz);
 Program.GUIHandling.handle_processing_vertical_zslider_change(app, nz, false);
 assert(app.proc_zSlider.Value == 1);
 Program.GUIHandling.handle_processing_primary_zslider_change(app, 16, false);
+for name = {'MajorTicks', 'MajorTickLabels', 'MinorTicks', 'FontSize', 'FontWeight'}
+    assert(isequal(app.proc_zSlider.(name{1}), app.ZSlider.(name{1})));
+end
+preview = getappdata(app.CELL_ID, 'proc_slice_preview');
+for z = [3 30 7]
+    app.proc_zSlider.ValueChangingFcn(app.proc_zSlider, struct('Value', z));
+end
+preview.flush();
+assert(app.proc_zSlider.Value == 7);
+app.proc_zSlider.ValueChangingFcn(app.proc_zSlider, struct('Value', 30));
+app.proc_zSlider.ValueChangedFcn(app.proc_zSlider, struct('Value', 16));
+preview.flush();
+assert(app.proc_zSlider.Value == 16);
+
 fprintf('PROCESSING_CANVAS=PASS\n');
 end

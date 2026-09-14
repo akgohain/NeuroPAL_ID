@@ -11,37 +11,12 @@ function configure_main_zslider(app, n_slices, current_slice)
     n_slices = max(1, round(double(n_slices)));
     current_slice = min(max(round(double(current_slice)), 1), n_slices);
 
-    if n_slices == 1
-        major_ticks = 1:n_slices;
-        minor_ticks = [];
-    else
-        major_ticks = unique(round(linspace(1, n_slices, 6)), 'stable');
-        minor_ticks = setdiff(1:n_slices, major_ticks);
-    end
-    tick_labels = arrayfun(@(z) sprintf('%d', z), major_ticks, 'UniformOutput', false);
-
-    Program.Helpers.configure_slice_zslider( ...
-        app.ZSlider, n_slices, current_slice, false, []);
-    app.ZSlider.MajorTicks = major_ticks;
-    if isprop(app.ZSlider, 'MajorTickLabels')
-        app.ZSlider.MajorTickLabels = tick_labels;
-    end
-    if isprop(app.ZSlider, 'MinorTicks')
-        app.ZSlider.MinorTicks = minor_ticks;
-    end
+    Program.Helpers.configure_navigation_zslider(app.ZSlider, n_slices, current_slice);
 
     has_secondary_slider = ...
         (isstruct(app) && isfield(app, 'ZSliderS')) || ...
         (~isstruct(app) && isprop(app, 'ZSliderS'));
     if has_secondary_slider && ~isempty(app.ZSliderS) && isvalid(app.ZSliderS)
-        Program.Helpers.configure_slice_zslider( ...
-            app.ZSliderS, n_slices, current_slice, false, []);
-        app.ZSliderS.MajorTicks = major_ticks;
-        if isprop(app.ZSliderS, 'MajorTickLabels')
-            app.ZSliderS.MajorTickLabels = tick_labels;
-        end
-        if isprop(app.ZSliderS, 'MinorTicks')
-            app.ZSliderS.MinorTicks = minor_ticks;
-        end
+        Program.Helpers.configure_navigation_zslider(app.ZSliderS, n_slices, current_slice);
     end
 end

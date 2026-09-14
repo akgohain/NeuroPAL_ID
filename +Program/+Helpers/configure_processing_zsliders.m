@@ -13,6 +13,7 @@ function configure_processing_zsliders(app, n_slices, current_slice)
         Program.Helpers.configure_slice_zslider(sliders{k}, n_slices, current_slice, k == 1, []);
         sliders{k}.Tooltip = 'Z slice';
     end
+    Program.Helpers.configure_navigation_zslider(app.proc_zSlider, n_slices, current_slice);
     app.proc_vert_zSlider.Value = sum(app.proc_vert_zSlider.Limits) - current_slice;
     app.proc_zEditField.Value = current_slice;
     Program.Helpers.render_processing_zticklabels(app);
