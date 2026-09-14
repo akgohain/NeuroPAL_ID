@@ -1,8 +1,12 @@
-function load(file)
+function load(file, parent_token)
+    if nargin < 2, parent_token = ''; end
+    job = Program.HeavyJob.acquire('Video loading', parent_token);
+    job_cleanup = onCleanup(@() delete(job));
     app = Program.app;
     app.video_path = file;
 
     d = uiprogressdlg(app.CELL_ID,'Title','Loading video...','Indeterminate','on');
+    progress_cleanup = onCleanup(@() local_close_progress(d));
 
     if ~isdeployed
         app.script_dir = fullfile(pwd, '+Wrapper');
@@ -108,4 +112,11 @@ function load(file)
     set(app.VideoGridLayout, 'Visible', 'on');
     Program.GUI.refresh_zephir_video_tab(app);
     close(d);
+end
+
+function local_close_progress(d)
+try
+    if ~isempty(d) && isvalid(d), close(d); end
+catch
+end
 end

@@ -8,21 +8,24 @@ classdef writeNWB
 
         function code = write_order(app, path, progress)
             % Full-shot NWB save routine
+            path = char(path);
+            job = Program.HeavyJob.acquire('NWB export');
+            job_cleanup = onCleanup(@() delete(job));
 
             if ~exist('progress', 'var')
                 progress = struct();
             end
 
-            % Initialize MatNWB with compatible schema version
-            try
-                % Clear any cached schemas and regenerate with compatible version
-                Program.Helpers.debug_log('DEBUG: Initializing MatNWB with compatible schema...\n');
-                generateCore('2.6.0');
-                generateExtension('/Users/adamg/neuroPAL/ndx-multichannel-volume/spec/ndx-multichannel-volume.namespace.yaml');
-                Program.Helpers.debug_log('DEBUG: Successfully initialized NWB 2.6.0 with ndx-multichannel-volume\n');
-            catch ME
-                Program.Helpers.debug_log('DEBUG: Failed to set specific schema, using defaults: %s\n', ME.message);
+            % Use the installed generated classes; saving must not regenerate schemas.
+            if exist('NwbFile', 'class') ~= 8 || ...
+                    exist('types.ndx_multichannel_volume.MultiChannelVolume', 'class') ~= 8
+                error('DataHandling:NWBExport:MissingSchema', ...
+                    'The installed MatNWB and multichannel-volume classes must be on the MATLAB path.');
             end
+            if isobject(progress) && isvalid(progress) && isprop(progress, 'Cancelable')
+                progress.Cancelable = 'on';
+            end
+            export_sources = {};
 
             % Grab NWB-compatible metadata from nwbsave.mlapp
             progress.Message = 'Parsing metadata...';
@@ -158,6 +161,9 @@ classdef writeNWB
                 end
                 ctx.build.modules.acquisition.NeuroPALImVol = ctx.colormap.imaging_volume;
 
+                export_source = DataHandling.Helpers.nwb_stream_export.image_source(ctx.colormap.data);
+                ctx.colormap.export_pipe = DataHandling.Helpers.nwb_stream_export.make_pipe(export_source.dims);
+                export_sources{end+1} = export_source;
                 ctx.colormap.multichannel_volume = DataHandling.writeNWB.create_volume('colormap', 'multichannel', ctx);
                 ctx.build.modules.acquisition.NeuroPALImageRaw = ctx.colormap.multichannel_volume;
                 
@@ -292,6 +298,11 @@ classdef writeNWB
                 end
                 ctx.build.modules.acquisition.CalciumImVol = ctx.video.imaging_volume;
 
+                source_app = Program.GUIHandling.get_parent_app( ...
+                    Program.GUIHandling.global_grab('NeuroPAL ID', 'CELL_ID'));
+                export_source = DataHandling.Helpers.nwb_stream_export.video_source(source_app);
+                ctx.video.export_pipe = DataHandling.Helpers.nwb_stream_export.make_pipe(export_source.dims);
+                export_sources{end+1} = export_source;
                 ctx.video.multichannel_volume = DataHandling.writeNWB.create_volume('video', 'multichannel', ctx);
                 ctx.build.modules.acquisition.CalciumImageSeries = ctx.video.multichannel_volume;
             end
@@ -420,7 +431,7 @@ classdef writeNWB
                     end
                     Program.Helpers.debug_log('==========================================\n\n');
                     
-                    nwbExport(ctx.build.file, path);
+                    DataHandling.Helpers.nwb_stream_export.write(ctx.build.file, path, export_sources, progress);
                     Program.Helpers.debug_log('Successfully saved NWB file: %s\n', path);
                     
                     % Verify data was saved by reading it back
@@ -460,25 +471,30 @@ classdef writeNWB
                     existing_nwb = nwbRead(path);
                     
                     % Merge data structures safely
-                    if ~isempty(ctx.build.file.acquisition)
-                        existing_nwb.acquisition = types.untyped.Set(existing_nwb.acquisition, ctx.build.file.acquisition);
-                    end
-                    if ~isempty(ctx.build.file.processing)
-                        existing_nwb.processing = types.untyped.Set(existing_nwb.processing, ctx.build.file.processing);
+                    for field = {'acquisition', 'processing', 'general_devices', 'general_optophysiology'}
+                        incoming = ctx.build.file.(field{1});
+                        destination = existing_nwb.(field{1});
+                        names = incoming.keys;
+                        for i = 1:numel(names)
+                            destination.set(names{i}, incoming.get(names{i}));
+                        end
                     end
                     if ~isempty(ctx.build.file.general_subject)
                         existing_nwb.general_subject = ctx.build.file.general_subject;
                     end
                     
-                    new_path = strrep(path, '.nwb', '-new.nwb');
-                    nwbExport(existing_nwb, new_path);
+                    [output_dir, output_name, output_ext] = fileparts(path);
+                    new_path = fullfile(output_dir, [output_name '-new' output_ext]);
+                    source_file = dir(path);
+                    DataHandling.Helpers.nwb_stream_export.write(existing_nwb, new_path, ...
+                        export_sources, progress, 'AdditionalDiskBytes', source_file.bytes);
                     Program.Helpers.debug_log('Successfully saved merged NWB file: %s\n', new_path);
                     
                     % No longer create companion ID file for merged file
                     Program.Helpers.debug_log('All neuron data saved within merged NWB file - no companion ID file needed.\n');
                 end
             catch ME
-                error('Failed to export NWB file: %s\nStack trace:\n%s', ME.message, getReport(ME));
+                rethrow(ME);
             end
 
             % Return code 0 to indicate that there were no issues.
@@ -487,21 +503,6 @@ classdef writeNWB
 
         function nwb_file = create_file(ctx)
             session_date = datetime(posixtime(ctx.worm.session_date),'ConvertFrom','posixtime', 'Format', 'yyyy-MM-dd HH:mm:ss');
-
-            % Force use of a compatible NWB schema version
-            try
-                % Try to use NWB 2.6.0 which should be more compatible
-                generateCore('2.6.0');
-                Program.Helpers.debug_log('DEBUG: Using NWB schema version 2.6.0\n');
-            catch
-                % Fall back to default if 2.6.0 is not available
-                try
-                    generateCore('2.5.0');
-                    Program.Helpers.debug_log('DEBUG: Using NWB schema version 2.5.0\n');
-                catch
-                    Program.Helpers.debug_log('DEBUG: Using default NWB schema version\n');
-                end
-            end
 
             nwb_file = NwbFile( ...
                 'session_description', ctx.author.data_description, ...
@@ -624,98 +625,15 @@ classdef writeNWB
                         'reference_frame', ['Worm ', ctx.worm.body_part]);
                 case 'multichannel'
                     if strcmp(preset, 'colormap')
-                        original_data = ctx.(preset).data;
-                        if isa(original_data, 'double')
-                            % Get data range and determine appropriate scaling
-                            data_min = min(original_data(:));
-                            data_max = max(original_data(:));
-                            
-                            % Use more conservative scaling to preserve precision
-                            % Scale to uint16 range unless data requires larger range
-                            if data_max > data_min
-                                data_range = data_max - data_min;
-                                if data_range <= 1.0
-                                    % Normalized data (0-1), scale to uint16
-                                    scaled_data = (original_data - data_min) / data_range * 65535;
-                                    converted_data = uint16(round(scaled_data));
-                                else
-                                    % Larger range, use uint32 for better precision
-                                    scaled_data = (original_data - data_min) / data_range * 4294967295;
-                                    converted_data = uint32(round(scaled_data));
-                                end
-                            else
-                                % Constant data
-                                converted_data = uint16(zeros(size(original_data)));
-                            end
-                        else
-                            % Already integer type, convert to uint64 for consistency
-                            converted_data = uint64(original_data);
-                        end
-                        
                         nwb_volume = types.ndx_multichannel_volume.MultiChannelVolume( ...
                             'description', ctx.(preset).description, ...
                             'RGBW_channels', ctx.(preset).prefs.RGBW, ...
-                            'data', converted_data, ...
+                            'data', ctx.(preset).export_pipe, ...
                             'imaging_volume', types.untyped.SoftLink('/general/optophysiology/NeuroPALImVol'));
                     elseif strcmp(preset, 'video')
-                        rf_app = Program.GUIHandling.get_parent_app(Program.GUIHandling.global_grab('NeuroPAL ID', 'CELL_ID'));
-                        
-                        % Validate video info fields
-                        required_fields = {'ny', 'nx', 'nz', 'nc', 'nt'};
-                        for field = required_fields
-                            if ~isfield(ctx.(preset).info, field{1}) || isempty(ctx.(preset).info.(field{1}))
-                                error('Missing required video info field: %s', field{1});
-                            end
-                        end
-                        
-                        % Initialize DataPipe with the first frame
-                        try
-                            Program.Helpers.debug_log('DEBUG: Initializing video export (Frame 1/%d)...\n', ctx.(preset).info.nt);
-                            first_frame = rf_app.retrieve_frame(1);
-                            
-                            % Ensure frame has correct dimensions (x, y, z, c)
-                            % DataPipe expects (x, y, z, c, t)
-                            
-                            data_pipe = types.untyped.DataPipe( ...
-                                'data', uint64(first_frame), ...
-                                'maxSize', [ctx.(preset).info.ny ctx.(preset).info.nx ctx.(preset).info.nz ctx.(preset).info.nc ctx.(preset).info.nt], ...
-                                'axis', 5);
-                                
-                            % Iteratively append the rest of the frames
-                            if ctx.(preset).info.nt > 1
-                                progress.Message = 'Exporting video frames...';
-                                for t = 2:ctx.(preset).info.nt
-                                    if mod(t, 10) == 0
-                                        Program.Helpers.debug_log('DEBUG: Exporting frame %d/%d\n', t, ctx.(preset).info.nt);
-                                        % Update progress bar if available (assuming progress is a uiprogressdlg or similar)
-                                        % progress.Value = t / ctx.(preset).info.nt; 
-                                    end
-                                    
-                                    frame = rf_app.retrieve_frame(t);
-                                    data_pipe.append(uint64(frame));
-                                end
-                            end
-                            Program.Helpers.debug_log('DEBUG: Video export complete.\n');
-                            
-                        catch ME
-                            warning('Video export failed: %s', ME.message);
-                            % Fallback to empty or partial data if export fails
-                            if ~exist('data_pipe', 'var')
-                                data_pipe = types.untyped.DataPipe( ...
-                                    'data', uint64(zeros([ctx.(preset).info.ny ctx.(preset).info.nx ctx.(preset).info.nz ctx.(preset).info.nc 1])), ...
-                                    'maxSize', [ctx.(preset).info.ny ctx.(preset).info.nx ctx.(preset).info.nz ctx.(preset).info.nc ctx.(preset).info.nt], ...
-                                    'axis', 5);
-                            end
-                        end
-
-                        if ~isfield(ctx.(preset), 'scan_rate')
-                            ctx.(preset).scan_line_rate = 1;
-                            ctx.(preset).scan_rate = 1;
-                        end
-
                         nwb_volume = types.ndx_multichannel_volume.MultiChannelVolumeSeries( ...
                             'description', ctx.(preset).description, ...
-                            'data', data_pipe, ...
+                            'data', ctx.(preset).export_pipe, ...
                             'device', ctx.(preset).device, ...
                             'imaging_volume', types.untyped.SoftLink('/general/optophysiology/CalciumImVol'));
                     end

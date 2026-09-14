@@ -1,4 +1,10 @@
 function load_file(mode, path)
+            % Leave unloaded controls disabled until a file is opened.
+            if isempty(path) || strlength(string(path)) == 0
+                return
+            end
+            job = Program.HeavyJob.acquire('Processing source loading');
+            job_cleanup = onCleanup(@() delete(job));
             app = Program.app;
             window = Program.window;
             mode = lower(string(mode));
@@ -45,14 +51,12 @@ function load_file(mode, path)
             switch mode
                 case "image"
                     Program.Routines.GUI.add_volume('Colormap')
-                    mat_file = fullfile(filepath, [name, '.mat']);
-                    if ~isfile(mat_file)
-                        DataHandling.NeuroPALImage.open(path);
-                        path = mat_file;
-                    end
-
-                    app.proc_image = matfile(mat_file);
-                    prefs = app.proc_image.prefs;
+                    mat_file = DataHandling.NeuroPALImage.prepare(path);
+                    path = mat_file;
+                    source = DataHandling.Helpers.npal_mat.open_source(mat_file);
+                    Program.HeavyJob.assertIdle(job.Token);
+                    app.proc_image = source.reader;
+                    prefs = source.metadata.prefs;
                     current_path = string(app.image_file);
                     if isempty(app.image_data) || current_path ~= string(mat_file)
                         app.image_file = mat_file;
@@ -120,7 +124,7 @@ function load_file(mode, path)
                         Program.Helpers.debug_event('ProcLoad', ...
                             'reusing loaded video metadata for %s', string(path));
                     else
-                        Program.Routines.Videos.load(path);
+                        Program.Routines.Videos.load(path, job.Token);
                     end
                     maximum_value = Program.Helpers.video_display_max(app);
 
@@ -201,6 +205,7 @@ function load_file(mode, path)
             Program.Routines.Processing.render();
             Program.GUIHandling.capture_processing_defaults(app, lower(string(app.VolumeDropDown.Value)), true);
             clear progress_cleanup
+            clear job_cleanup
 
             skip_crop_prompt = ~usejava('desktop') || mode == "video";
             if isappdata(app.CELL_ID, 'proc_skip_crop_recommendation')

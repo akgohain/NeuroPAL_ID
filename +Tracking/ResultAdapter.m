@@ -58,7 +58,14 @@ classdef ResultAdapter
 
         function observations = fromVideoNeurons(video_neurons, video_info)
             row_count = Tracking.ResultAdapter.positionCount(video_neurons, video_info);
-            rows = cell(row_count, 8);
+            track_ids = zeros(row_count, 1);
+            parent_ids = zeros(row_count, 1);
+            frames = zeros(row_count, 1);
+            z_positions = zeros(row_count, 1);
+            y_positions = zeros(row_count, 1);
+            x_positions = zeros(row_count, 1);
+            confidences = zeros(row_count, 1);
+            provenances = strings(row_count, 1);
             row_index = 0;
             for i = 1:numel(video_neurons)
                 [track_id, parent_id] = Tracking.ResultAdapter.trackIdentity( ...
@@ -71,25 +78,22 @@ classdef ResultAdapter
                     if ~Tracking.ResultAdapter.hasPosition(roi)
                         continue
                     end
-                    confidence = Tracking.ResultAdapter.confidence(roi);
-                    provenance = Tracking.ResultAdapter.provenance(video_neurons(i), t);
                     row_index = row_index + 1;
-                    rows(row_index, :) = {track_id, parent_id, t, ...
-                        double(roi.z_slice), double(roi.y_slice), ...
-                        double(roi.x_slice), confidence, provenance};
+                    track_ids(row_index) = track_id;
+                    parent_ids(row_index) = parent_id;
+                    frames(row_index) = t;
+                    z_positions(row_index) = double(roi.z_slice);
+                    y_positions(row_index) = double(roi.y_slice);
+                    x_positions(row_index) = double(roi.x_slice);
+                    confidences(row_index) = Tracking.ResultAdapter.confidence(roi);
+                    provenances(row_index) = Tracking.ResultAdapter.provenance(video_neurons(i), t);
                 end
             end
             variable_names = {'track_id', 'parent_id', 't', 'z', 'y', 'x', ...
                 'confidence', 'provenance'};
-            if isempty(rows)
-                observations = table(zeros(0, 1), zeros(0, 1), zeros(0, 1), ...
-                    zeros(0, 1), zeros(0, 1), zeros(0, 1), zeros(0, 1), ...
-                    strings(0, 1), 'VariableNames', variable_names);
-            else
-                observations = cell2table(rows, 'VariableNames', variable_names);
-                observations{:, 1:7} = double(observations{:, 1:7});
-                observations.provenance = string(observations.provenance);
-            end
+            observations = table(track_ids, parent_ids, frames, z_positions, ...
+                y_positions, x_positions, confidences, provenances, ...
+                'VariableNames', variable_names);
             observations = sortrows(observations, {'track_id', 't'});
             observations = Tracking.JobContract.observations(observations, video_info);
         end

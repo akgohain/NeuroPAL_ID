@@ -25,55 +25,22 @@ classdef NNDetect < handle
             obj.model = NN.model;
         end
         
-        function [pred_p] = predict_nn(obj,patches,pst_shape, titlestr)
+        function [pred_p] = predict_nn(obj,data,pst_shape, titlestr)
             import Methods.*;
             
             % Setup the progress bar.
             wait_title = 'Detecting Neurons';
             wb = waitbar(0, {titlestr, 'Initializing ...'}, 'Name', wait_title);
+            cleanup = onCleanup(@() NNDetect.close_progress(wb));
             wb.Children.Title.Interpreter = 'none';
-            
-            num_patches = length(patches);
-            pred = cell(num_patches,1);
-            for i=1:num_patches
-                
-                % Update the progress bar.
-                try
-                    waitbar(i/num_patches, wb,...
-                        {titlestr, ...
-                        sprintf('%d%% completed ...', int16(100*i/num_patches))}, ...
-                        'Name', wait_title);
-                catch
-                    break;
-                end
-                
-                % Neural prediction.
-                p = patches(i);
-                pred{i} = predict(obj.model,p{1});
-            end
-            
-            % Done.
-            try
-                close(wb);
-            catch
+
+            pred_ = NNDetect.predict_tiles(data, @(patch) predict(obj.model,patch), ...
+                @(index,total) NNDetect.update_progress(wb,titlestr,index,total));
+            if isempty(pred_) || ~isgraphics(wb)
                 warning('The detection was canceled.');
-                
-                % Amin, can we use any predictions if the user cancels early?
                 pred_p = [];
                 return;
             end
-            
-            pred_ = zeros([NNDetect.pst_shape(1:3),1]);
-            shape_ = floor(NNDetect.pst_shape(1:2)/NNDetect.stride);
-
-            for i=1:shape_(1)
-                for j=1:shape_(2)
-                    pred_(NNDetect.stride*(i-1)+1:(i-1)*NNDetect.stride+NNDetect.crop_size,...
-                        NNDetect.stride*(j-1)+1:(j-1)*NNDetect.stride+NNDetect.crop_size,...
-                        :,:) = pred{(i-1)*shape_(2)+j};
-                end
-            end
-            
             pred_p = NNDetect.pad_to_shape(pred_,pst_shape(1:3));
         end
     end
@@ -108,8 +75,7 @@ classdef NNDetect < handle
             
             % Detect the neurons.
             data_p = NNDetect.pad_to_shape(data, NNDetect.pst_shape);
-            patches = NNDetect.create_patches(data_p);
-            pred_p = NNDetect.instance().predict_nn(patches,size(data), titlestr);
+            pred_p = NNDetect.instance().predict_nn(data_p,size(data), titlestr);
             
             % Do we have any neuron predictions?
             if isempty(pred_p)
@@ -229,8 +195,10 @@ classdef NNDetect < handle
             [data, ~, prefs, ~, ~, ~, ~, ~] = DataHandling.NeuroPALImage.open(file);
             data_zscored = Methods.Preprocess.zscore_frame(data);
             data_zscored = data_zscored(:,:,:,prefs.RGBW(1:4));
-            data_p = NNDetect.pad_to_shape(data_zscored,NNDetect.pst_shape);
-            patches = NNDetect.create_patches(data_p);
+            if nargout > 1
+                data_p = NNDetect.pad_to_shape(data_zscored,NNDetect.pst_shape);
+                patches = NNDetect.create_patches(data_p);
+            end
         end
         
         function [data_p] = pad_to_shape(data,pst_shape)
@@ -267,6 +235,62 @@ classdef NNDetect < handle
                 end
             end
         end
+
+        function prediction = predict_tiles(data, predictor, progress_fcn)
+            %PREDICT_TILES Predict and assemble one image patch at a time.
+            if nargin < 3, progress_fcn = []; end
+            if iscell(data)
+                image_shape = Methods.NNDetect.pst_shape(1:3);
+            else
+                image_shape = [size(data,1),size(data,2),size(data,3)];
+            end
+            stride = Methods.NNDetect.stride;
+            crop_size = Methods.NNDetect.crop_size;
+            rows = 1:stride:image_shape(1)-crop_size+1;
+            columns = 1:stride:image_shape(2)-crop_size+1;
+            num_patches = numel(rows)*numel(columns);
+            if iscell(data) && numel(data) ~= num_patches
+                error('Methods:NNDetect:PatchCount', 'Unexpected number of image patches.');
+            end
+            prediction = zeros(image_shape);
+            index = 0;
+            for row = rows
+                for column = columns
+                    index = index+1;
+                    if ~isempty(progress_fcn) && ~progress_fcn(index,num_patches)
+                        prediction = [];
+                        return
+                    end
+                    y = row:row+crop_size-1;
+                    x = column:column+crop_size-1;
+                    if iscell(data)
+                        patch = data{index};
+                    else
+                        patch = data(y,x,:,:);
+                    end
+                    prediction(y,x,:) = predictor(patch);
+                end
+            end
+        end
+
+        function keep_going = update_progress(wb,titlestr,index,total)
+            %UPDATE_PROGRESS Stop inference if the progress window is closed.
+            keep_going = isgraphics(wb);
+            if ~keep_going, return; end
+            try
+                waitbar(index/total,wb,{titlestr, ...
+                    sprintf('%d%% completed ...',int16(100*index/total))}, ...
+                    'Name','Detecting Neurons');
+                keep_going = isgraphics(wb);
+            catch
+                keep_going = false;
+            end
+        end
+
+        function close_progress(wb)
+            %CLOSE_PROGRESS Release the window after success or failure.
+            if isgraphics(wb), delete(wb); end
+        end
         
         function visualize(data,centers,pred_p,save,varargin)
             figure('Renderer', 'painters', 'Position', [10 10 900 600]);
@@ -302,4 +326,3 @@ classdef NNDetect < handle
         end
     end
 end
-

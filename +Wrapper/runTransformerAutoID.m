@@ -17,8 +17,13 @@ arguments
     options.Device (1,1) string = ""
     options.DatasetID (1,1) string = "000981"
     options.OutputName (1,1) string = "neuropal_app_predictions.csv"
+    options.JobToken (1,1) string = ""
+    options.CancelFcn = []
+    options.TimeoutSeconds (1,1) double = 10800
     options.ProgressFcn = []
 end
+job = Program.HeavyJob.acquire('runTransformerAutoID', options.JobToken);
+job_cleanup = onCleanup(@() delete(job));
 
 if exist(nwb_path, 'file') ~= 2
     error('Wrapper:MissingNWB', 'NWB file not found: %s', nwb_path);
@@ -74,8 +79,9 @@ end
 
 local_progress(options.ProgressFcn, 'Running transformer preprocessing and inference...');
 local_prepare_python_environment();
-command = sprintf('cd %s && %s', local_shell_quote(repo_dir), local_join_quoted_command(command_parts));
-[status, output] = system(command);
+[status, output] = Wrapper.runPythonProcess(command_parts, ...
+    'JobToken', job.Token, 'ProgressFcn', options.ProgressFcn, ...
+    'CancelFcn', options.CancelFcn, 'TimeoutSeconds', options.TimeoutSeconds, 'WorkingDirectory', repo_dir);
 local_emit_progress_lines(options.ProgressFcn, output);
 if status ~= 0
     friendly_message = local_transformer_failure_message(output, checkpoint_path);
@@ -212,14 +218,6 @@ if status == 0
 else
     path_value = '';
 end
-end
-
-function command = local_join_quoted_command(parts)
-quoted = cell(size(parts));
-for i = 1:numel(parts)
-    quoted{i} = local_shell_quote(parts{i});
-end
-command = strjoin(quoted, ' ');
 end
 
 function out = local_shell_quote(value)

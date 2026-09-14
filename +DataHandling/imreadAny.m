@@ -22,65 +22,23 @@ function [image, metadata] = imreadAny(filename)
 %       hashtable = a Java Hashtable of keys and their values
 
 % Open the file.
-data = bfopen(filename);
+[reader, reader_cleanup, hashtable] = ...
+    DataHandling.Helpers.bioformats_image.open(filename);
 
 % Initialize the image data.
 image = [];
 metadata = [];
 
 % Extract the metadata.
-hashtable = data{1,2};
 keys = arrayfun(@char, hashtable.keySet.toArray, 'UniformOutput', false);
 values = cellfun(@(x) hashtable.get(x), keys, 'UniformOutput', false);
 
-% Get the image data.
-imageData = data{1,1};
-zcData = split(imageData{1,2},';');
-if length(zcData) < 2
-    f = uifigure;
-    str = sprintf('"%s" is not a multicolor image with Z slices!', filename);
-    uialert(f, str, 'Invalid Image Format');
-    return;
-end
-
-% Get the image z slices.
-zStr = zcData{end-1};
-zStr = strrep(zStr, '?', '');
-zI = strfind(zStr, '/');
-if (~contains(zStr, 'Z=') && ~contains(zStr, 'plane ')) || isempty(zI)
-    f = uifigure;
-    str = sprintf('"%s" has no Z slices!', filename);
-    uialert(f, str, 'Invalid Image Format');
-    return;
-end
-zSlices = round(str2double(zStr(zI+1:end)));
-
-% Do we have enough z slices?
-if zSlices < 1
-    f = uifigure;
-    str = sprintf('"%s" has no Z slices!', filename);
-    uialert(f, str, 'Invalid Image Format');
-    return;
-end
-
-% Get the image color channels.
-cStr = zcData{end};
-cStr = strrep(cStr, '?', '');
-cI = strfind(cStr, '/');
-if ~contains(cStr, 'C=') || isempty(cI)
-    f = uifigure;
-    str = sprintf('"%s" has no color channels!', filename);
-    uialert(f, str, 'Invalid Image Format');
-    return;
-end
-numChannels = round(str2double(cStr(zI+1:end)));
-
-% Do we have enough color channels?
+% Get the image dimensions.
+zSlices = double(reader.getSizeZ());
+numChannels = double(reader.getSizeC());
 if numChannels < 3
-    f = uifigure;
-    str = sprintf('"%s" has less than 3 color channels!', filename);
-    uialert(f, str, 'Invalid Image Format');
-    return;
+    error('DataHandling:Import:Channels', ...
+        '"%s" has less than 3 color channels!', filename);
 end
 
 % Get the image scale.
@@ -95,8 +53,8 @@ else
 end
 
 % Get the image size.
-yPixels = size(imageData{1},1);
-xPixels = size(imageData{1},2);
+yPixels = double(reader.getSizeY());
+xPixels = double(reader.getSizeX());
 
 % Organize the metadata.
 metadata.keys = keys;
@@ -133,24 +91,7 @@ image.dicChannel = nan;
 image.lasers = nan(numChannels,1);
 image.emissions = nan(numChannels,1);
 
-% Organize the image volume.
-image.data = uint16(nan([image.pixels; numChannels]'));
-for i=1:size(imageData,1)
-    
-    % Get the image plane data.
-    dataStrs = split(imageData{i,2}, ';');
-    zStr = strtrim(dataStrs{end-1});
-    cStr = strtrim(dataStrs{end});
-    zStr = strrep(zStr, '?', '');
-    cStr = strrep(cStr, '?', '');
-    
-    % Assemble the image.
-    z = sscanf(zStr,'Z=%f');
-    c = sscanf(cStr,'C=%f');
-    image.data(:,:,z,c) = imageData{i,1}';
-    
-    % Debug the image assembly.
-    % disp(imageData{i,2});
-    % printf('z=%d c=%d', z, c);
-end
+% Organize the image volume one plane at a time.
+image.pixels = double([reader.getSizeX(); reader.getSizeY(); reader.getSizeZ()]);
+image.data = DataHandling.Helpers.bioformats_image.read(reader, filename);
 end

@@ -4,6 +4,7 @@ function clear_video_view_state(app)
 if nargin < 1 || isempty(app) || ~isvalid(app)
     return
 end
+Program.GUI.clear_zephir_time_slider(app);
 
 if isprop(app, 'video_frame_cache')
     app.video_frame_cache = [];
@@ -13,6 +14,7 @@ if isprop(app, 'video_frame_cache_key')
 end
 
 keys = { ...
+    'video_projection_cache', ...
     'video_tslider_live_last_t', ...
     'video_tslider_live_last_seconds', ...
     'video_tslider_live_previewing'};

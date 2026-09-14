@@ -1,4 +1,7 @@
 import json
+import math
+import os
+import shutil
 import sys
 
 import h5py
@@ -124,16 +127,61 @@ def _normalize_axes(array, axes):
     return np.transpose(data, axis_order)
 
 
-def main():
-    if len(sys.argv) != 4:
-        raise SystemExit("usage: read_czi.py <input.czi> <output.h5> <output.json>")
+def _check_size(czi):
+    try:
+        limit = float(os.environ.get("NEUROPAL_IMAGE_MAX_MIB", "512"))
+    except ValueError:
+        limit = 512
+    if not math.isfinite(limit) or limit <= 0 or not math.isfinite(limit * 1024**2):
+        limit = 512
+    axes = czi.axes
+    shape = czi.shape
+    if len(axes) != len(shape) or len(set(axes)) != len(axes):
+        raise RuntimeError("Unsupported CZI dimensions")
+    if any(size != 1 and axis not in "XYZC" for axis, size in zip(axes, shape)):
+        raise RuntimeError("Static image import requires a single time point and scene")
+    if any(axis not in axes for axis in "XY"):
+        raise RuntimeError("CZI data missing X or Y axis")
+    size = math.prod(shape) * np.dtype(czi.dtype).itemsize
+    if size > max(1, math.floor(limit * 1024**2)):
+        raise RuntimeError(
+            f"CZI decoded image requires {size / 1024**2:.1f} MiB, above the "
+            f"{limit:.1f} MiB loading limit (NEUROPAL_IMAGE_MAX_MIB). "
+            "Create a smaller source before importing."
+        )
+    return size
 
-    input_path, output_h5, output_json = sys.argv[1:4]
 
+def convert(input_path, output_h5, output_json):
     with CziFile(input_path) as czi:
-        raw = czi.asarray()
+        size = _check_size(czi)
         metadata = czi.metadata(raw=False)
-        data = _normalize_axes(raw, czi.axes)
+        directory = os.path.dirname(os.path.abspath(output_h5))
+        if shutil.disk_usage(directory).free < size * 2 + 64 * 1024**2:
+            raise RuntimeError("Insufficient temporary disk space for CZI conversion")
+
+        # Decode subblocks sequentially into a disk-backed image.
+        scratch = str(output_h5) + ".pixels"
+        try:
+            raw = czi.asarray(out=scratch, max_workers=1)
+            try:
+                data = _normalize_axes(raw, czi.axes)
+                shape = data.shape
+                with h5py.File(output_h5, "w") as handle:
+                    dataset = handle.create_dataset(
+                        "data", shape=shape, dtype=data.dtype,
+                        chunks=(min(shape[0], 256), min(shape[1], 256), 1, 1),
+                        compression="gzip",
+                    )
+                    for c in range(shape[3]):
+                        for z in range(shape[2]):
+                            dataset[:, :, z, c] = data[:, :, z, c]
+                del data
+            finally:
+                raw._mmap.close()
+        finally:
+            if os.path.exists(scratch):
+                os.unlink(scratch)
 
     channels = (
         metadata.get("ImageDocument", {})
@@ -147,7 +195,7 @@ def main():
     channels = _as_list(channels)
 
     payload = {
-        "pixels": [int(data.shape[0]), int(data.shape[1]), int(data.shape[2])],
+        "pixels": [int(shape[0]), int(shape[1]), int(shape[2])],
         "scale": _extract_scale(metadata),
         "channels": [_channel_name(channel, i) for i, channel in enumerate(channels)],
         "colors": [_channel_color(channel) for channel in channels],
@@ -161,11 +209,14 @@ def main():
             payload["dicChannel"] = i
             break
 
-    with h5py.File(output_h5, "w") as handle:
-        handle.create_dataset("data", data=data, compression="gzip")
-
     with open(output_json, "w", encoding="utf-8") as handle:
         json.dump(payload, handle)
+
+
+def main():
+    if len(sys.argv) != 4:
+        raise SystemExit("usage: read_czi.py <input.czi> <output.h5> <output.json>")
+    convert(*sys.argv[1:4])
 
 
 if __name__ == "__main__":

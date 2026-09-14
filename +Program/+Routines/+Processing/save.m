@@ -1,11 +1,14 @@
 function save()
+    Program.HeavyJob.assertIdle();
     app = Program.app;
     actions = Program.GUIHandling.processing_file_actions(app);
 
     switch app.VolumeDropDown.Value
         case 'Colormap'
             if ~isempty(actions)
-                Program.Helpers.apply_processing_preview_action(app, actions);
+                if ~Program.Helpers.apply_processing_preview_action(app, actions)
+                    return
+                end
             end
 
             Program.Helpers.sync_main_display_from_processing(app, false);

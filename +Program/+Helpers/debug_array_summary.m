@@ -8,10 +8,11 @@ if isempty(arr)
     return
 end
 
-values = double(arr(:));
-if numel(values) > 1e5
-    idx = round(linspace(1, numel(values), 1e5));
-    values = values(idx);
+if numel(arr) > 1e5
+    idx = round(linspace(1, numel(arr), 1e5));
+    values = double(arr(idx));
+else
+    values = double(arr(:));
 end
 
 Program.Helpers.debug_event(source, ...

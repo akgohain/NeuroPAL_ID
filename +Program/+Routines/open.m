@@ -1,4 +1,5 @@
 function open(path)
+    Program.HeavyJob.assertIdle();
     app = Program.app;
     Program.GUIHandling.install_main_processing_sync_callbacks(app);
 
@@ -61,6 +62,7 @@ function open(path)
         d = uiprogressdlg(app.CELL_ID,'Title','Loading file...',...
     'Indeterminate','on');
         if proc_code == 1
+            close(d);
             app.is_opening_file = false;
             return
         end
@@ -77,12 +79,15 @@ function open(path)
         end
     end
 
+    progress_cleanup = onCleanup(@() local_close_progress(d));
     app.logEvent('Main',sprintf('Loading file from %s...', filename), 1)
 
     % Save the path in our preferences.
     GUI_prefs.image_dir = path;
     GUI_prefs.save();
 
+    job = Program.HeavyJob.acquire('Image loading');
+    job_cleanup = onCleanup(@() delete(job));
     try                
         [data, info, prefs, worm, mp, neurons, np_file, id_file] = ...
             DataHandling.NeuroPALImage.open(filename);
@@ -125,6 +130,7 @@ function open(path)
     end
 
     % Setup the file.
+    Program.HeavyJob.assertIdle(job.Token);
     app.image_file = np_file;
     app.id_file = [];
     app.image_prefs = prefs;
@@ -309,7 +315,7 @@ function open(path)
     Program.Routines.ID.hot_neuron_reset();
 
     if read_nwb_neurons == 1
-        app.load_neurons_from_nwb(nwb_data);
+        app.load_neurons_from_nwb(nwb_data, job.Token);
         Program.GUIHandling.gui_lock(app, 'enable', 'neuron_gui');
     end
 
@@ -320,8 +326,7 @@ function open(path)
     Program.Routines.ID.get_slice(app.ZSlider, app.image_view, app.XY);
     close(d)
 
-    addlistener(app.CELL_ID, 'WindowMousePress', @(src, event) app.DragManager('down', event));
-    addlistener(app.CELL_ID, 'WindowMouseRelease', @(src, event) app.DragManager('up', event));
+    Program.Helpers.drag_event_listeners(app);
     
     % Done.
     app.is_opening_file = false;
@@ -339,7 +344,15 @@ function open(path)
     set(app.IdButton, 'Visible', 'off');
     set(app.ProcessingButton, 'Visible', 'off');
     Program.GUIHandling.update_main_id_workflow_state(app);
+    app.TabGroup.SelectedTab = app.NeuroPALIDTab;
     drawnow;
+end
+
+function local_close_progress(d)
+try
+    if ~isempty(d) && isvalid(d), close(d); end
+catch
+end
 end
 
 function local_finish_open(app)
@@ -347,6 +360,7 @@ function local_finish_open(app)
 try
     if ~isempty(app) && isvalid(app)
         app.is_opening_file = false;
+        app.CELL_ID.Visible = 'on';
     end
 catch
 end

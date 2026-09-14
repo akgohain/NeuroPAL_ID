@@ -137,6 +137,7 @@ classdef GUIHandling
 
             Program.GUIHandling.prepare_unloaded_module_views(app);
 
+            Program.GUIHandling.install_open_callbacks(app);
             Program.GUIHandling.install_processing_resize_callback(app);
             Program.GUIHandling.install_main_processing_sync_callbacks(app);
             Program.GUIHandling.install_cellpose_mask_button(app);
@@ -146,6 +147,29 @@ classdef GUIHandling
             Program.GUIHandling.configure_main_detect_id_controls(app);
             Program.GUIHandling.configure_main_z_controls(app);
             Program.GUIHandling.update_main_id_workflow_state(app);
+        end
+
+        function install_open_callbacks(app)
+            app.OpenMenu.MenuSelectedFcn = @(~, ~) Program.Routines.open();
+            app.OpenButton.ButtonPushedFcn = @(~, ~) Program.Routines.open();
+            key = 'source_tab_callback';
+            if ~isappdata(app.CELL_ID, key)
+                callback = app.TabGroup.SelectionChangedFcn;
+                setappdata(app.CELL_ID, key, callback);
+                app.TabGroup.SelectionChangedFcn = @(src, event) ...
+                    Program.GUIHandling.handle_source_tab_change(app, callback, src, event);
+            end
+        end
+
+        function handle_source_tab_change(app, callback, src, event)
+            % An unloaded processing tab has no volume selection yet.
+            if app.TabGroup.SelectedTab == app.ImageProcessingTab && ...
+                    isempty(app.image_data) && ...
+                    ~Program.GUIHandling.processing_video_available(app) && ...
+                    ~Program.GUIHandling.processing_tab_rendered(app)
+                return
+            end
+            Program.GUIHandling.invoke_gui_callback(callback, src, event);
         end
 
         function configure_main_z_controls(app)
@@ -560,7 +584,6 @@ classdef GUIHandling
                 return
             end
 
-            empty_state = Program.GUIHandling.ensure_main_id_empty_state(app);
             has_image = false;
             try
                 has_image = ~isempty(app.image_data);
@@ -571,20 +594,9 @@ classdef GUIHandling
                 content_name = content_names{content_i};
                 if isprop(app, content_name) && ~isempty(app.(content_name)) && ...
                         isvalid(app.(content_name))
-                    app.(content_name).Visible = Program.GUIHandling.on_off(has_image);
+                    app.(content_name).Visible = 'on';
                 end
             end
-            if ~isempty(empty_state) && isvalid(empty_state)
-                empty_state.Visible = Program.GUIHandling.on_off(~has_image);
-                if ~has_image
-                    Program.GUIHandling.set_descendant_enable_state(empty_state, 'on');
-                    try
-                        uistack(empty_state, 'top');
-                    catch
-                    end
-                end
-            end
-
             controls = Program.GUIHandling.main_detect_id_controls(app);
             if isempty(controls)
                 return
@@ -697,82 +709,6 @@ classdef GUIHandling
             end
             if isprop(app, 'UserIDButton') && isvalid(app.UserIDButton)
                 app.UserIDButton.Enable = Program.GUIHandling.on_off(neuron_count > 0);
-            end
-        end
-
-        function panel = ensure_main_id_empty_state(app)
-            panel = findobj(app.IdGridLayout, 'Tag', 'MainIDEmptyState');
-            if ~isempty(panel) && isvalid(panel(1))
-                panel = panel(1);
-                return
-            end
-
-            panel = uipanel(app.IdGridLayout, ...
-                'Tag', 'MainIDEmptyState', ...
-                'BorderType', 'none', ...
-                'BackgroundColor', [0.97 0.98 0.99]);
-            panel.Layout.Row = [2 8];
-            panel.Layout.Column = [1 4];
-            grid = uigridlayout(panel, ...
-                'ColumnWidth', {'1x', 430, '1x'}, ...
-                'RowHeight', {'1x', 40, 56, 38, 28, 32, '1x'}, ...
-                'Padding', [20 20 20 20], ...
-                'RowSpacing', 8);
-
-            title_label = uilabel(grid, ...
-                'Text', 'Identify a NeuroPAL volume', ...
-                'FontSize', 24, ...
-                'FontWeight', 'bold', ...
-                'HorizontalAlignment', 'center', ...
-                'FontColor', [0.10 0.18 0.28]);
-            title_label.Layout.Row = 2;
-            title_label.Layout.Column = 2;
-
-            description = uilabel(grid, ...
-                'Text', {'Open a multichannel image and detect neuron centers.'; ...
-                    'Assign ranked identities, then review uncertain predictions.'}, ...
-                'FontSize', 14, ...
-                'HorizontalAlignment', 'center', ...
-                'FontColor', [0.30 0.35 0.42]);
-            description.Layout.Row = 3;
-            description.Layout.Column = 2;
-
-            open_button = uibutton(grid, 'push', ...
-                'Text', 'Open NeuroPAL image', ...
-                'FontSize', 15, ...
-                'FontWeight', 'bold', ...
-                'BackgroundColor', [0.10 0.42 0.78], ...
-                'FontColor', [1 1 1], ...
-                'ButtonPushedFcn', @(src, event) ...
-                    Program.GUIHandling.open_main_image_from_empty_state(app));
-            open_button.Layout.Row = 4;
-            open_button.Layout.Column = 2;
-
-            formats = uilabel(grid, ...
-                'Text', 'MAT, NWB, ND2, CZI, TIFF, and HDF5', ...
-                'FontSize', 12, ...
-                'HorizontalAlignment', 'center', ...
-                'FontColor', [0.38 0.42 0.48]);
-            formats.Layout.Row = 5;
-            formats.Layout.Column = 2;
-
-            workflow = uilabel(grid, ...
-                'Text', 'Workflow:  Open  >  Detect  >  Auto-ID  >  Review', ...
-                'FontSize', 12, ...
-                'FontWeight', 'bold', ...
-                'HorizontalAlignment', 'center', ...
-                'FontColor', [0.16 0.34 0.55]);
-            workflow.Layout.Row = 6;
-            workflow.Layout.Column = 2;
-        end
-
-        function open_main_image_from_empty_state(~)
-            try
-                Program.Routines.open();
-            catch ME
-                Program.Helpers.debug_event('OpenFileCallback', ...
-                    '%s', getReport(ME, 'extended', 'hyperlinks', 'off'));
-                rethrow(ME)
             end
         end
 
@@ -1459,6 +1395,8 @@ classdef GUIHandling
         end
 
         function run_modern_auto_detector(app, backend)
+            job = Program.HeavyJob.acquire('Neuron detection');
+            job_cleanup = onCleanup(@() delete(job));
             Program.GUIHandling.auto_detect_log(app, ...
                 'START backend=%s', char(string(backend)));
             if isempty(app.image_data)
@@ -1516,8 +1454,11 @@ classdef GUIHandling
             else
                 rgbw = Program.GUIHandling.main_detection_channel_indices(app);
             end
+            source_context = Program.Helpers.main_job_context(app);
+            input_context = Program.Helpers.main_job_context(app, true);
+            detected_params = previous_params;
             data_rgbw = app.image_data(:, :, :, rgbw);
-            readout_rgbw = Methods.Preprocess.zscore_frame(data_rgbw);
+            readout_rgbw = Methods.ColorReadout(data_rgbw);
             params = Program.GUIHandling.main_method_params(app, 'detect');
             if strcmp(backend, 'yolo')
                 params = Program.GUIHandling.migrate_yolo_detect_params(params);
@@ -1537,7 +1478,8 @@ classdef GUIHandling
                     case 'cellpose'
                         Program.GUIHandling.auto_detect_log(app, ...
                             'Dispatching Cellpose detector.');
-                        [sp, app.mp_params] = Methods.CellposeDetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                        [sp, detected_params] = Methods.CellposeDetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                            'JobToken', job.Token, ...
                             'ColorReadoutData', readout_rgbw, ...
                             'Mode', Program.GUIHandling.param_value(params, 'mode', "cellpose"), ...
                             'ModelPath', Program.GUIHandling.param_value(params, 'model_path', ""), ...
@@ -1545,7 +1487,8 @@ classdef GUIHandling
                     case 'yolo'
                         Program.GUIHandling.auto_detect_log(app, ...
                             'Dispatching YOLO detector.');
-                        [sp, app.mp_params] = Methods.YOLODetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                        [sp, detected_params] = Methods.YOLODetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                            'JobToken', job.Token, ...
                             'ColorReadoutData', readout_rgbw, ...
                             'Conf', Program.GUIHandling.param_value(params, 'conf', 0.60), ...
                             'ImgSize', Program.GUIHandling.param_value(params, 'imgsz', 512), ...
@@ -1561,6 +1504,7 @@ classdef GUIHandling
                             'LogFcn', @(message) Program.GUIHandling.auto_detect_log(app, '%s', message));
                     case 'detection_moe'
                         [sp, moe_params] = Methods.MoEDetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                            'JobToken', job.Token, ...
                             'ColorReadoutData', readout_rgbw, ...
                             'BundlePath', Program.GUIHandling.param_value(params, 'bundle_path', ''), ...
                             'PythonExecutable', Program.GUIHandling.param_value(params, 'python_executable', ''), ...
@@ -1569,12 +1513,13 @@ classdef GUIHandling
                             'OutputDir', Program.GUIHandling.method_output_dir(app, 'moe'), ...
                             'KeepArtifacts', true);
                         if ~isempty(sp)
-                            prepared_moe_neurons = Neurons.Image(sp, app.worm.body, 'scale', app.image_um_scale');
+                            prepared_moe_neurons = Neurons.Image(sp, source_context.worm.body, 'scale', source_context.scale');
                         end
                     case 'spotiflow_supervised'
                         Program.GUIHandling.auto_detect_log(app, ...
                             'Dispatching frozen four-view Spotiflow NeuroPAL v1 detector.');
-                        [sp, app.mp_params] = Methods.SpotiflowDetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                        [sp, detected_params] = Methods.SpotiflowDetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                            'JobToken', job.Token, ...
                             'ColorReadoutData', readout_rgbw, ...
                             'BundlePath', Program.GUIHandling.param_value(params, 'bundle_path', Methods.MethodBundle.resolve('spotiflow_supervised', '')), ...
                             'ProbabilityThreshold', Program.GUIHandling.param_value(params, 'probability_threshold', 0.185), ...
@@ -1587,6 +1532,7 @@ classdef GUIHandling
                             'ABORT unknown backend="%s".', char(string(backend)));
                         return
                 end
+                Program.Helpers.assert_main_job_context(app, input_context);
             catch ME
                 Program.GUIHandling.auto_detect_log(app, ...
                     'ERROR detector threw %s: %s', ME.identifier, ME.message);
@@ -1599,7 +1545,7 @@ classdef GUIHandling
                 'Detector returned: sp=%s, positions=%s, mp_params=%s', ...
                 Program.GUIHandling.struct_summary(sp), ...
                 Program.GUIHandling.supervoxel_positions_summary(sp), ...
-                Program.GUIHandling.struct_summary(app.mp_params));
+                Program.GUIHandling.struct_summary(detected_params));
             if isempty(sp)
                 if strcmp(backend, 'detection_moe')
                     Program.GUIHandling.safe_uialert(app, ...
@@ -1607,7 +1553,7 @@ classdef GUIHandling
                         'Detection Complete', 'Icon', 'info');
                     return
                 end
-                detail = Program.GUIHandling.auto_detect_empty_detail(app.mp_params);
+                detail = Program.GUIHandling.auto_detect_empty_detail(detected_params);
                 Program.GUIHandling.auto_detect_log(app, ...
                     'ABORT detector returned empty sp. detail="%s"', strtrim(detail));
                 Program.GUIHandling.safe_uialert(app, sprintf('Auto-detect failed to find any neurons.%s', detail), ...
@@ -1618,6 +1564,7 @@ classdef GUIHandling
             Program.GUIHandling.auto_detect_log(app, ...
                 'Clearing selected/user ID UI state before neuron import.');
             try
+                Program.Helpers.assert_main_job_context(app, input_context);
                 Program.GUIHandling.try_auto_detect_ui_step(app, 'Program.Handlers.neurons.unselect_neuron', ...
                     @() Program.Handlers.neurons.unselect_neuron(false));
                 Program.GUIHandling.try_auto_detect_ui_step(app, 'clear selected_neuron', ...
@@ -1637,6 +1584,7 @@ classdef GUIHandling
                     app.mp_params = moe_params;
                 else
                     app.image_neurons = Neurons.Image(sp, app.worm.body, 'scale', app.image_um_scale');
+                    app.mp_params = detected_params;
                 end
                 Program.GUIHandling.auto_detect_log(app, ...
                     'Neurons.Image constructed: count=%d.', app.image_neurons.num_neurons());
@@ -1684,7 +1632,8 @@ classdef GUIHandling
                     Program.GUIHandling.graphics_child_count(app.XY), ...
                     Program.GUIHandling.graphics_child_count(app.MaxProjection));
             catch ME
-                if strcmp(backend, 'detection_moe')
+                if strcmp(backend, 'detection_moe') && ...
+                        isequaln(Program.Helpers.main_job_context(app), source_context)
                     app.image_neurons = previous_neurons;
                     app.mp_params = previous_params;
                 end
@@ -3073,6 +3022,31 @@ classdef GUIHandling
                 Program.GUIHandling.wrap_main_processing_sync_callback( ...
                     app, targets{n, 1}, targets{n, 2});
             end
+            Program.GUIHandling.install_main_slice_preview(app);
+        end
+
+        function install_main_slice_preview(app)
+            key = 'main_slice_preview';
+            if isappdata(app.CELL_ID, key)
+                previous = getappdata(app.CELL_ID, key);
+                if isvalid(previous), return; end
+            end
+            commit = app.ZSlider.ValueChangedFcn;
+            preview = Program.LatestSlicePreview( ...
+                @(z) Program.GUIHandling.preview_main_slice(app, z), ...
+                @(src, event) Program.GUIHandling.invoke_gui_callback(commit, src, event), ...
+                @() Program.Helpers.main_display_source_revision(app), app.CELL_ID);
+            setappdata(app.CELL_ID, key, preview);
+            app.ZSlider.Interruptible = 'off';
+            app.ZSlider.ValueChangingFcn = @(~, event) preview.request(event.Value);
+            app.ZSlider.ValueChangedFcn = @(src, event) preview.finish(src, event);
+        end
+
+        function preview_main_slice(app, z)
+            if isempty(app.image_data) || app.is_opening_file, return; end
+            view = Program.Helpers.main_display_view_cache(app);
+            if ~isempty(view) && isequal(view.z_gui, z), return; end
+            Program.Routines.ID.get_slice(app.ZSlider, [], app.XY, false, z);
         end
 
         function remove_redundant_processing_menus(app)
@@ -3141,7 +3115,12 @@ classdef GUIHandling
             cleanup = onCleanup(@() setappdata(app.CELL_ID, guard_key, false));
 
             Program.GUIHandling.invoke_gui_callback(legacy_callback, src, event);
-            Program.GUIHandling.sync_processing_after_main_change(app);
+            slice_only = isequal(component, app.ZSlider);
+            if slice_only && ~isempty(app.image_data)
+                app.ZSlider.Value = Program.Helpers.gui_z_to_data_index( ...
+                    event.Value, size(app.image_data, 3), false);
+            end
+            Program.GUIHandling.sync_processing_after_main_change(app, slice_only);
         end
 
         function invoke_gui_callback(callback_handle, src, event)
@@ -3162,7 +3141,8 @@ classdef GUIHandling
             feval(callback_handle, src, event);
         end
 
-        function sync_processing_after_main_change(app)
+        function sync_processing_after_main_change(app, slice_only)
+            if nargin < 2, slice_only = false; end
             if nargin < 1 || isempty(app)
                 app = Program.app;
             end
@@ -3183,7 +3163,12 @@ classdef GUIHandling
                 Program.Routines.Processing.render();
             end
 
-            Program.Routines.ID.render();
+            % Slice navigation preserves the projection and display settings.
+            if slice_only
+                Program.Routines.ID.get_slice(app.ZSlider, app.image_view, app.XY);
+            else
+                Program.Routines.ID.render();
+            end
         end
 
         function gui_lock(app, action, group, event)
@@ -4058,15 +4043,26 @@ classdef GUIHandling
         function install_processing_zslider_callbacks(app)
             Program.GUIHandling.clear_processing_zslider_event_listeners(app);
 
-            app.proc_zSlider.ValueChangedFcn = @(src, event) ...
-                Program.GUIHandling.handle_processing_primary_zslider_change(app, event.Value, false);
+            key = 'proc_slice_preview';
+            if isappdata(app.CELL_ID, key)
+                previous = getappdata(app.CELL_ID, key);
+                if isvalid(previous), delete(previous); end
+            end
+            preview = Program.LatestSlicePreview( ...
+                @(z) Program.GUIHandling.handle_processing_primary_zslider_change(app, z, true), ...
+                @(src, event) Program.GUIHandling.handle_processing_primary_zslider_change(app, event.Value, false), ...
+                @() {Program.Helpers.main_display_source_revision(app), ...
+                    Program.Helpers.processing_raw_signature(app)}, app.CELL_ID);
+            setappdata(app.CELL_ID, key, preview);
+            app.proc_zSlider.Interruptible = 'off';
+            app.proc_zSlider.ValueChangedFcn = @(src, event) preview.finish(src, event);
             app.proc_hor_zSlider.ValueChangedFcn = @(src, event) ...
                 Program.GUIHandling.handle_processing_horizontal_zslider_change(app, event.Value, false);
             app.proc_vert_zSlider.ValueChangedFcn = @(src, event) ...
                 Program.GUIHandling.handle_processing_vertical_zslider_change(app, event.Value, false);
 
             if isprop(app.proc_zSlider, 'ValueChangingFcn')
-                app.proc_zSlider.ValueChangingFcn = @(src, event) [];
+                app.proc_zSlider.ValueChangingFcn = @(src, event) preview.request(event.Value);
             end
             if isprop(app.proc_hor_zSlider, 'ValueChangingFcn')
                 app.proc_hor_zSlider.ValueChangingFcn = @(src, event) [];
@@ -4076,8 +4072,6 @@ classdef GUIHandling
             end
 
             listeners = struct( ...
-                'primary', addlistener(app.proc_zSlider, 'ValueChanging', @(src, event) ...
-                    Program.GUIHandling.handle_processing_primary_zslider_change(app, event.Value, true)), ...
                 'horizontal', addlistener(app.proc_hor_zSlider, 'ValueChanging', @(src, event) ...
                     Program.GUIHandling.handle_processing_horizontal_zslider_change(app, event.Value, true)), ...
                 'vertical', addlistener(app.proc_vert_zSlider, 'ValueChanging', @(src, event) ...
@@ -4163,7 +4157,7 @@ classdef GUIHandling
         function handle_processing_vertical_zslider_change(app, value, is_live)
             value = Program.GUIHandling.clamp_processing_zslider_value(app, value);
             z_limits = double(app.proc_vert_zSlider.Limits);
-            z_value = min(max(round(z_limits(2) - value), z_limits(1)), z_limits(2));
+            z_value = min(max(round(sum(z_limits) - value), z_limits(1)), z_limits(2));
             Program.GUIHandling.handle_processing_zslider_change(app, z_value, is_live);
         end
 
@@ -4260,7 +4254,7 @@ classdef GUIHandling
             z_limits = double(app.proc_zSlider.Limits);
             z_value = min(max(round(double(z_value)), z_limits(1)), z_limits(2));
             vert_limits = double(app.proc_vert_zSlider.Limits);
-            vert_value = min(max(round(vert_limits(2) - z_value), vert_limits(1)), vert_limits(2));
+            vert_value = min(max(round(sum(vert_limits) - z_value), vert_limits(1)), vert_limits(2));
 
             if app.proc_zSlider.Value ~= z_value
                 app.proc_zSlider.Value = z_value;
@@ -4912,6 +4906,7 @@ classdef GUIHandling
         end
 
         function confirm_processing_rotation(app)
+            Program.HeavyJob.assertIdle();
             rotate_actions = {};
             should_rotate_neurons = false;
 
@@ -5112,6 +5107,7 @@ classdef GUIHandling
         end
 
         function apply_processing_mirror_z(app)
+            Program.HeavyJob.assertIdle();
             controls = Program.GUIHandling.processing_mirror_z_controls(app);
             include_neurons = false;
             if ~isempty(controls)
@@ -6045,7 +6041,7 @@ classdef GUIHandling
             mip_enabled = logical(app.ProcShowMIPCheckBox.Value);
             slow_preview_enabled = logical(app.ProcPreviewZslowCheckBox.Value);
             target_enable = 'on';
-            if mip_enabled
+            if mip_enabled || isequal(app.proc_zSlider.MajorTicks, 1)
                 target_enable = 'off';
             end
 

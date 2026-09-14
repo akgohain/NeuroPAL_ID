@@ -1,4 +1,5 @@
 function pass_to_main()
+    Program.HeavyJob.assertIdle();
     app = Program.app;
 
     switch app.VolumeDropDown.Value

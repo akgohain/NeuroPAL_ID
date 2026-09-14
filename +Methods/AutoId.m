@@ -32,8 +32,6 @@ classdef AutoId < handle
         assignment_prob_ranks % n_obsx7 matrix with the 7 most likely assignment
         assignment_prob_probs % n_obsx7 matrix with the corresponding probabilities of assignment_prob_ranks
         
-        pool = []; % pool for parallel processing
-        pool_timeout = 1; % parallel processing timeout
     end
     
     methods(Static)
@@ -95,6 +93,30 @@ classdef AutoId < handle
         end
         
         %% Utility functions.
+        function cancel_alignment_future(future)
+            %CANCEL_ALIGNMENT_FUTURE Release work owned by one alignment call.
+            try
+                if ~isempty(future) && isvalid(future), cancel(future); end
+            catch ME
+                warning('Methods:AutoId:FutureCleanup', '%s', ME.message);
+            end
+        end
+
+        function close_alignment_pool(pool, owns_pool)
+            %CLOSE_ALIGNMENT_POOL Leave an existing caller-owned pool running.
+            if ~owns_pool, return; end
+            try
+                if ~isempty(pool) && isvalid(pool), delete(pool); end
+            catch ME
+                warning('Methods:AutoId:PoolCleanup', '%s', ME.message);
+            end
+        end
+
+        function close_alignment_progress(wb)
+            %CLOSE_ALIGNMENT_PROGRESS Release the window after an exception.
+            if isgraphics(wb), delete(wb); end
+        end
+
         function rotmat = rotmat(theta)
             rotmat = [cos(theta) -sin(theta);...
                       sin(theta) cos(theta)];
@@ -603,6 +625,7 @@ classdef AutoId < handle
             % Note: windows wants the interpreter off from the beginning.
             wait_title = 'ID''ing Neurons';
             wb = waitbar(0, 'Initializing ...', 'Name', wait_title);
+            progress_cleanup = onCleanup(@() AutoId.close_alignment_progress(wb));
             wb.Children.Title.Interpreter = 'none';
             waitbar(0, wb, {file, 'Initializing ...'}, 'Name', wait_title);
             
@@ -615,10 +638,18 @@ classdef AutoId < handle
             num_tests = 2*length(AutoId.theta);
 
             % Start the parallel pool if needed.
+            pool = [];
+            pool_cleanup = [];
+            future_cleanup = cell(num_tests,1);
             if is_parallel
                 try
-                    if isempty(obj.pool) || ~isvalid(obj.pool) || ~obj.pool.Connected
-                        obj.pool = parpool('threads');
+                    pool = gcp('nocreate');
+                    if isempty(pool)
+                        pool = parpool('threads');
+                        pool_cleanup = onCleanup(@() AutoId.close_alignment_pool(pool,true));
+                    elseif ~isa(pool,'parallel.ThreadPool')
+                        error('Methods:AutoId:ExistingPool', ...
+                            'A process pool is already active; using serial alignment.');
                     end
                 catch ME
                     is_parallel = false;
@@ -636,15 +667,16 @@ classdef AutoId < handle
             for idx = 1:length(AutoId.theta)
                 if is_parallel
                     
-                    % Allocate memory.
-                    %f = parallel.FevalFuture.empty(2*length(AutoId.theta),0);
-                    
                     % Compute the alignment.
-                    f(idx) = parfeval(obj.pool, @AutoId.local_alignment, ...
+                    future = parfeval(pool, @AutoId.local_alignment, ...
                         3, col, pos, model, AutoId.theta(idx), +1, annotated);
-                    f(length(AutoId.theta) + idx) = ...
-                        parfeval(obj.pool, @AutoId.local_alignment, ...
+                    future_cleanup{idx} = onCleanup(@() AutoId.cancel_alignment_future(future));
+                    f(idx) = future;
+                    future = parfeval(pool, @AutoId.local_alignment, ...
                         3, col, pos, model, AutoId.theta(idx), -1, annotated);
+                    future_cleanup{length(AutoId.theta)+idx} = ...
+                        onCleanup(@() AutoId.cancel_alignment_future(future));
+                    f(length(AutoId.theta)+idx) = future;
                 else
                     
                     % Compute the alignment.
@@ -683,21 +715,8 @@ classdef AutoId < handle
                 end
             end
             
-            % Terminate the existing parallel session.
-            if exist('gcp', 'file') == 2
-                try
-                    delete(gcp('nocreate'));
-                catch ME
-                    msg = sprintf('AutoID: failed to close parallel pool. (%s)', ME.message);
-                    fprintf('%s\n', msg);
-                    if ~isempty(app) && isvalid(app)
-                        try
-                            app.logEvent('AutoID', msg, 0);
-                        catch
-                        end
-                    end
-                end
-            end
+            % Cancel remaining jobs and release only the pool created here.
+            clear future_cleanup pool_cleanup
             
             % Done.
             try

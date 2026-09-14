@@ -1,4 +1,5 @@
 function reset()
+    Program.HeavyJob.assertIdle();
     app = Program.GUIHandling.app;
 
     d = uiprogressdlg(app.CELL_ID, ...

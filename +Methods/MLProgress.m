@@ -67,6 +67,10 @@ classdef MLProgress
             fcn = @(message) Methods.MLProgress.update(progress, string(message), []);
         end
 
+        function value = cancelled(progress)
+            value = ~isempty(progress) && (~isvalid(progress) || progress.CancelRequested);
+        end
+
         function app = currentApp()
             app = [];
             try

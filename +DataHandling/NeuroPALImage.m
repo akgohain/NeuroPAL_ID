@@ -31,20 +31,15 @@ classdef NeuroPALImage
     methods (Static)
         function [data, info, prefs, worm, mp, neurons, np_file, id_file] = open(file)
             %OPEN Open an image in NeuroPAL format.
-            %
-            % Input:
-            %   file = the NeuroPAL format filename
-            %
-            % Output:
-            %   data = the image data
-            %   info = the image information
-            %   prefs = the user preferences
-            %   worm = the worm information
-            %   mp = matching pursuit (neuron detection) parameters
-            %   neurons = the neurons in the image
-            %	np_file = the NeuroPAL image file
-            %	id_file = the NeuroPAL ID file
+            np_file = DataHandling.NeuroPALImage.prepare(file);
+            [data, info, prefs, worm, mp, neurons, id_file] = ...
+                DataHandling.NeuroPALImage.loadNP(np_file);
+            Program.Validation.fill_channels(data);
+        end
 
+        function np_file = prepare(file)
+            %PREPARE Resolve a NeuroPAL MAT path without reopening converted pixels.
+            file = char(file);
             % Initialize the packages.
             import DataHandling.*;
 
@@ -113,11 +108,6 @@ classdef NeuroPALImage
                     'Cannot read or convert: "%s"', np_file);
             end
             
-            % Load the file.
-            [data, info, prefs, worm, mp, neurons, id_file] = ...
-                NeuroPALImage.loadNP(np_file);
-
-            Program.Validation.fill_channels(data);
         end
 
     end
@@ -157,7 +147,7 @@ classdef NeuroPALImage
             Program.Handlers.dialogue.step('Loading NeuroPAL_ID file...');
             
             % Open the image file.
-            np_data = load(image_file);
+            np_data = DataHandling.Helpers.npal_mat.load_fields(image_file, true);
             if ~isfield(np_data, 'data') || ...
                     ~isfield(np_data, 'info') || ...
                     ~isfield(np_data, 'prefs')
@@ -509,7 +499,8 @@ classdef NeuroPALImage
             worm.notes = '';
                 
             % Save the CZI file to our MAT file format.
-            np_file = strrep(czi_file, 'czi', 'mat');
+            [folder, name] = fileparts(czi_file);
+            np_file = fullfile(folder, [name '.mat']);
             version = ProgramInfo.version;
             save(np_file, 'version', 'data', 'info', 'prefs', 'worm', '-v7.3');
             clear data image_data

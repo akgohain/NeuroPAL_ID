@@ -1,12 +1,21 @@
-function get_slice(~, view, ~)
+function get_slice(~, view, ~, reset_limits, requested_z)
     %% Draw the neurons in this z-slice.
 
+    if nargin < 4, reset_limits = false; end
+    if nargin < 5, requested_z = []; end
     app = Program.app;
 
     % Sanity check the Z slice value.
-    z = Program.Helpers.gui_z_to_data_index(app.ZSlider.Value, size(app.image_data, 3), false);
-    app.logEvent('Main',sprintf('Drawing slice %s...', string(z)), 0);
-    app.ZSlider.Value = z;
+    is_preview = ~isempty(requested_z);
+    if ~is_preview
+        requested_z = app.ZSlider.Value;
+        app.logEvent('Main',sprintf('Drawing slice %s...', string(requested_z)), 0);
+    end
+    z = Program.Helpers.gui_z_to_data_index(requested_z, size(app.image_data, 3), false);
+    % A preview must not send an older thumb position back to the browser.
+    if ~is_preview && app.ZSlider.Value ~= z
+        app.ZSlider.Value = z;
+    end
 
     % Is there an image?
     if isempty(app.image_data)
@@ -40,37 +49,34 @@ function get_slice(~, view, ~)
         app.ZRightLabel.BackgroundColor = RV_color;
     end
 
-    % Clear the contents of the axis to draw the new Z-slice.
-    Program.Helpers.ensure_main_image_axes(app);
+    % Update the image and replace the annotations for this Z-slice.
+    if reset_limits || isempty(app.XY) || ~isvalid(app.XY)
+        Program.Helpers.ensure_main_image_axes(app);
+    end
     ax = app.XY;
-    cla(ax);
     % Create the slice at z for displaying in the axis.
-    [xy, ~, z] = Program.Helpers.get_current_display_slice(app, 'main', view);
+    [xy, ~, z] = Program.Helpers.get_current_display_slice(app, 'main', view, requested_z);
     Program.Helpers.debug_array_summary('IDSlice', 'xy_slice', xy);
     % Display the current slice in the XY axis.
-    Program.Helpers.fill_axes_parent(ax);
-    gui_image = image(xy, 'Parent', ax);
-    Program.Helpers.configure_image_axes_ticks( ...
-        ax, size(xy), app.image_um_scale(1:2), ...
-        'XLim', [0, size(xy, 2)], ...
-        'YLim', [0, size(xy, 1)]);
-    Program.Helpers.fill_axes_parent(ax);
-    hold(ax, 'on');
+    [gui_image, configure_axes] = Program.Helpers.main_slice_image( ...
+        ax, xy, app.image_um_scale(1:2), reset_limits);
+    if configure_axes
+        Program.Helpers.fill_axes_parent(ax);
+        Program.Helpers.configure_image_axes_ticks( ...
+            ax, size(xy), app.image_um_scale(1:2), ...
+            'XLim', [0, size(xy, 2)], ...
+            'YLim', [0, size(xy, 1)]);
+    end
+    if ~strcmp(ax.NextPlot, 'add')
+        hold(ax, 'on');
+    end
     local_draw_cellpose_mask_overlay(app, ax, z);
     local_draw_yolo_box_overlay(app, ax, z);
 
-    if strcmp(app.TabGroup.SelectedTab.Title, 'Image Processing') & strcmp(app.VolumeDropDown.Value, 'Colormap')
-        Program.Helpers.fill_axes_parent(app.proc_xyAxes);
-        image(xy, 'Parent', app.proc_xyAxes);
-        Program.Helpers.configure_image_axes_ticks( ...
-            app.proc_xyAxes, size(xy), app.image_um_scale(1:2), ...
-            'XLim', [1, size(xy, 2)], ...
-            'YLim', [1, size(xy, 1)]);
-        Program.Helpers.fill_axes_parent(app.proc_xyAxes);
-    end
-
     % Add the AddNeuron function as mouse click listener.
-    gui_image.ButtonDownFcn = {@app.ImageClicked};
+    if isempty(gui_image.ButtonDownFcn)
+        gui_image.ButtonDownFcn = {@app.ImageClicked};
+    end
 
     % Redraw the neurons in this z slice.
     if ~isempty(app.image_neurons) && ~isempty(app.image_neurons.neurons)

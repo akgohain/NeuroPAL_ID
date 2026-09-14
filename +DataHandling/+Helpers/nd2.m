@@ -274,6 +274,7 @@ classdef nd2
         function names = get_channel_names(reader)
             if isstring(reader) || ischar(reader)
                 reader = bfGetReader(reader);
+                reader_cleanup = onCleanup(@() reader.close());
             end
 
             names = strings(1, reader.getSizeC);
@@ -288,8 +289,11 @@ classdef nd2
 
             switch fmt
                 case '.nd2'
-                    f_data = bfopen(file);
-                    f_metadata = f_data{cellfun(@(x)isa(x,'java.util.Hashtable'), f_data)};
+                    reader = bfGetReader(file);
+                    reader_cleanup = onCleanup(@() reader.close());
+                    f_metadata = reader.getSeriesMetadata();
+                    javaMethod('merge', 'loci.formats.MetadataTools', ...
+                        reader.getGlobalMetadata(), f_metadata, 'Global ');
                     f_metadata_keys = string(f_metadata.keySet.toArray);
                     f_ch_idx = contains(f_metadata_keys, 'Global Name #');
                     f_ch_str = string({f_metadata_keys{f_ch_idx}});

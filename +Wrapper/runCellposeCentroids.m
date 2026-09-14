@@ -12,8 +12,13 @@ arguments
     options.OutputDir (1,1) string = ""
     options.KeepArtifacts (1,1) logical = false
     options.SaveMasksMat (1,1) logical = false
+    options.JobToken (1,1) string = ""
+    options.CancelFcn = []
+    options.TimeoutSeconds (1,1) double = 10800
     options.ProgressFcn = []
 end
+job = Program.HeavyJob.acquire('runCellposeCentroids', options.JobToken);
+job_cleanup = onCleanup(@() delete(job));
 
 mode = lower(strtrim(string(options.Mode)));
 if numel(mode) > 1
@@ -120,13 +125,16 @@ fclose(request_fid);
 script_path = fullfile(wrapper_dir, 'cellpose_centroids.py');
 local_prepare_python_environment();
 
-command = local_join_quoted_command({ ...
+command_parts = { ...
     python_executable, script_path, ...
     '--input', request_path, ...
     '--output', response_path, ...
-    '--mode', mode});
+    '--mode', mode};
+command = local_join_quoted_command(command_parts);
 local_progress(progress_fcn, 'Running Cellpose inference. This can take several minutes without a GPU...');
-[status, output] = system(command);
+[status, output] = Wrapper.runPythonProcess(command_parts, ...
+    'JobToken', job.Token, 'ProgressFcn', progress_fcn, ...
+    'CancelFcn', options.CancelFcn, 'TimeoutSeconds', options.TimeoutSeconds);
 local_emit_progress_lines(progress_fcn, output);
 if status ~= 0
     friendly_message = local_cellpose_failure_message(output, model_path);

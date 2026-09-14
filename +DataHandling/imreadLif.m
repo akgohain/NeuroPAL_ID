@@ -33,6 +33,7 @@ metadata = [];
 
 % create reader
 reader=bfGetReader(filename); %create a reader using the .lif file name as input
+reader_cleanup = onCleanup(@() reader.close());
 glob=reader.getGlobalMetadata();
 ser=reader.getSeriesMetadata();
 javaMethod('merge', 'loci.formats.MetadataTools', ...
@@ -60,6 +61,8 @@ end
 ChEx = inputdlg(prompt, ...
     'Dataset info (Enter 0 for DIC)', [1 35], DatInf(1:size(prompt,2)));
 
+if isempty(ChEx), return; end
+
 [UC,~,k] = unique(ChEx);
 N = histc(k,1:numel(UC));
 if sum(N>1)
@@ -81,10 +84,28 @@ end
 %object starts with 0, needs to be changed to select a specific series
 
 SeriesI=str2double(ChEx{1});
+if ~isfinite(SeriesI) || SeriesI ~= fix(SeriesI) || SeriesI < 1 || SeriesI > nSeries
+    error('DataHandling:Import:Series', 'Select a valid image series.');
+end
+reader.setSeries(SeriesI - 1);
+dims = DataHandling.Helpers.bioformats_image.check(reader, filename);
+if dims(4) ~= sC
+    error('DataHandling:Import:Channels', ...
+        'Selected series has a different channel count. Export this series separately.');
+end
+sx = dims(1);
+sy = dims(2);
+sz = dims(3);
+ser = reader.getSeriesMetadata();
+javaMethod('merge', 'loci.formats.MetadataTools', glob, ser, 'Global ');
 
+% Allocate the image after checking the decoded dimensions.
+first_plane = bfGetPlane(reader, 1);
+image.data = zeros(sy, sx, sz, sC, 'like', first_plane);
+clear first_plane
 for j=1:sC
     for i=1:sz
-        iPlane=reader.getIndex(i-1,j-1,SeriesI-1)+1; %nSeries is the 0 in getIndex
+        iPlane=reader.getIndex(i-1,j-1,0)+1;
         image.data(:,:,i,j)=bfGetPlane(reader,iPlane);
     end
 end
@@ -123,9 +144,9 @@ xPixels = sy;
 
 % Get the scale size
 
-xy_s=omeMeta.getPixelsPhysicalSizeX(0).value();
+xy_s=omeMeta.getPixelsPhysicalSizeX(SeriesI-1).value();
 xy_scale=xy_s.doubleValue();
-z_s=omeMeta.getPixelsPhysicalSizeZ(0).value();
+z_s=omeMeta.getPixelsPhysicalSizeZ(SeriesI-1).value();
 z_scale=z_s.doubleValue();
 
 

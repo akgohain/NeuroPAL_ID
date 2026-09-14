@@ -22,10 +22,11 @@ function render()
                  state.white.bool state.dic.bool state.gfp.bool]), ...
         mat2str(app.image_gamma(:)'), ...
         mat2str(size(app.image_data)));
-    view_cache = Program.Helpers.render_main_display_view(app, app.ZSlider.Value, ...
-        Program.Helpers.main_display_view_cache(app));
+    % A full redraw is the conservative mutation boundary for legacy pixel
+    % editing callbacks. Slice navigation reuses the projection separately.
+    Program.Helpers.main_display_view_cache(app, []);
+    view_cache = Program.Helpers.render_main_display_view(app, app.ZSlider.Value);
     Program.Helpers.main_display_view_cache(app, view_cache);
-    app.image_view = view_cache.render_volume;
     Program.Helpers.debug_array_summary('IDRender', 'image_view.max_projection', view_cache.max_projection);
 
     % Redraw the max projection.
@@ -36,5 +37,5 @@ function render()
     Program.Helpers.fill_axes_parent(app.MaxProjection);
 
     % Redraw the Z-slice.
-    Program.Routines.ID.get_slice(app.ZSlider, view_cache, app.XY);
+    Program.Routines.ID.get_slice(app.ZSlider, view_cache, app.XY, true);
 end

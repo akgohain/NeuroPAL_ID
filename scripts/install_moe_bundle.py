@@ -44,7 +44,7 @@ def main():
     (root/'app_support/SHA256SUMS').write_text(''.join(f'{v}  yolo_inf2/{k}\n' for k,v in YOLO_HASHES.items()))
     roles = {**expected['models'], 'source': 'source/GAT-NeuroPAL', 'yolo_source':'app_support/yolo_inf2',
              'checksums':'SHA256SUMS', 'router_policy':'provenance/router.json', 'features':'configuration/ordered_features.json'}
-    manifest = dict(schema_version=1, method_id='detection_moe', display_name='Nonlinear MoE (fold 00, experimental)',
+    manifest = dict(schema_version=1, method_id='detection_moe', display_name='MoE',
                     source_revision=expected['source_commit'],
                     configuration={'python_executable':str(args.python.absolute()),'device':'cpu','dataset_id':'unknown'},
                     artifacts=[dict(role=k,path=v,required=True) for k,v in roles.items()])

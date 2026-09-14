@@ -105,6 +105,7 @@ win_visualize/for_testing/NeuroPAL_ID.exe
 win_visualize/PackagingLog.html
 *.tif
 venv/
+/venv
 External_Dependencies/matnwb/*
 External_Dependencies/3dct/*
 .idea/vcs.xml

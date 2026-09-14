@@ -15,3 +15,4 @@ pynwb==4.2.0
 tifffile==2026.3.3
 scikit-image==0.26.0
 opencv-python==4.13.0.92
+psutil; sys_platform == "win32"

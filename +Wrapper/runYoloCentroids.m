@@ -30,8 +30,13 @@ arguments
     options.DepthSanityRatioCap (1,1) double = 2.0
     options.Radius (1,1) double = 2
     options.LineWidth (1,1) double = 2
+    options.JobToken (1,1) string = ""
+    options.CancelFcn = []
+    options.TimeoutSeconds (1,1) double = 10800
     options.ProgressFcn = []
 end
+job = Program.HeavyJob.acquire('runYoloCentroids', options.JobToken);
+job_cleanup = onCleanup(@() delete(job));
 
 scale_um_xyz = double(scale_um_xyz(:)');
 if numel(scale_um_xyz) ~= 3
@@ -83,7 +88,7 @@ local_assert_free_space(output_dir, volume_bytes);
 volume_path = fullfile(output_dir, 'request_volume.mat');
 request_path = fullfile(output_dir, 'request.json');
 response_path = fullfile(output_dir, 'response.json');
-cleanup_obj = onCleanup(@() local_cleanup(output_dir, options.KeepArtifacts)); %#ok<NASGU>
+cleanup_obj = onCleanup(@() local_cleanup(output_dir, options.KeepArtifacts));
 
 request = struct();
 request.volume = volume;
@@ -124,9 +129,11 @@ fclose(fid);
 wrapper_dir = fileparts(mfilename('fullpath'));
 script_path = fullfile(wrapper_dir, 'yolo_centroids.py');
 local_prepare_python_environment();
-command = local_join_quoted_command({python_executable, script_path, '--request', request_path, '--response', response_path});
+command_parts = {python_executable, script_path, '--request', request_path, '--response', response_path};
 local_progress(options.ProgressFcn, 'Running YOLO detector...');
-[status, output] = system(command);
+[status, output] = Wrapper.runPythonProcess(command_parts, ...
+    'JobToken', job.Token, 'ProgressFcn', options.ProgressFcn, ...
+    'CancelFcn', options.CancelFcn, 'TimeoutSeconds', options.TimeoutSeconds);
 local_emit_progress_lines(options.ProgressFcn, output);
 if status ~= 0
     friendly_message = local_yolo_failure_message(output, weights_path);
@@ -276,14 +283,6 @@ if status == 0
 else
     path_value = '';
 end
-end
-
-function command = local_join_quoted_command(parts)
-quoted = cell(size(parts));
-for i = 1:numel(parts)
-    quoted{i} = local_shell_quote(parts{i});
-end
-command = strjoin(quoted, ' ');
 end
 
 function out = local_shell_quote(value)
