@@ -1,4 +1,9 @@
 function load_file(mode, path)
+            % Leave an unloaded tab on its open action.
+            if isempty(path) || strlength(string(path)) == 0
+                Program.GUIHandling.update_processing_empty_state(Program.app);
+                return
+            end
             job = Program.HeavyJob.acquire('Processing source loading');
             job_cleanup = onCleanup(@() delete(job));
             app = Program.app;

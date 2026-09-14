@@ -43,7 +43,7 @@ else
     channels_text_value = 'Channels: n/a';
     scale_text_value = 'Scale/timing: n/a';
     memory_text_value = 'Lazy streaming starts after a video is loaded.';
-    next_text = 'Next: open a video';
+    next_text = '';
 end
 
 set_label(app, 'zephir_status_file', file_text, [0.88 0.91 0.94]);
@@ -59,6 +59,7 @@ set_label(app, 'zephir_dataset_scale', scale_text_value, [0.10 0.10 0.10]);
 set_label(app, 'zephir_dataset_memory', memory_text_value, [0.10 0.10 0.10]);
 set_backend_readiness(app, backend, backend_readiness);
 set_empty_state(app, has_video);
+Program.GUIHandling.update_processing_empty_state(app);
 
 has_neuropal_neurons = neuro_pal_neurons_available(app);
 
