@@ -188,3 +188,27 @@ exactly, including orientation. A forced fallback also rejected the source under
 MATLAB's reduced image limit. The supervised load-plus-comparison run peaked at
 1,308,336 KiB summed RSS; this is fixture evidence, not an arbitrary-input ceiling.
 Artifacts: `/Users/adamg/neuroPAL/artifacts/performance-sweep/import-hardening/`.
+
+## Main Z slider latency follow-up
+
+The main slider's release callback was wrapped in the generic display-settings
+sync handler, which called `ID.render` and rebuilt the entire projection. Release
+now commits the event's final Z value and uses the existing slice cache. Display
+settings changes still request a full redraw.
+
+Slice updates also no longer reset both axes' layout, aspect-ratio modes, and
+image click callbacks. Layout is configured when the axes/image geometry is
+created or a full redraw is requested. The existing image/overlay behavior and
+zoom limits are preserved.
+
+On the 000715 fixture, matched 20-update profiles (excluding the first two warmup
+updates) measured median end-to-end redraw time of 112 ms before and 48 ms after.
+These timings include `drawnow` and profiler overhead. Slider-release updates in
+the patched app took 38–92 ms across ten trials. The real mouse-drag reversal was
+also checked manually. This is improved interactive latency, not a 60 FPS claim.
+
+`scripts/test_main_slider.m` exercises the actual installed release callback,
+including a release without a preceding drag render. It verifies the final slice,
+exact displayed pixels, unchanged projection/source revision, reused graphics,
+and preserved zoom. It is included in the full app test. Profiling artifacts are
+in `/Users/adamg/neuroPAL/artifacts/performance-sweep/slider-latency/`.

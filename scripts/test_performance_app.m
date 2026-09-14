@@ -43,6 +43,7 @@ exportapp(app.CELL_ID,fullfile(output,'loaded.png'));
 timings = zeros(2,30);
 base_image = findobj(app.XY,'Tag','main_slice_pixels');
 assert(isscalar(base_image));
+test_main_slider(app);
 for labels = [false true]
     app.show_labels = labels;
     app.XY.XLim = [20 90];

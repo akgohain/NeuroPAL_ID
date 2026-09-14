@@ -3154,7 +3154,12 @@ classdef GUIHandling
             cleanup = onCleanup(@() setappdata(app.CELL_ID, guard_key, false));
 
             Program.GUIHandling.invoke_gui_callback(legacy_callback, src, event);
-            Program.GUIHandling.sync_processing_after_main_change(app);
+            slice_only = isequal(component, app.ZSlider);
+            if slice_only && ~isempty(app.image_data)
+                app.ZSlider.Value = Program.Helpers.gui_z_to_data_index( ...
+                    event.Value, size(app.image_data, 3), false);
+            end
+            Program.GUIHandling.sync_processing_after_main_change(app, slice_only);
         end
 
         function invoke_gui_callback(callback_handle, src, event)
@@ -3175,7 +3180,8 @@ classdef GUIHandling
             feval(callback_handle, src, event);
         end
 
-        function sync_processing_after_main_change(app)
+        function sync_processing_after_main_change(app, slice_only)
+            if nargin < 2, slice_only = false; end
             if nargin < 1 || isempty(app)
                 app = Program.app;
             end
@@ -3196,7 +3202,12 @@ classdef GUIHandling
                 Program.Routines.Processing.render();
             end
 
-            Program.Routines.ID.render();
+            % Slice navigation preserves the projection and display settings.
+            if slice_only
+                Program.Routines.ID.get_slice(app.ZSlider, app.image_view, app.XY);
+            else
+                Program.Routines.ID.render();
+            end
         end
 
         function gui_lock(app, action, group, event)
