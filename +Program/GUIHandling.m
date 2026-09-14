@@ -137,6 +137,7 @@ classdef GUIHandling
 
             Program.GUIHandling.prepare_unloaded_module_views(app);
 
+            Program.GUIHandling.install_open_callbacks(app);
             Program.GUIHandling.install_processing_resize_callback(app);
             Program.GUIHandling.install_main_processing_sync_callbacks(app);
             Program.GUIHandling.install_cellpose_mask_button(app);
@@ -146,6 +147,29 @@ classdef GUIHandling
             Program.GUIHandling.configure_main_detect_id_controls(app);
             Program.GUIHandling.configure_main_z_controls(app);
             Program.GUIHandling.update_main_id_workflow_state(app);
+        end
+
+        function install_open_callbacks(app)
+            app.OpenMenu.MenuSelectedFcn = @(~, ~) Program.Routines.open();
+            app.OpenButton.ButtonPushedFcn = @(~, ~) Program.Routines.open();
+            key = 'source_tab_callback';
+            if ~isappdata(app.CELL_ID, key)
+                callback = app.TabGroup.SelectionChangedFcn;
+                setappdata(app.CELL_ID, key, callback);
+                app.TabGroup.SelectionChangedFcn = @(src, event) ...
+                    Program.GUIHandling.handle_source_tab_change(app, callback, src, event);
+            end
+        end
+
+        function handle_source_tab_change(app, callback, src, event)
+            % An unloaded processing tab has no volume selection yet.
+            if app.TabGroup.SelectedTab == app.ImageProcessingTab && ...
+                    isempty(app.image_data) && ...
+                    ~Program.GUIHandling.processing_video_available(app) && ...
+                    ~Program.GUIHandling.processing_tab_rendered(app)
+                return
+            end
+            Program.GUIHandling.invoke_gui_callback(callback, src, event);
         end
 
         function configure_main_z_controls(app)

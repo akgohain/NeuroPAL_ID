@@ -9,6 +9,7 @@ if exist(output,'dir') ~= 7, mkdir(output); end
 started = tic;
 app = visualize_light;
 cleanup = onCleanup(@() delete(app));
+test_unloaded_navigation(app);
 report = struct('startup_seconds',toc(started));
 fprintf('PERFORMANCE_APP startup %.3f seconds\n',report.startup_seconds);
 source = fullfile(bundle,'examples','original','000715__sub-55-YAaDV_ophys.nwb');

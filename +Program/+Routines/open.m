@@ -344,6 +344,7 @@ function open(path)
     set(app.IdButton, 'Visible', 'off');
     set(app.ProcessingButton, 'Visible', 'off');
     Program.GUIHandling.update_main_id_workflow_state(app);
+    app.TabGroup.SelectedTab = app.NeuroPALIDTab;
     drawnow;
 end
 
@@ -359,6 +360,7 @@ function local_finish_open(app)
 try
     if ~isempty(app) && isvalid(app)
         app.is_opening_file = false;
+        app.CELL_ID.Visible = 'on';
     end
 catch
 end

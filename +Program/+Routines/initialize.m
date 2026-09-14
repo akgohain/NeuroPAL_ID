@@ -49,6 +49,7 @@ function initialize()
 
     % Initialize the structured properties.
     Program.GUIHandling.init_click_states(app);
+    Program.GUIHandling.install_open_callbacks(app);
     Program.GUIHandling.hide_main_click_mode_control(app);
     Program.GUIHandling.hide_next_neuron_mode_control(app);
     Program.GUIHandling.configure_main_detect_id_controls(app);
