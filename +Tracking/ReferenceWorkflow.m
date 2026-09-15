@@ -294,6 +294,9 @@ classdef ReferenceWorkflow < handle
         function load(obj,file)
             if ~isempty(obj.Rows), error('Tracking:ExistingSeeds','Open a fresh reference session before importing another seed set.'); end
             response = obj.bridge(struct('action','import','source',obj.Source,'file',file));
+            obj.Candidates=zeros(0,7); obj.CandidateFrame=0;
+            obj.History={}; obj.Provenance=struct(); obj.TrackDirectory=''; obj.ActivityDirectory='';
+            obj.ActivityRows=[]; obj.ActivityExcluded=[]; obj.ActivitySettings=struct();
             obj.setRows(response.observations);
             if isfield(response.provenance,'session'), obj.Analysis.restoreSession(response.provenance.session); end
             if isfield(response.provenance,'jobs')
@@ -320,7 +323,7 @@ classdef ReferenceWorkflow < handle
                 if isfield(r,'excluded') && r.excluded, obj.Excluded(end+1,:) = [r.track_id r.t]; end
                 rows(i,:) = [r.track_id,r.t,r.x,r.y,r.z,r.confidence,channel];
             end
-            obj.Rows = rows; obj.NextID = max([0;rows(:,1);obj.Candidates(:,1)])+1;
+            obj.Rows = rows; obj.NextID = max(obj.NextID,max([0;rows(:,1);obj.Candidates(:,1)])+1);
         end
         function track(obj,resume)
             if nargin<2, resume=false; end

@@ -8,7 +8,7 @@ Open a five-dimensional H5 recording with **File → Open**. The file needs `/da
 2. In **Settings**, enter XYZ voxel spacing in micrometers. If spacing is missing, explicitly enable **Use assumed spacing** before detection. The initial `0.4 0.4 1.5` values are model-grid assumptions, not measured calibration.
 3. Choose MoE or Spotiflow and press **Auto Detect**. A single selected channel is repeated into the frozen model's four input channels. This adapter requires no training or ground-truth annotations, but GCaMP detection accuracy is not established by the RGBW model's validation.
 4. Review the orange candidates. Click a marker or list entry to select it, jump to its Z slice, and edit XYZ. Labels default to **Selected** to avoid overlapping text; **Sparse** and **All** are available. Click coincident markers repeatedly to cycle through nearby neurons. The projection shows all Z positions; the slice shows centers within 1.5 slices. Markers are displayed across image channels so coordinates can be compared against the co-registered second channel.
-5. **Accept candidates** retains the seed set. **Add neuron**, then click in the slice image, adds a coordinate. **Delete neuron** removes the selected candidate or observation. Re-detection does not silently replace accepted seeds.
+5. **Accept candidates** retains the seed set. **Add neuron**, then click in the slice image, adds a coordinate. **Delete candidate** removes a candidate; **Delete track** removes the selected neuron from every frame. Use the exclusion checkbox for individual bad frames. Re-detection does not silently replace accepted seeds.
 
 Coordinates are one-based XYZ voxel centers in the supplied image. The crop offset is retained as metadata, not added to coordinates. The selected ROI outline uses the activity radii in pixels; its XY cross-section changes with Z.
 
@@ -43,7 +43,7 @@ For each frame and neuron:
 
 No bleaching correction, spike inference, temporal interpolation, or automatic biological quality acceptance is performed. Missing or excluded observations remain gaps. ROI size and baseline choices affect the signal and should be reviewed for the experiment. Finite ΔF/F is not a guarantee of trustworthy activity.
 
-The lower **Activity** tab shows selected-neuron ΔF/F, corrected fluorescence, optional ratio ΔF/F, or a population heatmap. Orange trace points have quality flags. Changing coordinates, exclusions, measurement settings, or the range marks results out of date; extraction must be repeated before export.
+The lower **Activity** tab shows selected-neuron ΔF/F, raw/background/corrected fluorescence, reference fluorescence, optional ratio ΔF/F, or a population heatmap. Orange trace points have quality flags. Changing coordinates, exclusions, measurement settings, or the range marks results out of date; extraction must be repeated before export.
 
 **Export activity + tracks…** copies a complete analysis folder containing:
 

@@ -13,6 +13,7 @@ classdef ReferenceAnalysisView < handle
         PlotKey = {}
         Coverage
         Colorbar = []
+        ResultOptions = struct()
     end
     methods
         function obj = ReferenceAnalysisView(c,tabs,lower_tabs)
@@ -50,7 +51,7 @@ classdef ReferenceAnalysisView < handle
 
             obj.ActivityTab=uitab(lower_tabs,'Title','Activity');
             display=uigridlayout(obj.ActivityTab,[2 1]); display.RowHeight={25,'1x'}; display.Padding=[3 3 3 3];
-            obj.Mode=uidropdown(display,'Tooltip','Click a trace to seek to its frame. Orange points have quality flags; details are in quality.csv.','Items',{'ΔF/F','Fluorescence','Ratio ΔF/F','Population ΔF/F'},'ValueChangedFcn',@(~,~) obj.render());
+            obj.Mode=uidropdown(display,'Tooltip','Click a trace to seek to its frame. Orange points have quality flags; details are in quality.csv.','Items',{'ΔF/F','Raw fluorescence','Background','Fluorescence','Reference fluorescence','Ratio ΔF/F','Population ΔF/F'},'ValueChangedFcn',@(~,~) obj.render());
             panel=uipanel(display,'AutoResizeChildren','off','BorderType','none');
             obj.Axes=uiaxes(panel); obj.Axes.Toolbar.Visible='off';
             panel.SizeChangedFcn=@(~,~) obj.fitAxes(); obj.fitAxes();
@@ -84,6 +85,7 @@ classdef ReferenceAnalysisView < handle
             if isempty(c.ActivityDirectory) || ~isfile(file)
                 if ~isequal(obj.PlotKey,{'empty'})
                     obj.ResultKey='';
+                    if ~isempty(obj.Colorbar) && isvalid(obj.Colorbar), delete(obj.Colorbar); obj.Colorbar=[]; end
                     cla(obj.Axes); title(obj.Axes,'Extract activity to view traces'); xlabel(obj.Axes,'Frame');
                     obj.PlotKey={'empty'};
                 end
@@ -91,6 +93,7 @@ classdef ReferenceAnalysisView < handle
             end
             if ~strcmp(obj.ResultKey,file)
                 obj.Frames=double(h5read(file,'/frame')); obj.IDs=double(h5read(file,'/neuron_id'));
+                record=jsondecode(fileread(fullfile(c.ActivityDirectory,'analysis.json'))); obj.ResultOptions=record.options;
                 obj.ResultKey=file; obj.PlotKey={};
             end
             identity=c.View.PreferredID;
@@ -114,8 +117,17 @@ classdef ReferenceAnalysisView < handle
                     dataset='/dff'; ylabel_text='ΔF/F';
                     if strcmp(obj.Mode.Value,'Fluorescence'), dataset='/signal'; ylabel_text='Fluorescence (background corrected)'; end
                     if strcmp(obj.Mode.Value,'Ratio ΔF/F'), dataset='/ratio_dff'; ylabel_text='Ratio ΔF/F'; end
-                    data=double(h5read(file,dataset,[index 1],[1 nt]));
-                    curve=plot(obj.Axes,obj.Frames,data,'Color',[.15 .15 .15],'LineWidth',1.2);
+                    if strcmp(obj.Mode.Value,'Raw fluorescence')
+                        dataset=sprintf('/raw/channel_%d',obj.ResultOptions.signal_channel); ylabel_text='Raw fluorescence';
+                    elseif strcmp(obj.Mode.Value,'Background')
+                        dataset=sprintf('/background/channel_%d',obj.ResultOptions.signal_channel); ylabel_text='Background fluorescence';
+                    elseif strcmp(obj.Mode.Value,'Reference fluorescence')
+                        dataset=''; ylabel_text='Reference fluorescence (raw)';
+                        if obj.ResultOptions.reference_channel>=0, dataset=sprintf('/raw/channel_%d',obj.ResultOptions.reference_channel); end
+                    end
+                    if isempty(dataset), data=nan(1,nt);
+                    else, data=double(h5read(file,dataset,[index 1],[1 nt])); end
+                    curve=plot(obj.Axes,obj.Frames,data,'Color',[.15 .15 .15],'LineWidth',1.2,'Tag','activity_trace');
                     curve.ButtonDownFcn=@(~,~) obj.seek(false);
                     flags=h5read(file,'/quality_flags',[index 1],[1 nt]); bad=flags~=0 & isfinite(data);
                     scatter(obj.Axes,obj.Frames(bad),data(bad),16,[.8 .4 0],'filled','HitTest','off');
@@ -146,7 +158,7 @@ classdef ReferenceAnalysisView < handle
             value=struct('first',c.First.Value,'last',c.Last.Value,'reference',c.Reference.Value, ...
                 'tracking_channel',c.TrackingChannel.Value,'window_size',c.WindowSize.Value,'epochs',c.Epochs.Value, ...
                 'tracking_directory',c.TrackDirectory,'activity_directory',c.ActivityDirectory, ...
-                'activity_current',c.activityCurrent(),'activity_options',obj.options());
+                'activity_current',c.activityCurrent(),'activity_options',obj.options(),'next_id',c.NextID);
         end
         function restoreTracking(obj,parameters)
             c=obj.Controller; c.First.Value=parameters.frame_range(1)+1; c.Last.Value=parameters.frame_range(2)+1;
@@ -158,12 +170,15 @@ classdef ReferenceAnalysisView < handle
             c.First.Value=value.first; c.Last.Value=value.last; c.Reference.Value=value.reference;
             c.TrackingChannel.Value=value.tracking_channel; c.WindowSize.Value=value.window_size; c.Epochs.Value=value.epochs;
             c.TrackDirectory=value.tracking_directory; c.ActivityDirectory=value.activity_directory;
+            if isfield(value,'next_id'), c.NextID=max(c.NextID,value.next_id); end
             options=value.activity_options;
             obj.Controls.signal.Value=options.signal_channel; obj.Controls.reference.Value=options.reference_channel;
             obj.Controls.radius.Value=num2str(options.radius_xyz(:)'); obj.Controls.background.Value=options.background;
             obj.Controls.baseline.Value=options.baseline_percentile; obj.Controls.motion.Value=options.max_step;
             if value.activity_current
                 c.ActivityRows=c.Rows; c.ActivityExcluded=c.Excluded; c.ActivitySettings=obj.options();
+            else
+                c.ActivityRows=[]; c.ActivityExcluded=[]; c.ActivitySettings=struct();
             end
         end
     end

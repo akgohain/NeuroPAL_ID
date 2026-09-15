@@ -84,7 +84,7 @@ classdef ReferenceView < handle
             c.Buttons.accept = uibutton(controls,'Text','Accept candidates','ButtonPushedFcn',@(~,~) c.safe(@() c.accept()));
             c.Buttons.discard = uibutton(controls,'Text','Discard candidates','ButtonPushedFcn',@(~,~) c.safe(@() c.discard()));
             c.Buttons.add = uibutton(controls,'Text','Add neuron','ButtonPushedFcn',@(~,~) obj.armAdd());
-            c.Buttons.remove = uibutton(controls,'Text','Delete neuron','ButtonPushedFcn',@(~,~) c.safe(@() c.remove()));
+            c.Buttons.remove = uibutton(controls,'Text','Delete track','ButtonPushedFcn',@(~,~) c.safe(@() c.remove()));
             c.Buttons.load = uibutton(controls,'Text','Load seeds…','ButtonPushedFcn',@(~,~) c.safe(@() c.loadDialog()));
             c.Buttons.save = uibutton(controls,'Text','Save seeds…','ButtonPushedFcn',@(~,~) c.safe(@() c.saveDialog()));
             obj.Exclude=uicheckbox(controls,'Text','Exclude this observation from activity','ValueChangedFcn',@(~,~) obj.exclude()); obj.Exclude.Layout.Column=[1 2];
@@ -297,6 +297,8 @@ classdef ReferenceView < handle
                 for i=1:3, obj.Position{i}.Value = row(i+2); end
             end
             obj.ListKey = {c.Frame.Value,c.Channel.Value,c.Rows,c.Candidates,obj.Selection,c.Excluded};
+            c.Buttons.remove.Text='Delete track';
+            if ~isempty(obj.Selection) && obj.Selection(1), c.Buttons.remove.Text='Delete candidate'; end
             obj.Exclude.Value=~isempty(obj.Selection) && ismember(obj.Selection([2 3]),c.Excluded,'rows');
             obj.setBusy(c.Busy);
         end
@@ -370,12 +372,18 @@ classdef ReferenceView < handle
             obj.redraw();
         end
         function removeSelection(obj)
-            c = obj.Controller; if isempty(obj.Selection), return; end
-            if obj.Selection(1)
-                c.Candidates(c.Candidates(:,1)==obj.Selection(2) & c.Candidates(:,2)==obj.Selection(3),:)=[];
+            c=obj.Controller; if isempty(obj.Selection), return; end
+            identity=obj.Selection(2); pending=obj.Selection(1);
+            selected=obj.ListRows(:,1)==identity & obj.ListRows(:,8)==pending;
+            position=find(selected,1); remaining=obj.ListRows(~selected,:);
+            if isempty(position), position=1; end
+            if ~isempty(remaining), obj.PreferredID=remaining(min(position,size(remaining,1)),1); end
+            if pending
+                c.Candidates(c.Candidates(:,1)==identity,:)=[];
             else
-                c.Rows(c.Rows(:,1)==obj.Selection(2) & c.Rows(:,2)==obj.Selection(3),:)=[];
-                c.Excluded(ismember(c.Excluded,obj.Selection([2 3]),'rows'),:)=[];
+                c.Rows(c.Rows(:,1)==identity,:)=[]; c.Excluded(c.Excluded(:,1)==identity,:)=[];
+                keys=c.Origins.keys; keys=keys(startsWith(keys,sprintf('%d:',identity)));
+                if ~isempty(keys), remove(c.Origins,keys); end
             end
             obj.Selection=[]; c.render();
         end
