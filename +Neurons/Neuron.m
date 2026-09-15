@@ -33,6 +33,13 @@ classdef Neuron < handle
     end
 
     methods (Static)
+        function colors = marker_palette()
+            %MARKER_PALETTE Share neuron display colors between image views.
+            colors = struct('unassigned', Neurons.Neuron.NO_CONFIDENCE_COLOR, ...
+                'candidate', Neurons.Neuron.AUTO_ID_COLOR, ...
+                'selected', Neurons.Neuron.SELECTED_COLOR);
+        end
+
         
             
         function neuron = unmarshall(sp, i)

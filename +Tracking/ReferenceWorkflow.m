@@ -30,6 +30,7 @@ classdef ReferenceWorkflow < handle
         OutputRoot
         CloseCallback
         Origins
+        View
     end
     methods (Static)
         function yes = supports(path)
@@ -93,53 +94,14 @@ classdef ReferenceWorkflow < handle
             app.CELL_ID.CloseRequestFcn = @(src,event) obj.closeSession(src,event);
             obj.OutputRoot = fullfile(prefdir,'NeuroPAL','reference-jobs');
             app.VideoGridLayout.Visible = 'off';
-            obj.Grid = uigridlayout(app.VideoTrackingTab,[4 2]);
-            obj.Grid.ColumnWidth = {'1x',380}; obj.Grid.RowHeight = {60,'1x',150,28};
-            controls = uigridlayout(obj.Grid,[1 6]); controls.Layout.Column = [1 2];
-            controls.ColumnWidth = {60,90,40,'1x',70,120};
-            uilabel(controls,'Text','Frame');
-            obj.Frame = uispinner(controls,'Limits',[1 max(2,info.nt)],'Value',1,'Step',1, ...
-                'ValueChangedFcn',@(~,~) obj.safe(@() obj.render()));
-            uilabel(controls,'Text','Z');
-            obj.Slice = uislider(controls,'Limits',[1 max(2,info.nz)],'Value',ceil(info.nz/2), ...
-                'MajorTicks',unique(round(linspace(1,info.nz,min(5,info.nz)))), ...
-                'MinorTicks',[],'ValueChangedFcn',@(~,~) obj.safe(@() obj.render()));
-            uilabel(controls,'Text','Channel');
-            obj.Channel = uidropdown(controls,'Items',cellstr("C"+string(0:info.nc-1)), ...
-                'ItemsData',0:info.nc-1,'Value',0,'ValueChangedFcn',@(~,~) obj.safe(@() obj.render()));
-            obj.Axes = uiaxes(obj.Grid); obj.Axes.Layout.Row = 2; obj.Axes.Layout.Column = 1;
-            obj.Axes.Toolbar.Visible = 'off'; obj.Axes.ButtonDownFcn = @(~,~) obj.captureCursor(); colormap(obj.Axes,gray(256));
-            panel = uigridlayout(obj.Grid,[12 2]); panel.Layout.Row = [2 3]; panel.Layout.Column = 2;
-            panel.RowHeight = {28,28,28,28,28,28,28,28,28,28,28,'1x'};
-            uilabel(panel,'Text','Detector'); obj.Detector = uidropdown(panel,'Items',{'MoE','Spotiflow'});
-            uilabel(panel,'Text','Spacing X Y Z (µm)'); obj.Spacing = uieditfield(panel,'text','Value','0.4 0.4 1.5', ...
-                'ValueChangedFcn',@(~,~) obj.spacingChanged());
-            obj.Calibration = uicheckbox(panel,'Text','Use assumed spacing','Value',false); obj.Calibration.Layout.Column = [1 2];
-            if info.spacing_measured
-                obj.Spacing.Value = num2str(info.spacing_um_xyz(:)'); obj.Calibration.Text = 'Use measured spacing'; obj.Calibration.Value = true;
-            end
-            obj.Buttons.detect = uibutton(panel,'Text','Detect frame','ButtonPushedFcn',@(~,~) obj.safe(@() obj.detect()));
-            obj.Buttons.cancel = uibutton(panel,'Text','Cancel','ButtonPushedFcn',@(~,~) obj.cancel());
-            obj.Buttons.accept = uibutton(panel,'Text','Accept candidates','ButtonPushedFcn',@(~,~) obj.safe(@() obj.accept()));
-            obj.Buttons.discard = uibutton(panel,'Text','Discard candidates','ButtonPushedFcn',@(~,~) obj.safe(@() obj.discard()));
-            obj.Buttons.add = uibutton(panel,'Text','Add at last click','ButtonPushedFcn',@(~,~) obj.safe(@() obj.add()));
-            obj.Buttons.remove = uibutton(panel,'Text','Delete selected','ButtonPushedFcn',@(~,~) obj.safe(@() obj.remove()));
-            obj.Buttons.save = uibutton(panel,'Text','Save seeds…','ButtonPushedFcn',@(~,~) obj.safe(@() obj.saveDialog()));
-            obj.Buttons.load = uibutton(panel,'Text','Load seeds…','ButtonPushedFcn',@(~,~) obj.safe(@() obj.loadDialog()));
-            uilabel(panel,'Text','Track from frame'); obj.First = uispinner(panel,'Limits',[1 max(2,info.nt)],'Value',1);
-            uilabel(panel,'Text','Through frame'); obj.Last = uispinner(panel,'Limits',[1 max(2,info.nt)],'Value',min(3,info.nt));
-            obj.Buttons.track = uibutton(panel,'Text','Track window','ButtonPushedFcn',@(~,~) obj.safe(@() obj.track())); obj.Buttons.track.Layout.Column = [1 2];
-            note = uilabel(panel,'Text','Review candidates before saving or tracking. Single-channel model accuracy is unvalidated.', 'WordWrap','on'); note.Layout.Column = [1 2];
-            obj.Table = uitable(obj.Grid,'Data',obj.Rows,'ColumnName',{'ID','Frame','X','Y','Z','Score','Channel'}, ...
-                'ColumnEditable',[false false true true true false false],'CellEditCallback',@(~,e) obj.safe(@() obj.edit(e)));
-            obj.Table.Layout.Row = 3; obj.Table.Layout.Column = 1;
-            obj.Status = uilabel(obj.Grid,'Text',''); obj.Status.Layout.Row = 4; obj.Status.Layout.Column = [1 2];
+            obj.View = Tracking.ReferenceView(obj);
             app.VideoTrackingTab.Tag = 'rendered'; app.TabGroup.SelectedTab = app.VideoTrackingTab;
             obj.render();
             if info.nt==1, obj.Frame.Enable = 'off'; end
             if info.nz==1, obj.Slice.Enable = 'off'; end
         end
         function delete(obj)
+            if ~isempty(obj.View) && isvalid(obj.View), delete(obj.View); end
             if ~isempty(obj.App) && isvalid(obj.App) && isvalid(obj.App.CELL_ID)
                 obj.App.CELL_ID.CloseRequestFcn = obj.CloseCallback;
             end
@@ -165,6 +127,7 @@ classdef ReferenceWorkflow < handle
         function safe(obj, action)
             if obj.Busy, return; end
             obj.Busy = true; obj.Cancelled = false;
+            obj.View.setBusy(true);
             obj.Frame.Enable = 'off'; obj.Channel.Enable = 'off'; obj.Slice.Enable = 'off';
             obj.Table.Enable = 'off';
             obj.Detector.Enable = 'off'; obj.Spacing.Enable = 'off'; obj.Calibration.Enable = 'off';
@@ -186,6 +149,7 @@ classdef ReferenceWorkflow < handle
             obj.Table.Enable = 'on';
             obj.Detector.Enable = 'on'; obj.Spacing.Enable = 'on'; obj.Calibration.Enable = 'on';
             obj.First.Enable = 'on'; obj.Last.Enable = 'on';
+            obj.View.updateList(); obj.View.setBusy(false);
             if obj.Source.nt==1, obj.Frame.Enable = 'off'; end
             if obj.Source.nz==1, obj.Slice.Enable = 'off'; end
         end
@@ -208,27 +172,13 @@ classdef ReferenceWorkflow < handle
             volume = obj.Cache(:,:,:,obj.Channel.Value+1);
         end
         function render(obj)
-            volume = obj.frameData(); z = min(obj.Source.nz,round(obj.Slice.Value)); obj.Slice.Value = z;
-            image = imagesc(obj.Axes,volume(:,:,z)); image.HitTest = 'off';
-            axis(obj.Axes,'image'); obj.Axes.YDir = 'reverse';
-            obj.Axes.XLim = [.5 obj.Source.nx+.5]; obj.Axes.YLim = [.5 obj.Source.ny+.5];
-            xlabel(obj.Axes,'X (pixels)'); ylabel(obj.Axes,'Y (pixels)');
-            title(obj.Axes,sprintf('Frame %d · C%d · Z %d',obj.Frame.Value,obj.Channel.Value,z));
-            hold(obj.Axes,'on');
-            obj.drawRows(obj.Rows,z,[.4 .9 .6]); obj.drawRows(obj.Candidates,z,[1 .7 .2]);
-            hold(obj.Axes,'off'); obj.Table.Data = obj.Rows;
-            obj.Status.Text = sprintf('%d accepted observations · %d candidates · %s',size(obj.Rows,1),size(obj.Candidates,1),obj.Source.file);
-        end
-        function drawRows(obj,rows,z,color)
-            if isempty(rows), return; end
-            keep = rows(:,2)==obj.Frame.Value & abs(rows(:,5)-z)<=1 & rows(:,7)==obj.Channel.Value;
-            scatter(obj.Axes,rows(keep,3),rows(keep,4),55,color,'HitTest','off');
+            obj.View.render();
         end
         function spacingChanged(obj)
             obj.Calibration.Text = 'Use assumed spacing'; obj.Calibration.Value = false;
         end
         function detect(obj)
-            if ~obj.Calibration.Value, error('Tracking:Spacing','Confirm measured or assumed voxel spacing before detection.'); end
+            if ~obj.Calibration.Value, error('Tracking:Spacing','Confirm measured or assumed voxel spacing in Settings before detection.'); end
             scale = sscanf(obj.Spacing.Value,'%f')';
             if numel(scale)~=3 || any(~isfinite(scale) | scale<=0), error('Tracking:Spacing','Enter three positive XYZ spacings.'); end
             actual = obj.bridge(struct('action','inspect','file',obj.Source.file));
@@ -255,6 +205,7 @@ classdef ReferenceWorkflow < handle
             end
             n = size(xyz,1);
             obj.Candidates = [(obj.NextID:obj.NextID+n-1)',repmat(frame,n,1),xyz,response.scores(:),repmat(channel,n,1)];
+            obj.NextID = obj.NextID+n;
             obj.CandidateFrame = frame; obj.Provenance = response;
             obj.History{end+1} = response;
             obj.First.Value = frame; obj.Last.Value = min(obj.Source.nt,frame+2);
@@ -268,7 +219,7 @@ classdef ReferenceWorkflow < handle
             if any(ismember(obj.Candidates(:,[2 7]),obj.Rows(:,[2 7]),'rows'))
                 error('Tracking:ExistingSeeds','This frame/channel already has seeds. Delete those rows before accepting a replacement.');
             end
-            obj.Rows = [obj.Rows;obj.Candidates]; obj.NextID = max(obj.Rows(:,1))+1;
+            obj.Rows = [obj.Rows;obj.Candidates]; obj.NextID = max(obj.NextID,max(obj.Rows(:,1))+1);
             obj.Candidates = zeros(0,7); obj.render();
         end
         function discard(obj)
@@ -285,9 +236,7 @@ classdef ReferenceWorkflow < handle
             obj.Rows(end+1,:) = [obj.NextID,obj.Frame.Value,xyz,1,obj.Channel.Value]; obj.NextID = obj.NextID+1; obj.render();
         end
         function remove(obj)
-            selection = obj.Table.Selection;
-            if isempty(selection), return; end
-            obj.Rows(unique(selection(:,1)),:) = []; obj.render();
+            obj.View.removeSelection();
         end
         function edit(obj,event)
             row = event.Indices(1); column = event.Indices(2); value = event.NewData;
