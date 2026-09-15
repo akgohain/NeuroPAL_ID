@@ -3,7 +3,7 @@ function test_reference_view(w)
 assert(~isempty(w.Candidates) && isempty(w.Rows));
 candidates = w.Candidates; next_id = w.NextID;
 cleanup = onCleanup(@() restore(w,candidates,next_id));
-v = w.View; w.render();
+v = w.View; v.LabelMode.Value='All'; w.render();
 assert(numel(v.NeuronList.Items)==size(candidates,1));
 assert(numel(findobj(v.Projection,'Tag','reference_label'))==size(candidates,1));
 assert(isequal(w.Slice.Limits,[1 w.Source.nz]));
@@ -25,7 +25,7 @@ for z=[1 w.Source.nz 13]
 end
 if w.Source.nc>1
     w.Channel.Value=mod(candidates(1,7)+1,w.Source.nc); w.render();
-    assert(isempty(findobj(v.Projection,'Tag','reference_label')));
+    assert(numel(findobj(v.Projection,'Tag','reference_label'))==size(candidates,1));
     w.Channel.Value=candidates(1,7); w.render();
 end
 v.NeuronList.Value=2; v.NeuronList.ValueChangedFcn([],[]);
@@ -59,6 +59,6 @@ fprintf('REFERENCE_VIEW_SELECTION_EDIT_SAVE_RELOAD=PASS\n');
 end
 function restore(w,candidates,next_id)
 w.Rows=zeros(0,7); w.Candidates=candidates; w.NextID=next_id;
-w.View.Labels.Value=true; w.Frame.Value=candidates(1,2); w.Channel.Value=candidates(1,7);
+w.View.Labels.Value=true; w.View.LabelMode.Value='Selected'; w.Frame.Value=candidates(1,2); w.Channel.Value=candidates(1,7);
 w.Slice.Value=round(candidates(1,5)); w.View.Selection=[]; w.render();
 end

@@ -31,6 +31,17 @@ classdef ReferenceWorkflow < handle
         CloseCallback
         Origins
         View
+        Analysis
+        Reference
+        TrackingChannel
+        WindowSize
+        Epochs
+        TrackDirectory = ''
+        ActivityDirectory = ''
+        ActivityRows = []
+        ActivityExcluded = []
+        ActivitySettings = struct()
+        Excluded = zeros(0,2)
     end
     methods (Static)
         function yes = supports(path)
@@ -71,8 +82,11 @@ classdef ReferenceWorkflow < handle
                 error('Tracking:PythonMissing','Set NEUROPAL_VIDEO_PYTHON to the ZephIR Python environment.');
             end
         end
-        function response = bridge(request, cancel)
+        function response = bridge(request, cancel, progress)
             if nargin < 2, cancel = @() false; end
+            if nargin < 3, progress = []; end
+            timeout = 3600;
+            if strcmp(request.action,'track_sequence'), timeout = 86400; end
             folder = tempname; mkdir(folder);
             cleanup = onCleanup(@() rmdir(folder,'s'));
             input = fullfile(folder,'request.json'); output = fullfile(folder,'response.json');
@@ -81,7 +95,7 @@ classdef ReferenceWorkflow < handle
             root = fileparts(fileparts(mfilename('fullpath')));
             [status, detail] = Wrapper.runPythonProcess( ...
                 {Tracking.ReferenceWorkflow.python(),'-u',fullfile(root,'+Wrapper','reference_video.py'), ...
-                '--request',input,'--response',output},'CancelFcn',cancel,'TimeoutSeconds',3600);
+                '--request',input,'--response',output},'CancelFcn',cancel,'ProgressFcn',progress,'TimeoutSeconds',timeout);
             if status ~= 0, error('Tracking:ReferenceFailed','%s',detail); end
             response = jsondecode(fileread(output));
         end
@@ -101,6 +115,7 @@ classdef ReferenceWorkflow < handle
             if info.nz==1, obj.Slice.Enable = 'off'; end
         end
         function delete(obj)
+            if ~isempty(obj.Analysis) && isvalid(obj.Analysis), delete(obj.Analysis); end
             if ~isempty(obj.View) && isvalid(obj.View), delete(obj.View); end
             if ~isempty(obj.App) && isvalid(obj.App) && isvalid(obj.App.CELL_ID)
                 obj.App.CELL_ID.CloseRequestFcn = obj.CloseCallback;
@@ -132,6 +147,7 @@ classdef ReferenceWorkflow < handle
             obj.Table.Enable = 'off';
             obj.Detector.Enable = 'off'; obj.Spacing.Enable = 'off'; obj.Calibration.Enable = 'off';
             obj.First.Enable = 'off'; obj.Last.Enable = 'off';
+            obj.Analysis.setBusy(true);
             cleanup = onCleanup(@() obj.finish());
             try
                 action();
@@ -149,12 +165,14 @@ classdef ReferenceWorkflow < handle
             obj.Table.Enable = 'on';
             obj.Detector.Enable = 'on'; obj.Spacing.Enable = 'on'; obj.Calibration.Enable = 'on';
             obj.First.Enable = 'on'; obj.Last.Enable = 'on';
-            obj.View.updateList(); obj.View.setBusy(false);
+            obj.View.updateList(); obj.View.setBusy(false); obj.Analysis.setBusy(false);
             if obj.Source.nt==1, obj.Frame.Enable = 'off'; end
             if obj.Source.nz==1, obj.Slice.Enable = 'off'; end
         end
         function progress(obj,message)
             obj.Status.Text = char(message);
+            prefix = 'Tracking workspace: ';
+            if startsWith(message,prefix), obj.TrackDirectory = char(extractAfter(message,prefix)); end
         end
         function cancel(obj)
             obj.Cancelled = true;
@@ -208,7 +226,7 @@ classdef ReferenceWorkflow < handle
             obj.NextID = obj.NextID+n;
             obj.CandidateFrame = frame; obj.Provenance = response;
             obj.History{end+1} = response;
-            obj.First.Value = frame; obj.Last.Value = min(obj.Source.nt,frame+2);
+            obj.Reference.Value = frame; obj.First.Value = 1; obj.Last.Value = obj.Source.nt;
             obj.render();
         end
         function accept(obj)
@@ -249,18 +267,18 @@ classdef ReferenceWorkflow < handle
             obj.Rows(row,column) = value; obj.Rows(row,6) = 1; obj.render();
         end
         function observations = observations(obj)
-            observations = struct('track_id',{},'parent_id',{},'t',{},'x',{},'y',{},'z',{},'confidence',{},'provenance',{},'channel',{});
+            observations = struct('track_id',{},'parent_id',{},'t',{},'x',{},'y',{},'z',{},'confidence',{},'provenance',{},'channel',{},'excluded',{});
             for i=1:size(obj.Rows,1)
                 r = obj.Rows(i,:); origin = 'reviewed';
                 key = sprintf('%d:%d',r(1),r(2));
                 if isKey(obj.Origins,key), origin = obj.Origins(key); end
                 observations(i) = struct('track_id',r(1),'parent_id',0,'t',r(2),'x',r(3),'y',r(4),'z',r(5), ...
-                    'confidence',r(6),'provenance',origin,'channel',r(7));
+                    'confidence',r(6),'provenance',origin,'channel',r(7),'excluded',ismember(r([1 2]),obj.Excluded,'rows'));
             end
         end
         function response = save(obj,folder)
             response = obj.bridge(struct('action','export','source',obj.Source,'observations',obj.observations(), ...
-                'output_dir',folder,'provenance',struct('jobs',{obj.History})),@() obj.Cancelled || ~isvalid(obj.App));
+                'output_dir',folder,'provenance',struct('jobs',{obj.History},'session',obj.Analysis.session())),@() obj.Cancelled || ~isvalid(obj.App));
             obj.Status.Text = ['Saved seeds: ' response.directory];
         end
         function saveDialog(obj)
@@ -277,6 +295,7 @@ classdef ReferenceWorkflow < handle
             if ~isempty(obj.Rows), error('Tracking:ExistingSeeds','Open a fresh reference session before importing another seed set.'); end
             response = obj.bridge(struct('action','import','source',obj.Source,'file',file));
             obj.setRows(response.observations);
+            if isfield(response.provenance,'session'), obj.Analysis.restoreSession(response.provenance.session); end
             if isfield(response.provenance,'jobs')
                 jobs = response.provenance.jobs;
                 if isempty(jobs), obj.History = {};
@@ -293,28 +312,91 @@ classdef ReferenceWorkflow < handle
             obj.render();
         end
         function setRows(obj,observations)
-            rows = zeros(numel(observations),7);
+            rows = zeros(numel(observations),7); obj.Excluded = zeros(0,2);
             for i=1:numel(observations)
                 r = observations(i); channel = obj.Channel.Value;
                 if isfield(r,'channel'), channel = r.channel; end
                 obj.Origins(sprintf('%d:%d',r.track_id,r.t)) = char(r.provenance);
+                if isfield(r,'excluded') && r.excluded, obj.Excluded(end+1,:) = [r.track_id r.t]; end
                 rows(i,:) = [r.track_id,r.t,r.x,r.y,r.z,r.confidence,channel];
             end
-            obj.Rows = rows; obj.NextID = max([0;rows(:,1)])+1;
+            obj.Rows = rows; obj.NextID = max([0;rows(:,1);obj.Candidates(:,1)])+1;
         end
-        function track(obj)
-            first = round(obj.First.Value); last = round(obj.Last.Value);
-            if last-first+1>100 || first>last || last>obj.Source.nt, error('Tracking:Window','Select a valid window of at most 100 frames.'); end
-            observations = obj.observations();
-            if ~isempty(observations), observations = observations([observations.channel]==obj.Channel.Value); end
-            response = obj.bridge(struct('action','track','source',obj.Source,'observations',observations, ...
-                'frame_range',[first-1 last-1],'channel',obj.Channel.Value,'output_dir',obj.OutputRoot,'provenance',obj.Provenance),@() obj.Cancelled || ~isvalid(obj.App));
-            retained = obj.Rows(~(obj.Rows(:,2)>=first & obj.Rows(:,2)<=last & obj.Rows(:,7)==obj.Channel.Value),:);
-            obj.setRows(response.observations); obj.Rows = [retained;obj.Rows]; obj.NextID = max([0;obj.Rows(:,1)])+1;
+        function track(obj,resume)
+            if nargin<2, resume=false; end
+            request = struct('action','track_sequence','source',obj.Source,'observations',obj.observations(), ...
+                'frame_range',[obj.First.Value-1 obj.Last.Value-1],'reference_frame',obj.Reference.Value-1, ...
+                'channel',obj.TrackingChannel.Value,'window_size',obj.WindowSize.Value,'epochs',obj.Epochs.Value, ...
+                'output_dir',obj.OutputRoot,'provenance',struct('jobs',{obj.History}));
+            if resume
+                if isempty(obj.TrackDirectory), error('Tracking:Resume','There is no tracking run to resume.'); end
+                request.resume_dir=obj.TrackDirectory;
+            end
+            response = obj.bridge(request,@() obj.Cancelled || ~isvalid(obj.App),@(message) obj.progress(message));
+            obj.TrackDirectory=response.directory;
+            obj.mergeTracks(response.observations);
             obj.render(); obj.Status.Text = ['Tracking complete: ' response.directory];
         end
+        function mergeTracks(obj,observations)
+            previous=obj.observations(); excluded=obj.Excluded;
+            keys=[[observations.track_id]' [observations.t]'];
+            if ~isempty(previous)
+                retained=~ismember([[previous.track_id]' [previous.t]'],keys,'rows');
+                previous=previous(retained);
+            end
+            obj.setRows(observations);
+            current=obj.observations(); obj.setRows([previous(:);current(:)]);
+            retained=ismember(excluded,obj.Rows(:,[1 2]),'rows'); obj.Excluded=unique([obj.Excluded;excluded(retained,:)],'rows');
+        end
+        function openTracking(obj)
+            [file,folder]=uigetfile('tracking.json','Open a saved tracking run',fullfile(obj.OutputRoot,'tracking.json'));
+            if isequal(file,0), return; end
+            if ~isempty(obj.Rows)
+                answer=uiconfirm(obj.App.CELL_ID,'Replace the current neurons with this tracking checkpoint? Save seeds first to retain edits.', ...
+                    'Open tracking run','Options',{'Cancel','Replace'},'DefaultOption','Cancel','CancelOption','Cancel');
+                if strcmp(answer,'Cancel'), return; end
+            end
+            response=obj.bridge(struct('action','tracking_checkpoint','source',obj.Source,'directory',folder));
+            obj.TrackDirectory=folder; obj.Candidates=zeros(0,7); obj.setRows(response.observations);
+            obj.Analysis.restoreTracking(response.manifest.parameters); obj.Frame.Value=obj.Reference.Value; obj.render();
+        end
+        function loadProgress(obj)
+            if isempty(obj.TrackDirectory), error('Tracking:Resume','There is no tracking run to load.'); end
+            response=obj.bridge(struct('action','tracking_checkpoint','source',obj.Source,'directory',obj.TrackDirectory));
+            obj.mergeTracks(response.observations); obj.Analysis.restoreTracking(response.manifest.parameters); obj.render();
+            obj.Status.Text=sprintf('Loaded %d completed tracking windows.',numel(response.manifest.completed));
+        end
+        function extractActivity(obj)
+            response=obj.bridge(struct('action','activity','source',obj.Source,'observations',obj.observations(), ...
+                'frame_range',[obj.First.Value-1 obj.Last.Value-1],'options',obj.Analysis.options(), ...
+                'output_dir',obj.OutputRoot,'provenance',struct('jobs',{obj.History},'tracking',obj.TrackDirectory)), ...
+                @() obj.Cancelled || ~isvalid(obj.App),@(message) obj.progress(message));
+            obj.ActivityDirectory=response.directory; obj.ActivityRows=obj.Rows; obj.ActivityExcluded=obj.Excluded;
+            obj.ActivitySettings=obj.Analysis.options(); obj.Analysis.showActivity();
+            obj.Status.Text=sprintf('Activity saved · %.1f%% finite ΔF/F · %s',100*response.finite_fraction,response.directory);
+        end
+        function current = activityCurrent(obj)
+            current=~isempty(obj.ActivityDirectory) && isfile(fullfile(obj.ActivityDirectory,'activity.h5')) && isequal(obj.Rows,obj.ActivityRows) && ...
+                isequal(obj.Excluded,obj.ActivityExcluded) && isequal(obj.Analysis.options(),obj.ActivitySettings);
+        end
+        function exportActivity(obj)
+            if ~obj.activityCurrent(), error('Tracking:Activity','Extract activity again after changing tracks or measurement settings.'); end
+            folder=uigetdir(fileparts(obj.Source.file),'Export activity and tracks');
+            if isequal(folder,0), return; end
+            [~,name]=fileparts(tempname(folder)); destination=fullfile(folder,['activity-' name]);
+            stage=fullfile(folder,['.activity-' name]); cleanup=onCleanup(@() obj.removeFolder(stage));
+            [ok,message]=copyfile(obj.ActivityDirectory,stage);
+            if ~ok, error('Tracking:Export','%s',message); end
+            [ok,message]=movefile(stage,destination);
+            if ~ok, error('Tracking:Export','%s',message); end
+            obj.Status.Text=['Exported activity and tracks: ' destination];
+        end
+
     end
     methods (Static, Access=private)
+        function removeFolder(folder)
+            if isfolder(folder), rmdir(folder,'s'); end
+        end
         function removeFile(file)
             if isfile(file), delete(file); end
         end

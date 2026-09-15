@@ -153,6 +153,7 @@ def read_seeds(path, info):
             old = by_key.get((row['track_id'],row['t']))
             if old and all(abs(row[a]-old[a]) < 1e-4 for a in 'xyz'):
                 row.update({k:v for k,v in old.items() if k not in ('track_id','t','name')})
+    for row in rows: row.setdefault('excluded',False)
     validate_observations(rows, info)
     return rows
 
@@ -190,6 +191,8 @@ def run(request):
     if action == 'export': return export_seeds(request)
     if action == 'import':
         info = request['source']
+        if source_info(info['file'])['source_id'] != info['source_id']:
+            raise ValueError('Source recording changed; reopen it before importing seeds')
         provenance = Path(request['file']).parent/'provenance.json'
         saved = json.loads(provenance.read_text()) if provenance.exists() else None
         if saved and saved['source']['source_id'] != info['source_id']:
@@ -211,6 +214,17 @@ def run(request):
         validate_observations(rows,info)
         return dict(observations=rows, provenance=saved.get('detection',{}) if saved else {})
     if action == 'track': return track(request)
+    if action in ('track_sequence','activity'):
+        import reference_analysis
+        return getattr(reference_analysis,action)(request)
+    if action == 'tracking_checkpoint':
+        directory = Path(request['directory'])
+        manifest = json.loads((directory/'tracking.json').read_text())
+        actual = source_info(request['source']['file'])
+        if manifest['source']['source_id'] != actual['source_id'] or request['source']['source_id'] != actual['source_id']:
+            raise ValueError('Tracking checkpoint belongs to a different source')
+        rows = validate_observations(json.loads((directory/'checkpoint.json').read_text()),request['source'])
+        return dict(observations=rows,manifest=manifest)
     raise ValueError('Unknown reference action: '+action)
 
 
@@ -235,6 +249,7 @@ def track(request):
     if shutil.disk_usage(root).free < staged_bytes + 512*2**20:
         raise OSError('Insufficient free space for the isolated tracking window and checkpoint reserve')
     stage = Path(tempfile.mkdtemp(prefix='zephir-', dir=root))
+    (stage/'.neuropal-window').write_text(info['source_id'])
     local = dict(info, nt=last-first+1, nc=1, axis_order='TCZYX')
     metadata = dict(info['metadata'])
     metadata.update({f'shape_{k}':v for k,v in zip('tczyx',[local['nt'],1,info['nz'],info['ny'],info['nx']])})
@@ -249,6 +264,9 @@ def track(request):
         with h5py.File(info['file'],'r') as src:
             if info.get('has_times'): f['times'] = src['times'][first:last+1]
     write_seed_files(stage,rows,local,request.get('provenance',{}))
+    # Supplied coordinates anchor this window; the sidecar retains their provenance.
+    with h5py.File(stage/'annotations.h5','r+') as annotations:
+        annotations['provenance'][:]=np.array([b'MANU']*len(rows),dtype='S4')
     print('NEUROPAL_PROGRESS:Tracking selected window with ZephIR',flush=True)
     # Import lazily so ordinary frame reads do not load torch or model weights.
     from docopt import docopt

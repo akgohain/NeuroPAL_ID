@@ -1,46 +1,84 @@
-# Calcium reference detection and ZephIR seeds
+# Calcium detection, tracking and activity
 
-Use **File → Open** to select a five-dimensional H5 recording with `/data` and adjacent `metadata.json`. The Video Tracking tab opens a reference workspace. Existing NeuroPAL RGBW detection remains available in the identification workflow.
+Open a five-dimensional H5 recording with **File → Open**. The file needs `/data` and an adjacent `metadata.json` declaring its dimensions or axis order. The Video Tracking tab provides detection, coordinate review, resumable ZephIR tracking, and activity export. The original RGBW identification workflow remains available separately.
 
-## Workflow
+## Detect and review
 
-1. Choose a one-based **Frame** and a zero-based source **Channel**. Bedant's recording uses **C0 = GCaMP**, **C1 = RFP**; C2 is blank. The selected channel supplies both the preview and inference input.
-2. In **Settings**, enter XYZ voxel spacing in micrometers. If the metadata does not supply `spacing_um_xyz`, explicitly check **Use assumed spacing** before detection. The initial `0.4 0.4 1.5` values are model-grid assumptions, not measurements of this recording.
-3. Run **Auto Detect**. MoE runs the three frozen fold-00 experts and router; Spotiflow runs the corresponding frozen expert alone. A single selected channel is repeated into the model's four input channels. This is an inference adapter; these NeuroPAL-trained models have not been validated for GCaMP accuracy.
-4. Inspect orange candidates across Z and in the maximum intensity projection. Filled markers, selection highlighting, arrow labels and the Z slider follow the NeuroPAL ID viewer. Click a marker or a neuron-list entry to select it and jump to its slice. Edit its XYZ coordinates in the **Neurons** panel; **Accept candidates** keeps the reviewed detections as red neuron markers. Use **Add neuron**, then click in the slice image to place a new neuron; **Delete neuron** removes the selected candidate or neuron. The **Table** panel also supports coordinate editing. Re-detection never silently replaces accepted seeds. Discard candidates or delete the existing seeds before accepting a replacement for the same frame/channel.
-5. **Save seeds** creates a new subfolder containing `annotations.h5`, `worldlines.h5`, `centers.csv`, exact `observations.json`, and `provenance.json`. Load `annotations.h5` in an empty reference session to resume. Keep these files together to preserve exact coordinates, channel information, scores and source identity.
-6. In **Tracking**, choose a short inclusive tracking window containing the reference frame and press **Track window**. This creates an isolated ZephIR dataset containing only the selected channel and window. The run uses CPU, 40 epochs and a linear frame order. It imports resulting observations into the table with the original frame numbers and worldline IDs. Save again to export the resulting observations. New tracked positions carry `zephir` provenance and score 0 (unscored); reviewed seed scores are retained.
+1. Choose a frame and source channel. For Bedant's recording, **C0 is GCaMP**, **C1 is RFP**, and C2 is blank. Frame numbers are one-based; channel numbers are zero-based.
+2. In **Settings**, enter XYZ voxel spacing in micrometers. If spacing is missing, explicitly enable **Use assumed spacing** before detection. The initial `0.4 0.4 1.5` values are model-grid assumptions, not measured calibration.
+3. Choose MoE or Spotiflow and press **Auto Detect**. A single selected channel is repeated into the frozen model's four input channels. This adapter requires no training or ground-truth annotations, but GCaMP detection accuracy is not established by the RGBW model's validation.
+4. Review the orange candidates. Click a marker or list entry to select it, jump to its Z slice, and edit XYZ. Labels default to **Selected** to avoid overlapping text; **Sparse** and **All** are available. Click coincident markers repeatedly to cycle through nearby neurons. The projection shows all Z positions; the slice shows centers within 1.5 slices. Markers are displayed across image channels so coordinates can be compared against the co-registered second channel.
+5. **Accept candidates** retains the seed set. **Add neuron**, then click in the slice image, adds a coordinate. **Delete neuron** removes the selected candidate or observation. Re-detection does not silently replace accepted seeds.
 
-The first tracking milestone is deliberately limited to **100 frames per run**. It does not launch a full 1,800-frame tracking job or claim biological tracking accuracy. Use a complete reviewed reference set in the window; independently detected frames receive new IDs and are not automatically identity-matched.
+Coordinates are one-based XYZ voxel centers in the supplied image. The crop offset is retained as metadata, not added to coordinates. The selected ROI outline uses the activity radii in pixels; its XY cross-section changes with Z.
 
-## Data and coordinates
+## Track
 
-- Native `TCZYX` and MATLAB-written `TCZXY` layouts are resolved using explicit `axis_order` or matching `shape_t/c/z/y/x` metadata. Conflicting or missing shape metadata is rejected.
-- MATLAB previews are YXZ; table/CSV coordinates are one-based XYZ pixel centers. The frame control is one-based; channel labels use the source's zero-based numbering.
-- ZephIR H5 uses `t_idx = frame - 1` and normalized centers `(coordinate - 0.5) / dimension`. Worldline IDs remain unchanged. Float32 H5 normalization is paired with exact JSON coordinates for lossless app round-trips.
-- Coordinates refer to the supplied cropped image. `crop_box_yxyx` is retained as metadata, not silently added to coordinates.
-- Unknown voxel spacing and `/times` units remain unknown in source provenance. An assumed model spacing is recorded with the detection request.
-- Source data and metadata are read-only. Export creates a fresh directory; tracking runs in a separate directory and preserves original time samples for its window.
+In **Tracking**, set the full range, reference frame, tracking channel, frames per window, and epochs. All seed IDs must be present at the reference frame. Detection and tracking channels can differ; using a weak or non-colocalized reference channel can still produce poor tracks.
+
+**Run ZephIR** tracks forward and backward from the reference in windows of at most 100 frames. Adjacent windows share an anchor frame and retain neuron IDs. Each completed window is written to an atomic checkpoint before its temporary image copy is removed. Existing manual coordinates are retained as constraints; propagated boundary coordinates carry their original provenance.
+
+**Cancel** stops the worker tree. **Load progress** imports completed windows, and **Resume tracking** continues the same run. Changed seeds or settings require a new run. After restarting the app, **Open tracking run…** loads `tracking.json` from the saved workspace; the source identity must match. Original H5 data is never modified.
+
+Review tracks at representative times. Trace/heatmap clicks seek to the corresponding frame. Coordinate edits retain the neuron ID. **Exclude this observation from activity** marks a bad measurement without deleting the worldline or silently interpolating its position. Editing positions does not automatically repair later frames: rerun the relevant tracking range using the corrected reference constraints.
+
+## Measure and export
+
+In **Activity**, choose:
+
+- Signal channel: normally C0 for GCaMP.
+- Optional reference channel: only use a co-registered signal appropriate for normalization.
+- Ellipsoid ROI radii in XYZ **pixels** (default `3 3 1`).
+- Local background subtraction (enabled by default).
+- Baseline percentile (default 20) and motion-warning distance in pixels per frame.
+
+**Extract activity** uses the range in Tracking. Coordinate coverage is shown before extraction. The worker reads original image intensities one frame at a time; it does not measure the contrast-stretched display.
+
+For each frame and neuron:
+
+1. Voxel centers inside the ellipsoid form the ROI. Overlapping voxels belong to the nearest neuron in radius-normalized XYZ coordinates; equal-distance ties go to the lower ID. Thus overlapping ROIs never double-count a voxel.
+2. Raw fluorescence is the mean of the assigned voxel intensities. Background is the median in an ellipsoidal shell from 1.5 to 2.5 times the radii, excluding all neuron ROI voxels. Corrected fluorescence is raw minus background. Negative values are retained.
+3. F0 is the chosen percentile of finite corrected fluorescence over the selected range. ΔF/F is `(F - F0) / F0`; nonpositive or missing F0 produces NaN.
+4. If configured, the reference ratio divides corrected signal fluorescence by positive corrected reference fluorescence. Ratio ΔF/F uses its own percentile baseline. Invalid reference denominators remain NaN.
+
+No bleaching correction, spike inference, temporal interpolation, or automatic biological quality acceptance is performed. Missing or excluded observations remain gaps. ROI size and baseline choices affect the signal and should be reviewed for the experiment. Finite ΔF/F is not a guarantee of trustworthy activity.
+
+The lower **Activity** tab shows selected-neuron ΔF/F, corrected fluorescence, optional ratio ΔF/F, or a population heatmap. Orange trace points have quality flags. Changing coordinates, exclusions, measurement settings, or the range marks results out of date; extraction must be repeated before export.
+
+**Export activity + tracks…** copies a complete analysis folder containing:
+
+- `activity.h5`: frame numbers, neuron IDs, original time samples, XYZ centers, raw and background fluorescence per selected channel, corrected signal, F0, ΔF/F, optional ratios, ROI voxel counts, saturation fractions and quality flags. Matrix axes are frame × neuron; H5 attributes record axis conventions.
+- `activity.csv`: long-form coordinates and measurements with one row per frame/neuron.
+- `quality.csv`: per-neuron counts of measured/finite samples and each quality flag.
+- `analysis.json`: source identity, parameters, software hashes, units, flag definitions and provenance.
+- `tracks/`: ZephIR `annotations.h5` and `worldlines.h5`, exact `observations.json`, coordinate CSV and provenance.
+
+Flags identify missing/excluded observations, ROI clipping/overlap/empty masks, unavailable background, invalid baselines/reference signals, large coordinate steps, and intensity saturation. They identify review targets; they are not a tracking-accuracy metric.
+
+The UI uses frame numbers. Original `/times` values are exported unchanged; unknown time units are not labeled as seconds. Bedant's supplied images are uint8, so raw fluorescence is in those stored intensity units.
+
+## Save and resume
+
+**Save seeds…** saves accepted observations, exclusions, detection history and the current tracking/activity settings and workspace paths. It creates a fresh directory and does not overwrite earlier exports. **Load seeds…** restores it in an empty reference session. Keep the exact JSON sidecar with the H5 files: ZephIR normalized float32 coordinates alone cannot preserve full coordinate precision.
+
+ZephIR coordinates use `t_idx = frame - 1` and `(coordinate - 0.5) / dimension`. IDs are unchanged. Source metadata and source identity are checked on tracking, extraction, import/export, and checkpoint loading. The source path is part of the identity, so moving a recording requires reopening it and an explicit new workflow rather than silently attaching old coordinates to another file.
 
 ## Runtime and resource limits
 
-The viewer caches one frame (about 6.4 MiB for this recording). Z and channel navigation reuse it. Frame reads, inference and tracking use the existing supervised Python process runner, cancellation and memory limits. Frames or individual H5 chunks larger than 256 MiB are rejected by this reference reader. Tracking windows must fit a 1 GiB staging budget, with a disk-space reserve checked before copying. Failed jobs preserve accepted annotations.
+Set `NEUROPAL_VIDEO_PYTHON` to a Python environment with NumPy, h5py and the application's ZephIR dependencies (`requirements-macos.txt` / `requirements.txt`). Existing local setups also check `NEUROPAL_YOLO_PYTHON` and the sibling `.venv-ai-pipeline` environment. MoE uses its configured bundle and interpreter; install the frozen bundle with `scripts/install_moe_bundle.py`. Weights and recordings are not committed to Git.
 
-Set `NEUROPAL_VIDEO_PYTHON` to a Python environment with NumPy, h5py and the application's ZephIR dependencies (`requirements-macos.txt` / `requirements.txt`). For existing local setups the viewer also checks `NEUROPAL_YOLO_PYTHON` and the sibling `.venv-ai-pipeline` environment. MoE uses its configured method bundle and `NEUROPAL_MOE_PYTHON` or the bundle's interpreter. Install the frozen bundle with `scripts/install_moe_bundle.py` and its `requirements-moe.txt` environment. Model weights and example recordings are not committed to the repository.
+The viewer caches one frame (about 6.4 MiB for Bedant's recording). Image handles and the unchanged projection are reused during Z navigation. Frame/chunk reads are limited to 256 MiB; each staged tracking window must fit 1 GiB plus disk reserve. Window sizes are 2–100 frames, with CPU ZephIR and 40 epochs by default. The full recording is processed as multiple windows rather than one large image allocation.
 
-Default job output is under MATLAB's `prefdir/NeuroPAL/reference-jobs`. Detector output includes the request, transform, scores, expert predictions, logs and resource records. Track output includes staged input, ZephIR files and source-frame/channel mapping.
+Fluorescence arrays, ROI neighborhoods, worker memory, logs and process lifetimes have explicit bounds. The existing supervisor enforces cancellation and prevents simultaneous heavy jobs. Default workspaces are under MATLAB's `prefdir/NeuroPAL/reference-jobs`. A failed or canceled tracking run preserves its last completed checkpoint and logs.
 
-## Validation
+## Validation entry points
 
-- `scripts/test_reference_video.py`: native/legacy layout, axis markers, normalized-coordinate and exact sidecar round-trip, identity preservation, invalid indices, metadata mismatch and source-change rejection.
-- `scripts/test_single_channel_moe.py`: channel isolation, RGBW input preservation, blank/nonfinite/mismatched input and memory preflight.
-- `scripts/test_reference_workflow.m`: actual app callbacks on the supplied recording, blank C2, C0 detection, acceptance, editing, save/reload and a three-frame ZephIR run.
-- `scripts/test_reference_view.m`: shared image-handle reuse, label visibility, selection, candidate editing/deletion, acceptance and exact seed save/reload on an open reference workspace.
-- Existing MoE fixture replay and app development checks remain regression checks.
+- `scripts/test_reference_video.py`: native/legacy layout, exact coordinate round-trip, identity preservation and invalid/source-change inputs.
+- `scripts/test_single_channel_moe.py`: selected-channel isolation and model input adaptation.
+- `scripts/test_reference_analysis.py`: known fluorescence/background/baselines, ratios, missing/excluded samples, overlap ownership, saturation, clipping and interrupted/resumed tracking.
+- `scripts/test_reference_workflow.m`: real detection, review, export and short ZephIR run.
+- `scripts/test_reference_view.m`: image/cache reuse, marker selection, editing and seed round-trip.
+- `scripts/test_reference_activity.m`: trace/heatmap linkage, exclusions, stale-result detection and session settings.
+- `scripts/run_dev_cycle fast`: existing app and performance regressions.
 
-Example MATLAB invocation after launching the app:
-
-```matlab
-addpath('scripts');
-test_reference_workflow(Program.app, '/path/to/Test Image/data.h5', '/path/to/test-output');
-```
+Actual full-recording output remains a software-validation example until its detections, tracks and fluorescence choices have been reviewed for biological analysis.
