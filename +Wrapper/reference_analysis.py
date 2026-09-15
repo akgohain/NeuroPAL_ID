@@ -11,7 +11,7 @@ import sys
 import tempfile
 import numpy as np
 import h5py
-from reference_video import source_info, validate_observations, write_seed_files
+from reference_video import source_info, read_frame, validate_observations, write_seed_files
 
 
 def atomic_json(path, value):
@@ -83,6 +83,8 @@ def track_sequence(request):
         raise ValueError('The reference frame must lie inside the tracking range')
     if not 0 <= channel < info['nc'] or not 2 <= size <= 100 or not 1 <= epochs <= 1000:
         raise ValueError('Invalid tracking channel, window size (2–100) or epochs (1–1000)')
+    if not np.any(read_frame(info,reference,channel)>0):
+        raise ValueError('The tracking channel has no signal in the reference frame; choose another channel')
     observations = validate_observations(request['observations'], info)
     seeds = [dict(r) for r in observations if r['t'] == reference+1 or r.get('provenance') != 'zephir']
     seeds = [r for r in seeds if first < r['t'] <= last+1]
@@ -168,7 +170,7 @@ def track_sequence(request):
 
 # Flags are stored with every frame/neuron measurement; gaps remain NaN.
 FLAGS = dict(missing=1, excluded=2, clipped_roi=4, overlap=8, empty_roi=16,
-             empty_background=32, invalid_baseline=64, invalid_reference=128, large_step=256, saturated=512)
+             empty_background=32, invalid_baseline=64, invalid_reference=128, large_step=256, saturated=512, invalid_ratio_baseline=1024)
 
 
 def roi_indices(center, radius, shape, inner=0., outer=1.):
@@ -281,6 +283,7 @@ def activity(request):
             ratio[valid,j]=trace[valid]/denominator[valid]
             if np.any(valid): ratio_f0[j]=np.percentile(ratio[valid,j],options['baseline_percentile'])
             if ratio_f0[j]>0: ratio_dff[valid,j]=(ratio[valid,j]-ratio_f0[j])/ratio_f0[j]
+            else: flags[:,j]|=FLAGS['invalid_ratio_baseline']
     root=Path(request['output_dir']); root.mkdir(parents=True,exist_ok=True)
     if shutil.disk_usage(root).free < raw.nbytes*20+256*2**20: raise OSError('Insufficient free space for activity export')
     stage=Path(tempfile.mkdtemp(prefix='.activity-',dir=root)); destination=root/('activity-'+stage.name[10:])

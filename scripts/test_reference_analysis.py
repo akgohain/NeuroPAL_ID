@@ -101,6 +101,22 @@ class AnalysisTests(unittest.TestCase):
             request=self.request();request['options'].update(options)
             with self.assertRaises(ValueError):analysis.activity(request)
 
+    def test_blank_tracking_channel_and_invalid_ratio_baseline(self):
+        self.data[:,1]=0;self.write()
+        request=dict(source=self.info,observations=[self.rows[0]],frame_range=[0,6],reference_frame=0,channel=1,
+                     window_size=3,epochs=1,output_dir=str(self.root))
+        with self.assertRaisesRegex(ValueError,'no signal'):analysis.track_sequence(request)
+        core,_,_=analysis.roi_indices([12,10,5],[2,2,1],(23,19,9))
+        self.data[:,1]=10
+        self.data[0,0].flat[core]=5
+        self.data[0,1].flat[core]=30
+        self.write();request=self.request();request['options']['baseline_percentile']=20
+        out=analysis.activity(request)
+        with h5py.File(Path(out['directory'])/'activity.h5') as f:
+            self.assertTrue(np.isfinite(f['dff'][:]).all())
+            self.assertTrue(np.isnan(f['ratio_dff'][:]).all())
+            self.assertTrue(np.all(f['quality_flags'][:]&analysis.FLAGS['invalid_ratio_baseline']))
+
     def test_tracking_resume_bidirectional_ids_and_settings(self):
         calls=[]
         def worker(request,directory,number):
