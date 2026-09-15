@@ -3,7 +3,7 @@ function test_reference_view(w)
 assert(~isempty(w.Candidates) && isempty(w.Rows));
 candidates = w.Candidates; next_id = w.NextID;
 cleanup = onCleanup(@() restore(w,candidates,next_id));
-v = w.View; v.LabelMode.Value='All'; w.render();
+v = w.View; v.DisplayMode.Value='Slice'; v.LabelMode.Value='All'; w.render();
 assert(numel(v.NeuronList.Items)==size(candidates,1));
 assert(numel(findobj(v.Projection,'Tag','reference_label'))==size(candidates,1));
 assert(isequal(w.Slice.Limits,[1 w.Source.nz]));

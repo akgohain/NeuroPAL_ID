@@ -8,6 +8,9 @@ classdef ReferenceWorkflow < handle
         Slice
         Channel
         Detector
+        DetectionChannel
+        DetectionMode
+        RGBW
         Spacing
         Calibration
         Status
@@ -61,6 +64,7 @@ classdef ReferenceWorkflow < handle
             key = 'calcium_reference_workflow';
             if isappdata(app.CELL_ID,key)
                 previous = getappdata(app.CELL_ID,key);
+                if isvalid(previous), previous.View.Playback.stop(); end
                 if isvalid(previous) && ~isempty(previous.Rows)
                     answer = uiconfirm(app.CELL_ID,'Close the current reference session? Save seeds first to retain edits.', ...
                         'Open recording','Options',{'Cancel','Close session'},'DefaultOption','Cancel','CancelOption','Cancel');
@@ -126,6 +130,7 @@ classdef ReferenceWorkflow < handle
             if ~isempty(obj.Grid) && isvalid(obj.Grid), delete(obj.Grid); end
         end
         function closeSession(obj,src,event)
+            obj.View.Playback.stop();
             if obj.Busy
                 obj.Cancelled = true;
                 obj.Status.Text = 'Canceling the active job. Close again when it has stopped.';
@@ -144,10 +149,12 @@ classdef ReferenceWorkflow < handle
         end
         function safe(obj, action)
             if obj.Busy, return; end
+            obj.View.Playback.stop(); obj.View.FramePreview.cancel(); obj.View.Preview.cancel();
             obj.Busy = true; obj.Cancelled = false;
             obj.View.setBusy(true);
             obj.Frame.Enable = 'off'; obj.Channel.Enable = 'off'; obj.Slice.Enable = 'off';
             obj.Table.Enable = 'off';
+            obj.DetectionChannel.Enable='off'; obj.DetectionMode.Enable='off'; obj.RGBW.Enable='off';
             obj.Detector.Enable = 'off'; obj.Spacing.Enable = 'off'; obj.Calibration.Enable = 'off';
             obj.First.Enable = 'off'; obj.Last.Enable = 'off';
             obj.Analysis.setBusy(true);
@@ -166,6 +173,7 @@ classdef ReferenceWorkflow < handle
             if ~isvalid(obj.App) || ~isvalid(obj.Frame), return; end
             obj.Frame.Enable = 'on'; obj.Channel.Enable = 'on'; obj.Slice.Enable = 'on';
             obj.Table.Enable = 'on';
+            obj.DetectionChannel.Enable='on'; obj.DetectionMode.Enable='on'; obj.RGBW.Enable='on';
             obj.Detector.Enable = 'on'; obj.Spacing.Enable = 'on'; obj.Calibration.Enable = 'on';
             obj.First.Enable = 'on'; obj.Last.Enable = 'on';
             obj.View.updateList(); obj.View.setBusy(false); obj.Analysis.setBusy(false);
@@ -203,15 +211,24 @@ classdef ReferenceWorkflow < handle
             if ~strcmp(actual.source_id,obj.Source.source_id)
                 error('Tracking:SourceChanged','Recording or metadata changed. Reopen the source before detection.');
             end
-            volume = obj.frameData(); frame = obj.Frame.Value; channel = obj.Channel.Value;
+            mode='single_channel'; channel=obj.DetectionChannel.Value; mapping=[];
+            if strcmp(obj.DetectionMode.Value,'RGBW')
+                mode='rgbw'; mapping=sscanf(obj.RGBW.Value,'%f')';
+                if numel(mapping)~=4 || numel(unique(mapping))~=4 || any(~isfinite(mapping) | mapping~=round(mapping) | mapping<0 | mapping>=obj.Source.nc)
+                    error('Tracking:RGBWChannels','Enter four distinct channel indices in R G B W order.');
+                end
+                channel=mapping(1);
+            end
+            obj.Channel.Value=channel; volume=obj.frameData(); frame=obj.Frame.Value;
+            if strcmp(mode,'rgbw'), volume=obj.Cache(:,:,:,mapping+1); end
             measured = obj.Source.spacing_measured && isequal(scale,obj.Source.spacing_um_xyz(:)');
             snapshot = struct('source_id',obj.Source.source_id,'frame_index',frame-1,'channel_index',channel, ...
-                'spacing_measured',measured,'spacing_um_xyz',scale);
+                'spacing_measured',measured,'spacing_um_xyz',scale,'input_mode',mode,'rgbw_channels',mapping);
             obj.Status.Text = 'Detecting selected channel…'; drawnow;
             if ~any(volume(:)>0)
                 response = struct('centroids_yxz',zeros(0,3),'scores',zeros(0,1),'num_centroids',0,'source_metadata',snapshot);
             else
-                response = Wrapper.runMoECentroids(volume,scale,'InputMode','single_channel','SourceMetadata',snapshot, ...
+                response = Wrapper.runMoECentroids(volume,scale,'InputMode',string(mode),'SourceMetadata',snapshot, ...
                     'Backend',lower(string(obj.Detector.Value)),'ProgressFcn',@(message) obj.progress(message),'CancelFcn',@() obj.Cancelled || ~isvalid(obj.App),'OutputDir',obj.OutputRoot);
             end
             if obj.Frame.Value~=frame || obj.Channel.Value~=channel
@@ -221,6 +238,7 @@ classdef ReferenceWorkflow < handle
             if any(xyz<1,'all') || any(xyz>[obj.Source.nx obj.Source.ny obj.Source.nz],'all')
                 error('Tracking:Bounds','Detector returned a center outside pixel-center bounds.');
             end
+            obj.View.Review.clear();
             n = size(xyz,1);
             obj.Candidates = [(obj.NextID:obj.NextID+n-1)',repmat(frame,n,1),xyz,response.scores(:),repmat(channel,n,1)];
             obj.NextID = obj.NextID+n;
@@ -237,10 +255,12 @@ classdef ReferenceWorkflow < handle
             if any(ismember(obj.Candidates(:,[2 7]),obj.Rows(:,[2 7]),'rows'))
                 error('Tracking:ExistingSeeds','This frame/channel already has seeds. Delete those rows before accepting a replacement.');
             end
+            obj.View.Review.checkpoint();
             obj.Rows = [obj.Rows;obj.Candidates]; obj.NextID = max(obj.NextID,max(obj.Rows(:,1))+1);
             obj.Candidates = zeros(0,7); obj.render();
         end
         function discard(obj)
+            obj.View.Review.checkpoint();
             obj.Candidates = zeros(0,7); obj.render();
         end
         function captureCursor(obj)
@@ -249,6 +269,7 @@ classdef ReferenceWorkflow < handle
         end
         function add(obj)
             if isempty(obj.Cursor), error('Tracking:Cursor','Click a location in the image first.'); end
+            obj.View.Review.checkpoint();
             point = obj.Cursor;
             xyz = [min(obj.Source.nx,max(1,point(1,1))),min(obj.Source.ny,max(1,point(1,2))),round(obj.Slice.Value)];
             obj.Rows(end+1,:) = [obj.NextID,obj.Frame.Value,xyz,1,obj.Channel.Value]; obj.NextID = obj.NextID+1; obj.render();
@@ -263,6 +284,7 @@ classdef ReferenceWorkflow < handle
             if ~isscalar(value) || ~isfinite(value) || value<1 || value>bounds(column-2)
                 obj.Table.Data = obj.Rows; error('Tracking:EditBounds','Coordinates must lie inside the volume.');
             end
+            obj.View.Review.checkpoint(obj.Rows(row,1));
             obj.Origins(sprintf('%d:%d',obj.Rows(row,1),obj.Rows(row,2))) = 'reviewed';
             obj.Rows(row,column) = value; obj.Rows(row,6) = 1; obj.render();
         end
@@ -315,6 +337,7 @@ classdef ReferenceWorkflow < handle
             obj.render();
         end
         function setRows(obj,observations)
+            obj.View.Review.clear();
             rows = zeros(numel(observations),7); obj.Excluded = zeros(0,2);
             for i=1:numel(observations)
                 r = observations(i); channel = obj.Channel.Value;
@@ -326,6 +349,7 @@ classdef ReferenceWorkflow < handle
             obj.Rows = rows; obj.NextID = max(obj.NextID,max([0;rows(:,1);obj.Candidates(:,1)])+1);
         end
         function track(obj,resume)
+            obj.View.Review.clear();
             if nargin<2, resume=false; end
             request = struct('action','track_sequence','source',obj.Source,'observations',obj.observations(), ...
                 'frame_range',[obj.First.Value-1 obj.Last.Value-1],'reference_frame',obj.Reference.Value-1, ...
@@ -382,13 +406,20 @@ classdef ReferenceWorkflow < handle
             current=~isempty(obj.ActivityDirectory) && isfile(fullfile(obj.ActivityDirectory,'activity.h5')) && isequal(obj.Rows,obj.ActivityRows) && ...
                 isequal(obj.Excluded,obj.ActivityExcluded) && isequal(obj.Analysis.options(),obj.ActivitySettings);
         end
-        function exportActivity(obj)
+        function exportActivity(obj,folder)
             if ~obj.activityCurrent(), error('Tracking:Activity','Extract activity again after changing tracks or measurement settings.'); end
-            folder=uigetdir(fileparts(obj.Source.file),'Export activity and tracks');
+            if nargin<2, folder=uigetdir(fileparts(obj.Source.file),'Export activity and tracks'); end
             if isequal(folder,0), return; end
             [~,name]=fileparts(tempname(folder)); destination=fullfile(folder,['activity-' name]);
             stage=fullfile(folder,['.activity-' name]); cleanup=onCleanup(@() obj.removeFolder(stage));
             [ok,message]=copyfile(obj.ActivityDirectory,stage);
+            if ~ok, error('Tracking:Export','%s',message); end
+            % Include review decisions made after the measurements were extracted.
+            snapshot=obj.bridge(struct('action','export','source',obj.Source,'observations',obj.observations(), ...
+                'output_dir',stage,'provenance',struct('jobs',{obj.History},'session',obj.Analysis.session())), ...
+                @() obj.Cancelled || ~isvalid(obj.App));
+            tracks=fullfile(stage,'tracks'); if isfolder(tracks), rmdir(tracks,'s'); end
+            [ok,message]=movefile(snapshot.directory,tracks);
             if ~ok, error('Tracking:Export','%s',message); end
             [ok,message]=movefile(stage,destination);
             if ~ok, error('Tracking:Export','%s',message); end

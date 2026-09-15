@@ -17,6 +17,8 @@ classdef ReferenceView < handle
         AddMode = false
         DisplayKey = []
         DisplayMaximum = 1
+        DisplayMinimum = 0
+        Contrast
         ProjectionPixels = []
         Summary
         ListKey = {}
@@ -25,122 +27,183 @@ classdef ReferenceView < handle
         PreferredID = 1
         Exclude
         ShowROI
+        Playback
+        Review
+        Panels = cell(1,5)
+        Stages = cell(1,5)
+        Stage = 1
+        Body
+        DisplayMode
+        DetectionSummary
+        Trails
+        Follow
+        XYZ
+        ImageGrid
+        SlicePanel
+        ProjectionPanel
+        OrthogonalPanel
+        Orthogonal = cell(1,3)
+        CorrectMode = false
+        TableWindow = []
+        Rendering = false
+        PendingRender = false
     end
     methods
         function obj = ReferenceView(c)
             obj.Controller = c;
-            c.Grid = uigridlayout(c.App.VideoTrackingTab,[3 2]);
-            c.Grid.ColumnWidth = {'1x',350}; c.Grid.RowHeight = {34,'1x',24};
-            c.Grid.Padding = [6 6 6 6]; c.Grid.ColumnSpacing = 6; c.Grid.RowSpacing = 4;
-            toolbar = uigridlayout(c.Grid,[1 10]); toolbar.Layout.Column = [1 2];
-            toolbar.Padding = [0 0 0 0];
-            toolbar.ColumnWidth = {40,75,50,80,105,115,70,'1x',75,100};
-            uilabel(toolbar,'Text','Frame');
-            c.Frame = uispinner(toolbar,'Limits',[1 max(2,c.Source.nt)],'Value',1, ...
-                'Step',1);
-            uilabel(toolbar,'Text','Channel');
-            c.Channel = uidropdown(toolbar,'Items',cellstr("C"+string(0:c.Source.nc-1)), ...
-                'ItemsData',0:c.Source.nc-1,'Value',0,'ValueChangedFcn',@(~,~) c.safe(@() c.render()));
-            c.Detector = uidropdown(toolbar,'Items',{'MoE','Spotiflow'});
-            c.Buttons.detect = uibutton(toolbar,'Text','Auto Detect','ButtonPushedFcn',@(~,~) c.safe(@() c.detect()));
-            c.Buttons.cancel = uibutton(toolbar,'Text','Cancel','ButtonPushedFcn',@(~,~) c.cancel());
-            uilabel(toolbar,'Text','');
-            obj.Labels = uicheckbox(toolbar,'Text','Labels','Value',true,'ValueChangedFcn',@(~,~) obj.redraw());
-            obj.LabelMode=uidropdown(toolbar,'Items',{'Selected','Sparse','All'},'Value','Selected','ValueChangedFcn',@(~,~) obj.redraw());
-
-            images = uigridlayout(c.Grid,[3 1]); images.Layout.Row = 2; images.Layout.Column = 1;
-            images.RowHeight = {'2x',52,'1x'}; images.Padding = [0 0 0 0]; images.RowSpacing = 4;
-            slice_panel = uipanel(images,'BorderType','line','AutoResizeChildren','off');
-            c.Axes = uiaxes(slice_panel);
-            c.Axes.Toolbar.Visible = 'off'; c.Axes.FontSize = c.App.XY.FontSize;
-            slice_panel.SizeChangedFcn = @(~,~) obj.fitAxes(c.Axes);
-            navigation = uigridlayout(images,[1 3]); navigation.Padding = [6 4 6 4];
-            navigation.ColumnWidth = {20,'1x',65};
-            uilabel(navigation,'Text','Z','FontWeight','bold');
-            c.Slice = uislider(navigation);
-            Program.Helpers.configure_navigation_zslider(c.Slice,c.Source.nz,ceil(c.Source.nz/2));
-            obj.SliceValue = uispinner(navigation,'Limits',[1 max(2,c.Source.nz)], ...
-                'Value',c.Slice.Value,'ValueChangedFcn',@(~,~) obj.enterSlice());
-            lower_tabs=uitabgroup(images);
-            projection_tab=uitab(lower_tabs,'Title','Maximum Intensity Projection');
-            projection_grid=uigridlayout(projection_tab,[1 1]); projection_grid.Padding=[0 0 0 0];
-            projection_panel = uipanel(projection_grid,'BorderType','none','AutoResizeChildren','off');
-            obj.Projection = uiaxes(projection_panel); obj.Projection.Toolbar.Visible = 'off';
-            obj.Projection.FontSize = c.App.XY.FontSize;
-            projection_panel.SizeChangedFcn = @(~,~) obj.fitAxes(obj.Projection);
-
-            tabs = uitabgroup(c.Grid); tabs.Layout.Row = 2; tabs.Layout.Column = 2;
-            neurons = uitab(tabs,'Title','Neurons');
-            controls = uigridlayout(neurons,[9 2]); controls.Padding = [6 6 6 6];
-            controls.RowHeight = {24,'1x',96,28,28,28,24,24,24};
-            obj.Summary = uilabel(controls,'Text',''); obj.Summary.Layout.Column = [1 2];
-            obj.NeuronList = uilistbox(controls,'Items',{},'ValueChangedFcn',@(~,~) obj.chooseList());
-            obj.NeuronList.Layout.Row = 2; obj.NeuronList.Layout.Column = [1 2];
-            coordinates = uigridlayout(controls,[3 2]); coordinates.Layout.Row = 3; coordinates.Layout.Column = [1 2];
-            coordinates.ColumnWidth = {35,'1x'}; coordinates.Padding = [0 0 0 0];
-            dimensions = [c.Source.nx,c.Source.ny,c.Source.nz];
-            for i = 1:3
-                names = {'X','Y','Z'};
-                uilabel(coordinates,'Text',names{i});
-                obj.Position{i} = uispinner(coordinates,'Limits',[1 max(2,dimensions(i))], ...
-                    'Value',1,'Step',1,'ValueChangedFcn',@(~,~) obj.move(i));
+            Tracking.VideoWorkspace.build(obj);
+        end
+        function setStage(obj,index)
+            if obj.Controller.Busy, return; end
+            if ~isempty(obj.Playback), obj.Playback.stop(); end
+            obj.Stage=index;
+            for i=1:5
+                obj.Panels{i}.Visible=matlab.lang.OnOffSwitchState(i==index);
+                if i==index
+                    obj.Stages{i}.BackgroundColor=[.24 .24 .24]; obj.Stages{i}.FontColor=[1 1 1]; obj.Stages{i}.FontWeight='bold';
+                else
+                    obj.Stages{i}.BackgroundColor=[.94 .94 .94]; obj.Stages{i}.FontColor=[.25 .25 .25]; obj.Stages{i}.FontWeight='normal';
+                end
             end
-            c.Buttons.accept = uibutton(controls,'Text','Accept candidates','ButtonPushedFcn',@(~,~) c.safe(@() c.accept()));
-            c.Buttons.discard = uibutton(controls,'Text','Discard candidates','ButtonPushedFcn',@(~,~) c.safe(@() c.discard()));
-            c.Buttons.add = uibutton(controls,'Text','Add neuron','ButtonPushedFcn',@(~,~) obj.armAdd());
-            c.Buttons.remove = uibutton(controls,'Text','Delete track','ButtonPushedFcn',@(~,~) c.safe(@() c.remove()));
-            c.Buttons.load = uibutton(controls,'Text','Load seeds…','ButtonPushedFcn',@(~,~) c.safe(@() c.loadDialog()));
-            c.Buttons.save = uibutton(controls,'Text','Save seeds…','ButtonPushedFcn',@(~,~) c.safe(@() c.saveDialog()));
-            obj.Exclude=uicheckbox(controls,'Text','Exclude this observation from activity','ValueChangedFcn',@(~,~) obj.exclude()); obj.Exclude.Layout.Column=[1 2];
-            obj.ShowROI=uicheckbox(controls,'Text','Show selected ROI','Value',true,'ValueChangedFcn',@(~,~) obj.redraw()); obj.ShowROI.Layout.Column=[1 2];
-            legend = uilabel(controls,'Text','Orange: candidate   Red: neuron','FontSize',10); legend.Layout.Column = [1 2];
-
-            settings = uitab(tabs,'Title','Settings');
-            settings_grid = uigridlayout(settings,[5 1]); settings_grid.RowHeight = {24,28,28,60,'1x'};
-            uilabel(settings_grid,'Text','Voxel spacing X Y Z (µm)');
-            c.Spacing = uieditfield(settings_grid,'text','Value','0.4 0.4 1.5','ValueChangedFcn',@(~,~) c.spacingChanged());
-            c.Calibration = uicheckbox(settings_grid,'Text','Use assumed spacing','Value',false);
-            if c.Source.spacing_measured
-                c.Spacing.Value = num2str(c.Source.spacing_um_xyz(:)');
-                c.Calibration.Text = 'Use measured spacing'; c.Calibration.Value = true;
+        end
+        function detectionModeChanged(obj)
+            c=obj.Controller;
+            rgbw=strcmp(c.DetectionMode.Value,'RGBW');
+            c.RGBW.Visible=matlab.lang.OnOffSwitchState(rgbw);
+            c.DetectionChannel.Visible=matlab.lang.OnOffSwitchState(~rgbw);
+        end
+        function changeView(obj)
+            obj.Playback.stop(); obj.Preview.cancel(); obj.FramePreview.cancel(); obj.redraw();
+        end
+        function changeLabels(obj)
+            obj.Labels.Value=~strcmp(obj.LabelMode.Value,'None'); obj.redraw();
+        end
+        function previewRequest(obj,z)
+            c=obj.Controller; if c.Busy, return; end
+            obj.Follow.Value=false;
+            % Keep the chosen depth when the next movie frame arrives.
+            c.Slice.Value=max(1,min(c.Source.nz,round(z)));
+            obj.Preview.request(c.Slice.Value);
+        end
+        function finishSlice(obj,src,event)
+            c=obj.Controller; if c.Busy, return; end
+            z=src.Value;
+            if (isstruct(event) && isfield(event,'Value')) || (isobject(event) && isprop(event,'Value')), z=event.Value; end
+            obj.Follow.Value=false; obj.Preview.cancel();
+            c.Slice.Value=max(1,min(c.Source.nz,round(z))); obj.redraw();
+        end
+        function radius = sliceRadius(obj)
+            radius=1.5;
+            if strcmp(obj.DisplayMode.Value,'Slab'), radius=2.5; end
+        end
+        function armCorrect(obj)
+            c=obj.Controller; if c.Busy || isempty(obj.Selection), return; end
+            obj.Playback.stop(); obj.CorrectMode=true; obj.AddMode=false;
+            obj.DisplayMode.Value='Slice'; obj.redraw();
+            c.Status.Text='Click the selected neuron’s new center in this Z slice.';
+        end
+        function correctAt(obj,xyz)
+            c=obj.Controller; if c.Busy || isempty(obj.Selection), return; end
+            xyz=min([c.Source.nx c.Source.ny c.Source.nz],max(1,xyz));
+            pending=obj.Selection(1);
+            if pending, rows=c.Candidates; else, rows=c.Rows; end
+            index=find(rows(:,1)==obj.Selection(2) & rows(:,2)==c.Frame.Value,1);
+            if isempty(index), return; end
+            obj.Review.checkpoint(); obj.CorrectMode=false;
+            rows(index,3:5)=xyz; rows(index,6)=1;
+            if pending, c.Candidates=rows;
+            else
+                c.Rows=rows; c.Origins(sprintf('%d:%d',rows(index,1),rows(index,2)))='reviewed';
             end
-            uilabel(settings_grid,'Text','Single-channel model accuracy is unvalidated. Review detections before tracking.','WordWrap','on');
-            c.Analysis=Tracking.ReferenceAnalysisView(c,tabs,lower_tabs);
-            table_tab = uitab(tabs,'Title','Table');
-            table_grid = uigridlayout(table_tab,[1 1]); table_grid.Padding = [0 0 0 0];
-            c.Table = uitable(table_grid,'Data',c.Rows,'ColumnName',{'ID','Frame','X','Y','Z','Score','Channel'}, ...
-                'ColumnWidth',{45,50,65,65,65,60,55},'ColumnEditable',[false false true true true false false], ...
-                'CellEditCallback',@(~,event) c.safe(@() c.edit(event)), ...
+            c.render();
+        end
+        function openTable(obj)
+            obj.Playback.stop();
+            if ~isempty(obj.TableWindow) && isvalid(obj.TableWindow)
+                figure(obj.TableWindow); return;
+            end
+            obj.TableWindow=uifigure('Name','Neuron coordinates','Position',[200 200 720 420]);
+            grid=uigridlayout(obj.TableWindow,[1 1]); c=obj.Controller;
+            uitable(grid,'Data',c.Rows,'ColumnName',c.Table.ColumnName,'ColumnEditable',c.Table.ColumnEditable, ...
+                'CellEditCallback',@(src,event) obj.editTable(src,event), ...
                 'CellSelectionCallback',@(~,event) obj.chooseTable(event));
-            c.Status = uilabel(c.Grid,'Text',''); c.Status.Layout.Row = 3; c.Status.Layout.Column = [1 2];
-            obj.Preview = Program.LatestSlicePreview(@(z) obj.preview(z), ...
-                @(~,~) obj.redraw(),@() {c.Source.source_id,c.Frame.Value,c.Channel.Value,c.Busy},c.Grid);
-            obj.FramePreview=Program.LatestSlicePreview(@(t) obj.navigate(t), ...
-                @(src,~) obj.navigate(src.Value),@() {c.Source.source_id,c.Busy},c.Grid);
-            c.Frame.ValueChangingFcn=@(~,event) obj.FramePreview.request(event.Value);
-            c.Frame.ValueChangedFcn=@(src,event) obj.FramePreview.finish(src,event);
-            c.Slice.ValueChangingFcn = @(~,event) obj.Preview.request(event.Value);
-            c.Slice.ValueChangedFcn = @(src,event) obj.Preview.finish(src,event);
-            obj.fitAxes(c.Axes); obj.fitAxes(obj.Projection);
+        end
+        function editTable(obj,src,event)
+            obj.Controller.safe(@() obj.Controller.edit(event)); src.Data=obj.Controller.Rows;
+        end
+        function drawTrail(obj,ax)
+            c=obj.Controller; trail=findobj(ax,'Tag','selected_trail');
+            if ~isempty(trail), trail.Visible='off'; end
+            if ~obj.Trails.Value || isempty(obj.Selection) || obj.Selection(1), return; end
+            rows=sortrows(c.Rows(c.Rows(:,1)==obj.PreferredID & c.Rows(:,2)<=c.Frame.Value & c.Rows(:,2)>c.Frame.Value-12,:),2);
+            if size(rows,1)<2, return; end
+            if isequal(ax,c.Axes) && abs(rows(end,5)-obj.SliceValue.Value)>=obj.sliceRadius(), return; end
+            x=rows(:,3); y=rows(:,4);
+            gaps=[false;diff(rows(:,2))>1] | ismember(rows(:,[1 2]),c.Excluded,'rows'); x(gaps)=NaN; y(gaps)=NaN;
+            if isempty(trail)
+                plot(ax,x,y,'Color',[.8 .7 .35],'LineWidth',.75,'HitTest','off','Tag','selected_trail');
+            else
+                set(trail,'XData',x,'YData',y,'Visible','on');
+            end
+        end
+        function drawOrthogonal(obj,volume)
+            if ~obj.XYZ.Value
+                obj.ImageGrid.ColumnWidth={'1x',0}; obj.OrthogonalPanel.Visible='off'; return;
+            end
+            obj.ImageGrid.ColumnWidth={'1x',160}; obj.OrthogonalPanel.Visible='on';
+            c=obj.Controller;
+            row=obj.ListRows(obj.ListRows(:,1)==obj.PreferredID & obj.ListRows(:,8)==0,:);
+            if isempty(row)
+                for i=1:3, cla(obj.Orthogonal{i}); title(obj.Orthogonal{i},'No selected center'); end
+                return;
+            end
+            xyz=round(row(1,3:5)); x=max(1,xyz(1)-18):min(c.Source.nx,xyz(1)+18);
+            y=max(1,xyz(2)-18):min(c.Source.ny,xyz(2)+18); z=max(1,xyz(3)-8):min(c.Source.nz,xyz(3)+8);
+            planes={volume(y,x,xyz(3)),reshape(volume(xyz(2),x,z),numel(x),numel(z))',reshape(volume(y,xyz(1),z),numel(y),numel(z))'};
+            names={'XY','XZ','YZ'};
+            for i=1:3
+                ax=obj.Orthogonal{i}; img=findobj(ax,'Type','image'); pixels=obj.displayPixels(planes{i});
+                if isempty(img), image(ax,pixels); else, img.CData=pixels; img.XData=[1 size(pixels,2)]; img.YData=[1 size(pixels,1)]; end
+                axis(ax,'image'); ax.XTick=[]; ax.YTick=[]; title(ax,[names{i} ' · voxels'],'FontSize',10);
+            end
         end
         function delete(obj)
+            if isprop(obj,'Playback') && ~isempty(obj.Playback) && isvalid(obj.Playback), delete(obj.Playback); end
+            if isprop(obj,'TableWindow') && ~isempty(obj.TableWindow) && isvalid(obj.TableWindow), delete(obj.TableWindow); end
+            if isprop(obj,'Review') && ~isempty(obj.Review) && isvalid(obj.Review), obj.Review.clear(); delete(obj.Review); end
+            if ~isempty(obj.Contrast) && isvalid(obj.Contrast), delete(obj.Contrast); end
             if ~isempty(obj.FramePreview) && isvalid(obj.FramePreview), delete(obj.FramePreview); end
             if ~isempty(obj.Preview) && isvalid(obj.Preview), delete(obj.Preview); end
         end
-        function navigate(obj,frame)
+        function navigate(obj,frame,continuous)
             c=obj.Controller; if c.Busy, return; end
+            if nargin<3 || ~continuous, obj.Playback.stop(); end
+            if obj.Rendering
+                if nargin<3 || ~continuous, obj.FramePreview.request(frame); end
+                return;
+            end
+            if obj.Follow.Value
+                row=find(c.Rows(:,1)==obj.PreferredID & c.Rows(:,2)==round(frame),1);
+                if ~isempty(row), c.Slice.Value=min(c.Source.nz,max(1,round(c.Rows(row,5)))); end
+            end
             obj.Preview.cancel(); c.Frame.Value=min(c.Source.nt,max(1,round(frame)));
             try
                 c.render();
             catch ME
                 if c.CacheFrame>0, c.Frame.Value=c.CacheFrame; end
-                c.Status.Text=ME.message; uialert(c.App.CELL_ID,ME.message,'Frame navigation');
+                obj.Playback.stop(); c.Status.Text=ME.message; uialert(c.App.CELL_ID,ME.message,'Frame navigation');
             end
         end
-        function fitAxes(~,ax)
-            Program.Helpers.fill_axes_parent(ax);
+        function fitAxes(obj,ax)
             if isgraphics(ax)
-                ax.OuterPosition = [0 0 1 1];
+                if isequal(ax,obj.Controller.Axes) || isequal(ax,obj.Projection)
+                    % Reserve space for labels when the image pane changes width.
+                    ax.Units='normalized'; ax.PositionConstraint='outerposition';
+                    ax.LooseInset=max(ax.TightInset,[.04 .10 .02 .06]);
+                    ax.OuterPosition=[0 0 1 1];
+                else
+                    Program.Helpers.fill_axes_parent(ax); ax.OuterPosition=[0 0 1 1];
+                end
                 daspect(ax,[1 1 1]);
             end
         end
@@ -150,7 +213,8 @@ classdef ReferenceView < handle
         function enterSlice(obj)
             c = obj.Controller;
             if c.Busy, return; end
-            c.Slice.Value = min(c.Source.nz,round(obj.SliceValue.Value)); obj.redraw();
+            obj.Follow.Value=false; obj.Preview.cancel();
+            c.Slice.Value = max(1,min(c.Source.nz,round(obj.SliceValue.Value))); obj.redraw();
         end
         function preview(obj,z)
             c = obj.Controller;
@@ -159,36 +223,60 @@ classdef ReferenceView < handle
         end
         function render(obj,requested_z)
             c = obj.Controller;
+            if obj.Rendering, obj.PendingRender=true; return; end
+            obj.Rendering=true; cleanup=onCleanup(@() obj.finishRender());
             if nargin<2, requested_z = c.Slice.Value; end
             volume = c.frameData(); z = max(1,min(c.Source.nz,round(requested_z)));
-            obj.SliceValue.Value = z;
-            key = [c.CacheFrame,c.Channel.Value];
+            if obj.SliceValue.Value~=z, obj.SliceValue.Value=z; end
+            range = obj.Contrast.getRange(volume);
+            obj.DisplayMinimum = range(1); obj.DisplayMaximum = range(2);
+            key = [c.CacheFrame,c.Channel.Value,range];
             if ~isequal(obj.DisplayKey,key)
-                obj.DisplayMaximum = max(1,double(max(volume,[],'all')));
                 obj.ProjectionPixels = obj.displayPixels(max(volume,[],3)); obj.DisplayKey = key;
             end
-            obj.drawImage(c.Axes,obj.displayPixels(volume(:,:,z)));
-            [~,name,extension] = fileparts(c.Source.file);
-            title(c.Axes,sprintf('%s%s · Frame %d · C%d · Z %d',name,extension,c.Frame.Value,c.Channel.Value,z),'Interpreter','none');
+            plane=volume(:,:,z);
+            if strcmp(obj.DisplayMode.Value,'Slab')
+                plane=max(volume(:,:,max(1,z-2):min(c.Source.nz,z+2)),[],3);
+            end
+            obj.drawImage(c.Axes,obj.displayPixels(plane));
+            mip=strcmp(obj.DisplayMode.Value,'MIP');
+            obj.SlicePanel.Visible=matlab.lang.OnOffSwitchState(~mip);
+            obj.ProjectionPanel.Visible=matlab.lang.OnOffSwitchState(mip);
+            title(c.Axes,sprintf('Frame %d · C%d · Z %d',c.Frame.Value,c.Channel.Value,z),'Interpreter','none','FontWeight','normal');
             obj.updateList();
             setappdata(c.Axes,'reference_label_boxes',zeros(0,4));
             obj.drawMarkers(c.Axes,obj.ListRows(obj.ListRows(:,8)==0,1:7),false,z); obj.drawMarkers(c.Axes,c.Candidates,true,z);
-            obj.drawROI(c.Axes,z);
+            obj.drawROI(c.Axes,z); obj.drawTrail(obj.Projection);
             projection_key = {key,obj.ListRows,obj.Selection,obj.Labels.Value,obj.LabelMode.Value,c.Excluded,obj.ShowROI.Value,c.Analysis.options()};
             if ~isequaln(obj.ProjectionKey,projection_key)
                 obj.drawImage(obj.Projection,obj.ProjectionPixels);
                 setappdata(obj.Projection,'reference_label_boxes',zeros(0,4));
                 obj.drawMarkers(obj.Projection,obj.ListRows(obj.ListRows(:,8)==0,1:7),false,[]); obj.drawMarkers(obj.Projection,c.Candidates,true,[]);
                 obj.drawROI(obj.Projection,[]);
+                title(obj.Projection,sprintf('Frame %d · C%d · MIP',c.Frame.Value,c.Channel.Value),'FontWeight','normal');
                 obj.ProjectionKey = projection_key;
             end
-            if ~isequaln(obj.TableRows,c.Rows), c.Table.Data=c.Rows; obj.TableRows=c.Rows; end
+            if ~isequaln(obj.TableRows,c.Rows)
+                c.Table.Data=c.Rows; obj.TableRows=c.Rows;
+                if ~isempty(obj.TableWindow) && isvalid(obj.TableWindow)
+                    table=findobj(obj.TableWindow,'Type','uitable'); table.Data=c.Rows;
+                end
+            end
             c.Status.Text = sprintf('Frame %d / %d · C%d · %d neurons · %d candidates', ...
                 c.Frame.Value,c.Source.nt,c.Channel.Value,numel(unique(c.Rows(:,1))),size(c.Candidates,1));
-            c.Analysis.render();
+            obj.drawTrail(c.Axes); obj.drawTrail(obj.Projection); obj.drawOrthogonal(volume);
+            obj.Playback.sync(); c.Analysis.render(); obj.Review.render();
+            obj.DetectionSummary.Text=sprintf('Frame %d · %d candidates',c.Frame.Value,size(c.Candidates,1));
+        end
+        function finishRender(obj)
+            obj.Rendering=false;
+            if obj.PendingRender
+                obj.PendingRender=false;
+                obj.Preview.request(obj.Controller.Slice.Value);
+            end
         end
         function pixels = displayPixels(obj,plane)
-            pixels = repmat(uint8(single(plane)*(255/obj.DisplayMaximum)),[1 1 3]);
+            pixels = Tracking.DisplayContrast.pixels(plane,[obj.DisplayMinimum obj.DisplayMaximum]);
         end
         function drawImage(obj,ax,pixels)
             c = obj.Controller;
@@ -222,7 +310,7 @@ classdef ReferenceView < handle
             if isempty(rows), return; end
             c = obj.Controller;
             keep = rows(:,2)==c.Frame.Value;
-            if ~isempty(z), keep = keep & abs(rows(:,5)-z)<1.5; end
+            if ~isempty(z), keep = keep & abs(rows(:,5)-z)<obj.sliceRadius(); end
             rows = rows(keep,:); if isempty(rows), return; end
             palette = Neurons.Neuron.marker_palette(); color = palette.unassigned;
             if pending, color = palette.candidate; end
@@ -302,6 +390,7 @@ classdef ReferenceView < handle
         function exclude(obj)
             c=obj.Controller;
             if c.Busy || isempty(obj.Selection) || obj.Selection(1), return; end
+            obj.Review.checkpoint();
             key=obj.Selection([2 3]); c.Excluded(ismember(c.Excluded,key,'rows'),:)=[];
             if obj.Exclude.Value, c.Excluded(end+1,:)=key; end
             obj.redraw();
@@ -319,6 +408,7 @@ classdef ReferenceView < handle
             obj.ListRows=[rows,zeros(size(rows,1),1);candidates,ones(size(candidates,1),1)];
             count = size(obj.ListRows,1);
             obj.Summary.Text = sprintf('%d neurons · %d candidates',nnz(obj.ListRows(:,8)==0),nnz(obj.ListRows(:,8)==1));
+            if ~any(obj.ListRows(:,8)), obj.Summary.Text=sprintf('%d neurons',count); end
             if count==0
                 obj.NeuronList.Items = {}; obj.NeuronList.ItemsData = []; obj.Selection = [];
             else
@@ -333,6 +423,10 @@ classdef ReferenceView < handle
                     index = find(obj.ListRows(:,8)==obj.Selection(1) & obj.ListRows(:,1)==obj.Selection(2) & obj.ListRows(:,2)==obj.Selection(3),1);
                 end
                 if isempty(index), index=find(obj.ListRows(:,1)==obj.PreferredID,1); end
+                if isempty(index) && any(c.Rows(:,1)==obj.PreferredID)
+                    set(obj.NeuronList,'Items',labels,'ItemsData',1:count,'Value',1);
+                    obj.Selection=[]; obj.ListKey=key; obj.setBusy(c.Busy); return;
+                end
                 if isempty(index), index=1; end
                 row = obj.ListRows(index,:); obj.Selection = [row(8),row(1),row(2)]; obj.PreferredID=row(1);
                 set(obj.NeuronList,'Items',labels,'ItemsData',1:count,'Value',index);
@@ -345,12 +439,21 @@ classdef ReferenceView < handle
             obj.setBusy(c.Busy);
         end
         function setBusy(obj,busy)
+            obj.Controller.Buttons.cancel.Visible=matlab.lang.OnOffSwitchState(busy);
+            obj.Contrast.setBusy(busy); obj.Playback.setBusy(busy);
+            if ~isempty(obj.Review) && ~isempty(obj.Review.Confirm)
+                obj.Review.Confirm.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(obj.Selection) && ~obj.Selection(1));
+                obj.Review.Undo.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(obj.Review.Snapshots));
+            end
+            for i=1:5, obj.Stages{i}.Enable=matlab.lang.OnOffSwitchState(~busy); end
+            handles={obj.DisplayMode,obj.Follow,obj.Trails,obj.XYZ};
+            for i=1:numel(handles), handles{i}.Enable=matlab.lang.OnOffSwitchState(~busy); end
             state = matlab.lang.OnOffSwitchState(~busy);
             obj.Labels.Enable = state; obj.LabelMode.Enable=state; obj.ShowROI.Enable=state; obj.NeuronList.Enable = state;
             obj.Exclude.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(obj.Selection) && ~obj.Selection(1));
             obj.SliceValue.Enable = matlab.lang.OnOffSwitchState(~busy && obj.Controller.Source.nz>1);
             for i=1:3
-                obj.Position{i}.Enable = matlab.lang.OnOffSwitchState(~isempty(obj.ListRows) && ~busy);
+                obj.Position{i}.Enable = matlab.lang.OnOffSwitchState(~isempty(obj.Selection) && ~busy);
             end
         end
         function chooseList(obj)
@@ -365,14 +468,14 @@ classdef ReferenceView < handle
             row = c.Rows(event.Indices(1),:); obj.select(row,false);
         end
         function select(obj,row,pending)
-            c = obj.Controller; obj.Selection = [pending,row(1),row(2)]; obj.PreferredID=row(1);
-            c.Frame.Value = row(2); c.Channel.Value = row(7); c.Slice.Value = min(c.Source.nz,max(1,round(row(5))));
+            c = obj.Controller; obj.Playback.stop(); obj.Selection = [pending,row(1),row(2)]; obj.PreferredID=row(1);
+            c.Frame.Value = row(2); if pending, c.Channel.Value = row(7); end; c.Slice.Value = min(c.Source.nz,max(1,round(row(5))));
             c.safe(@() c.render());
         end
         function markerClick(obj,ax,~,~)
             c=obj.Controller; if c.Busy, return; end
             rows=obj.ListRows;
-            if isequal(ax,c.Axes), rows=rows(abs(rows(:,5)-obj.SliceValue.Value)<1.5,:); end
+            if isequal(ax,c.Axes), rows=rows(abs(rows(:,5)-obj.SliceValue.Value)<obj.sliceRadius(),:); end
             if isempty(rows), return; end
             point=ax.CurrentPoint; distance=sum((rows(:,3:4)-point(1,1:2)).^2,2);
             nearby=find(distance<=min(distance)+4); index=nearby(1);
@@ -384,6 +487,7 @@ classdef ReferenceView < handle
         end
         function armAdd(obj)
             if obj.Controller.Busy, return; end
+            obj.Playback.stop(); obj.CorrectMode=false; obj.DisplayMode.Value='Slice'; obj.redraw();
             obj.AddMode = ~obj.AddMode;
             if obj.AddMode, obj.Controller.Buttons.add.Text = 'Click image…';
             else, obj.Controller.Buttons.add.Text = 'Add neuron'; end
@@ -391,7 +495,11 @@ classdef ReferenceView < handle
         function imageClick(obj,ax)
             c = obj.Controller; if c.Busy, return; end
             if obj.AddMode && ~isequal(ax,c.Axes), return; end
-            c.Cursor = ax.CurrentPoint;
+            obj.Playback.stop(); c.Cursor = ax.CurrentPoint;
+            if obj.CorrectMode && isequal(ax,c.Axes) && ~isempty(obj.Selection)
+                obj.correctAt([c.Cursor(1,1:2),round(c.Slice.Value)]);
+                return;
+            end
             if obj.AddMode
                 obj.AddMode = false; c.Buttons.add.Text = 'Add neuron';
                 c.safe(@() c.add());
@@ -405,6 +513,7 @@ classdef ReferenceView < handle
             if pending, rows = c.Candidates; else, rows = c.Rows; end
             index = find(rows(:,1)==obj.Selection(2) & rows(:,2)==obj.Selection(3),1);
             if isempty(index), return; end
+            obj.Review.checkpoint();
             rows(index,dimension+2) = value; rows(index,6)=1;
             if pending, c.Candidates=rows;
             else
@@ -415,6 +524,7 @@ classdef ReferenceView < handle
         end
         function removeSelection(obj)
             c=obj.Controller; if isempty(obj.Selection), return; end
+            obj.Review.checkpoint();
             identity=obj.Selection(2); pending=obj.Selection(1);
             selected=obj.ListRows(:,1)==identity & obj.ListRows(:,8)==pending;
             position=find(selected,1); remaining=obj.ListRows(~selected,:);

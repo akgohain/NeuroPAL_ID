@@ -12,11 +12,11 @@ for z=[1 8 25 13], w.Slice.Value=z; w.render(); end
 assert(isequal(w.Cache,cached));
 fprintf('REFERENCE_SLICE_SECONDS=%.3f\n',toc(started));
 w.Calibration.Value=true;
-w.Channel.Value=2;
+w.Channel.Value=2; w.DetectionChannel.Value=2;
 w.Buttons.detect.ButtonPushedFcn([],[]);
 assert(isempty(w.Candidates) && isempty(w.Rows) && ~w.Busy);
 fprintf('REFERENCE_BLANK_CHANNEL=PASS\n');
-w.Channel.Value=0;
+w.Channel.Value=0; w.DetectionChannel.Value=0;
 w.Buttons.detect.ButtonPushedFcn([],[]);
 assert(size(w.Candidates,1)>0 && isempty(w.Rows) && ~w.Busy);
 count=size(w.Candidates,1);

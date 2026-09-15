@@ -13,6 +13,7 @@ classdef FrameReader < handle
         Directory = ''
         Process = []
         Sequence = 0
+        Reading = false
     end
     methods
         function obj = FrameReader(source)
@@ -21,6 +22,8 @@ classdef FrameReader < handle
             obj.Capacity=max(1,min(5,floor(64*2^20/bytes)));
         end
         function pixels = read(obj,frame)
+            if obj.Reading, error('Tracking:FrameReaderBusy','A frame read is already in progress.'); end
+            obj.Reading=true; cleanup=onCleanup(@() obj.finishRead());
             s=obj.Source;
             if ~isscalar(frame) || ~isfinite(frame) || frame~=round(frame) || frame<1 || frame>s.nt
                 error('Tracking:Frame','Frame index is outside recording');
@@ -53,28 +56,35 @@ classdef FrameReader < handle
             if numel(obj.Frames)>obj.Capacity, obj.Frames(1)=[]; obj.Pixels(1)=[]; end
         end
         function pixels = readPython(obj,frame)
-            if isempty(obj.Process)
-                obj.Directory=tempname; mkdir(obj.Directory);
-                obj.writeJSON('source.json',obj.Source);
-                root=fileparts(fileparts(mfilename('fullpath')));
-                command={Tracking.ReferenceWorkflow.python(),'-u',fullfile(root,'+Wrapper','reference_frame_server.py'), ...
-                    '--directory',obj.Directory,'--parent',num2str(feature('getpid'))};
-                args=java.util.ArrayList;
-                for i=1:numel(command), args.add(java.lang.String(command{i})); end
-                builder=java.lang.ProcessBuilder(args); builder.redirectErrorStream(true);
-                builder.redirectOutput(java.io.File(fullfile(obj.Directory,'reader.log')));
-                obj.Process=builder.start(); obj.wait('ready.json');
+            try
+                if isempty(obj.Process)
+                    obj.Directory=tempname; mkdir(obj.Directory);
+                    obj.writeJSON('source.json',obj.Source);
+                    root=fileparts(fileparts(mfilename('fullpath')));
+                    command={Tracking.ReferenceWorkflow.python(),'-u',fullfile(root,'+Wrapper','reference_frame_server.py'), ...
+                        '--directory',obj.Directory,'--parent',num2str(feature('getpid'))};
+                    args=java.util.ArrayList;
+                    for i=1:numel(command), args.add(java.lang.String(command{i})); end
+                    builder=java.lang.ProcessBuilder(args); builder.redirectErrorStream(true);
+                    builder.redirectOutput(java.io.File(fullfile(obj.Directory,'reader.log')));
+                    obj.Process=builder.start(); obj.wait('ready.json');
+                end
+                obj.Sequence=obj.Sequence+1;
+                obj.writeJSON('request.json',struct('frame',frame-1,'sequence',obj.Sequence));
+                response=obj.wait('response.json');
+                if response.sequence~=obj.Sequence, error('Tracking:Frame','Frame reader response is out of sequence'); end
+                fid=fopen(fullfile(obj.Directory,'frame.bin'),'r');
+                if fid<0, error('Tracking:Frame','Could not read the frame buffer'); end
+                cleanup=onCleanup(@() fclose(fid)); s=obj.Source;
+                shape=[s.ny s.nx s.nz s.nc]; raw=fread(fid,prod(shape),['*' s.dtype]);
+                if numel(raw)~=prod(shape), error('Tracking:Frame','Frame buffer is incomplete'); end
+                pixels=reshape(raw,shape);
+            catch ME
+                obj.resetTransport(); rethrow(ME);
             end
-            obj.Sequence=obj.Sequence+1;
-            obj.writeJSON('request.json',struct('frame',frame-1,'sequence',obj.Sequence));
-            response=obj.wait('response.json');
-            if response.sequence~=obj.Sequence, error('Tracking:Frame','Frame reader response is out of sequence'); end
-            fid=fopen(fullfile(obj.Directory,'frame.bin'),'r');
-            if fid<0, error('Tracking:Frame','Could not read the frame buffer'); end
-            cleanup=onCleanup(@() fclose(fid)); s=obj.Source;
-            shape=[s.ny s.nx s.nz s.nc]; raw=fread(fid,prod(shape),['*' s.dtype]);
-            if numel(raw)~=prod(shape), error('Tracking:Frame','Frame buffer is incomplete'); end
-            pixels=reshape(raw,shape);
+        end
+        function finishRead(obj)
+            obj.Reading=false;
         end
         function value = wait(obj,name)
             path=fullfile(obj.Directory,name); started=tic;
@@ -93,13 +103,17 @@ classdef FrameReader < handle
             fwrite(fid,jsonencode(value)); clear cleanup
             movefile(temporary,path,'f');
         end
-        function delete(obj)
+        function resetTransport(obj)
             if ~isempty(obj.Process) && obj.Process.isAlive()
                 obj.Process.destroy();
                 obj.Process.waitFor(2,java.util.concurrent.TimeUnit.SECONDS);
                 if obj.Process.isAlive(), obj.Process.destroyForcibly(); end
             end
             if isfolder(obj.Directory), rmdir(obj.Directory,'s'); end
+            obj.Process=[]; obj.Directory=''; obj.Sequence=0;
+        end
+        function delete(obj)
+            obj.resetTransport();
         end
     end
 end
