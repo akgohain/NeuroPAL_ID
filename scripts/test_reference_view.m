@@ -13,7 +13,7 @@ end
 image = getappdata(w.Axes,'main_slice_image');
 projection = getappdata(v.Projection,'main_slice_image');
 cached = w.Cache;
-projection_markers = findobj(v.Projection,'Tag','reference_neurons');
+projection_markers = findobj(v.Projection,'-regexp','Tag','^reference_neurons_');
 for z=[1 w.Source.nz 13]
     w.Slice.Value=z; w.render();
     visible = sum(abs(candidates(:,5)-z)<1.5);
@@ -21,7 +21,7 @@ for z=[1 w.Source.nz 13]
     assert(isequal(getappdata(w.Axes,'main_slice_image'),image));
     assert(isequal(getappdata(v.Projection,'main_slice_image'),projection));
     assert(isequal(w.Cache,cached));
-    assert(isequal(findobj(v.Projection,'Tag','reference_neurons'),projection_markers));
+    assert(isequal(findobj(v.Projection,'-regexp','Tag','^reference_neurons_'),projection_markers));
 end
 if w.Source.nc>1
     w.Channel.Value=mod(candidates(1,7)+1,w.Source.nc); w.render();
@@ -32,7 +32,7 @@ v.NeuronList.Value=2; v.NeuronList.ValueChangedFcn([],[]);
 assert(w.Slice.Value==round(candidates(2,5)) && ~w.Busy);
 assert(strcmp(v.Position{1}.Enable,'on'));
 assert(isequal(v.Selection,[1 candidates(2,1:2)]));
-points = findobj(w.Axes,'Tag','reference_neurons');
+points = findobj(w.Axes,'-regexp','Tag','^reference_neurons_');
 assert(any(all(points.CData==Neurons.Neuron.marker_palette().selected,2)));
 v.Position{1}.Value=candidates(2,3)+.125; v.Position{1}.ValueChangedFcn([],[]);
 assert(w.Candidates(2,3)==candidates(2,3)+.125);
@@ -54,7 +54,7 @@ v.select(w.Rows(end,:),false); w.Buttons.remove.ButtonPushedFcn([],[]);
 assert(isequal(w.Rows,rows));
 v.Labels.Value=false; v.Labels.ValueChangedFcn([],[]);
 assert(isempty(findobj(v.Projection,'Tag','reference_label')));
-assert(~isempty(findobj(v.Projection,'Tag','reference_neurons')));
+assert(~isempty(findobj(v.Projection,'-regexp','Tag','^reference_neurons_')));
 fprintf('REFERENCE_VIEW_SELECTION_EDIT_SAVE_RELOAD=PASS\n');
 end
 function restore(w,candidates,next_id)

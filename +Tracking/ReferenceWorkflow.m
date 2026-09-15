@@ -22,6 +22,7 @@ classdef ReferenceWorkflow < handle
         NextID = 1
         Cache = []
         CacheFrame = 0
+        Reader
         Busy = false
         Cancelled = false
         Provenance = struct()
@@ -108,6 +109,7 @@ classdef ReferenceWorkflow < handle
             app.CELL_ID.CloseRequestFcn = @(src,event) obj.closeSession(src,event);
             obj.OutputRoot = fullfile(prefdir,'NeuroPAL','reference-jobs');
             app.VideoGridLayout.Visible = 'off';
+            obj.Reader = Tracking.FrameReader(info);
             obj.View = Tracking.ReferenceView(obj);
             app.VideoTrackingTab.Tag = 'rendered'; app.TabGroup.SelectedTab = app.VideoTrackingTab;
             obj.render();
@@ -115,6 +117,7 @@ classdef ReferenceWorkflow < handle
             if info.nz==1, obj.Slice.Enable = 'off'; end
         end
         function delete(obj)
+            if ~isempty(obj.Reader) && isvalid(obj.Reader), delete(obj.Reader); end
             if ~isempty(obj.Analysis) && isvalid(obj.Analysis), delete(obj.Analysis); end
             if ~isempty(obj.View) && isvalid(obj.View), delete(obj.View); end
             if ~isempty(obj.App) && isvalid(obj.App) && isvalid(obj.App.CELL_ID)
@@ -181,10 +184,7 @@ classdef ReferenceWorkflow < handle
             t = round(obj.Frame.Value); obj.Frame.Value = min(obj.Source.nt,t);
             t = obj.Frame.Value;
             if t ~= obj.CacheFrame
-                file = [tempname '.bin']; cleanup = onCleanup(@() obj.removeFile(file));
-                response = obj.bridge(struct('action','frame','source',obj.Source,'frame_index',t-1,'output_raw',file),@() obj.Cancelled || ~isvalid(obj.App));
-                fid = fopen(file,'r'); guard = onCleanup(@() fclose(fid));
-                obj.Cache = reshape(fread(fid,prod(response.shape_yxzc),['*' response.dtype]),response.shape_yxzc(:)');
+                obj.Cache = obj.Reader.read(t);
                 obj.CacheFrame = t;
             end
             volume = obj.Cache(:,:,:,obj.Channel.Value+1);

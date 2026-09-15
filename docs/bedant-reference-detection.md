@@ -67,12 +67,14 @@ ZephIR coordinates use `t_idx = frame - 1` and `(coordinate - 0.5) / dimension`.
 
 Set `NEUROPAL_VIDEO_PYTHON` to a Python environment with NumPy, h5py and the application's ZephIR dependencies (`requirements-macos.txt` / `requirements.txt`). Existing local setups also check `NEUROPAL_YOLO_PYTHON` and the sibling `.venv-ai-pipeline` environment. MoE uses its configured bundle and interpreter; install the frozen bundle with `scripts/install_moe_bundle.py`. Weights and recordings are not committed to Git.
 
-The viewer caches one frame (about 6.4 MiB for Bedant's recording). Image handles and the unchanged projection are reused during Z navigation. Frame/chunk reads are limited to 256 MiB; each staged tracking window must fit 1 GiB plus disk reserve. Window sizes are 2–100 frames, with CPU ZephIR and 40 epochs by default. The full recording is processed as multiple windows rather than one large image allocation.
+The viewer keeps an LRU cache of up to five frames (about 32 MiB for Bedant's recording), targeting a 64 MiB cache budget with at least one frame. MATLAB reads supported H5 filters directly; LZF recordings use a persistent h5py reader that closes with the session and exits if MATLAB disappears. Scrubbing coalesces pending requests so the final requested frame wins. Images, marker groups and activity cursors reuse their graphics handles. The trace is rebuilt only when the selected neuron, plot mode or analysis changes. Frame/chunk reads are limited to 256 MiB; each staged tracking window must fit 1 GiB plus disk reserve. Window sizes are 2–100 frames, with CPU ZephIR and 40 epochs by default. The full recording is processed as multiple windows rather than one large image allocation.
 
 Fluorescence arrays, ROI neighborhoods, worker memory, logs and process lifetimes have explicit bounds. The existing supervisor enforces cancellation and prevents simultaneous heavy jobs. Default workspaces are under MATLAB's `prefdir/NeuroPAL/reference-jobs`. A failed or canceled tracking run preserves its last completed checkpoint and logs.
 
 ## Validation entry points
 
+- `scripts/test_reference_frame_server.py`: persistent transport parity, axis order, singleton dimensions, invalid requests, changed-source rejection and shutdown. With `--fixtures OUTPUT_DIR RECORDING`, prepares fixtures for `test_frame_navigation(w, OUTPUT_DIR)` in MATLAB; the navigation test uses Bedant’s full session.
+- `scripts/test_frame_navigation.m`: real-frame pixel parity, bounded LRU eviction, graphics reuse and latest-frame coalescing.
 - `scripts/test_reference_video.py`: native/legacy layout, exact coordinate round-trip, identity preservation and invalid/source-change inputs.
 - `scripts/test_single_channel_moe.py`: selected-channel isolation and model input adaptation.
 - `scripts/test_reference_analysis.py`: known fluorescence/background/baselines, ratios, missing/excluded samples, overlap ownership, saturation, clipping and interrupted/resumed tracking.

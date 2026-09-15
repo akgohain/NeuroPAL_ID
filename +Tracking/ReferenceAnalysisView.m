@@ -14,6 +14,7 @@ classdef ReferenceAnalysisView < handle
         Coverage
         Colorbar = []
         ResultOptions = struct()
+        FrameCursor = []
     end
     methods
         function obj = ReferenceAnalysisView(c,tabs,lower_tabs)
@@ -99,8 +100,11 @@ classdef ReferenceAnalysisView < handle
             identity=c.View.PreferredID;
             index=find(obj.IDs==identity,1);
             if isempty(index), index=1; identity=obj.IDs(1); end
-            key={file,identity,c.Frame.Value,obj.Mode.Value,c.activityCurrent()};
-            if isequaln(obj.PlotKey,key), return; end
+            key={file,identity,obj.Mode.Value,c.activityCurrent()};
+            if strcmp(obj.Mode.Value,'Population ΔF/F'), key{2}=[]; end
+            if isequaln(obj.PlotKey,key) && isgraphics(obj.FrameCursor)
+                obj.FrameCursor.Value=c.Frame.Value; return
+            end
             if ~isempty(obj.Colorbar) && isvalid(obj.Colorbar), delete(obj.Colorbar); obj.Colorbar=[]; end
             cla(obj.Axes); hold(obj.Axes,'on');
             nt=numel(obj.Frames); population=strcmp(obj.Mode.Value,'Population ΔF/F');
@@ -137,7 +141,7 @@ classdef ReferenceAnalysisView < handle
             end
             if ~c.activityCurrent(), title(obj.Axes,'Measurements out of date — extract again'); end
             xlim(obj.Axes,[obj.Frames(1)-.5 obj.Frames(end)+.5]); xlabel(obj.Axes,'Frame');
-            xline(obj.Axes,c.Frame.Value,'Color',[.5 .5 .5],'HitTest','off');
+            obj.FrameCursor=xline(obj.Axes,c.Frame.Value,'Color',[.5 .5 .5],'HitTest','off','Tag','activity_cursor');
             obj.Axes.ButtonDownFcn=@(~,~) obj.seek(population); hold(obj.Axes,'off'); obj.PlotKey=key;
         end
         function seek(obj,population)

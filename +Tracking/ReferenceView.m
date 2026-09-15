@@ -10,6 +10,10 @@ classdef ReferenceView < handle
         Labels
         SliceValue
         Preview
+        FramePreview
+        IndexedRows = []
+        FrameIndices = {}
+        TableRows = []
         AddMode = false
         DisplayKey = []
         DisplayMaximum = 1
@@ -33,7 +37,7 @@ classdef ReferenceView < handle
             toolbar.ColumnWidth = {40,75,50,80,105,115,70,'1x',75,100};
             uilabel(toolbar,'Text','Frame');
             c.Frame = uispinner(toolbar,'Limits',[1 max(2,c.Source.nt)],'Value',1, ...
-                'Step',1,'ValueChangedFcn',@(~,~) c.safe(@() c.render()));
+                'Step',1);
             uilabel(toolbar,'Text','Channel');
             c.Channel = uidropdown(toolbar,'Items',cellstr("C"+string(0:c.Source.nc-1)), ...
                 'ItemsData',0:c.Source.nc-1,'Value',0,'ValueChangedFcn',@(~,~) c.safe(@() c.render()));
@@ -111,12 +115,27 @@ classdef ReferenceView < handle
             c.Status = uilabel(c.Grid,'Text',''); c.Status.Layout.Row = 3; c.Status.Layout.Column = [1 2];
             obj.Preview = Program.LatestSlicePreview(@(z) obj.preview(z), ...
                 @(~,~) obj.redraw(),@() {c.Source.source_id,c.Frame.Value,c.Channel.Value,c.Busy},c.Grid);
+            obj.FramePreview=Program.LatestSlicePreview(@(t) obj.navigate(t), ...
+                @(src,~) obj.navigate(src.Value),@() {c.Source.source_id,c.Busy},c.Grid);
+            c.Frame.ValueChangingFcn=@(~,event) obj.FramePreview.request(event.Value);
+            c.Frame.ValueChangedFcn=@(src,event) obj.FramePreview.finish(src,event);
             c.Slice.ValueChangingFcn = @(~,event) obj.Preview.request(event.Value);
             c.Slice.ValueChangedFcn = @(src,event) obj.Preview.finish(src,event);
             obj.fitAxes(c.Axes); obj.fitAxes(obj.Projection);
         end
         function delete(obj)
+            if ~isempty(obj.FramePreview) && isvalid(obj.FramePreview), delete(obj.FramePreview); end
             if ~isempty(obj.Preview) && isvalid(obj.Preview), delete(obj.Preview); end
+        end
+        function navigate(obj,frame)
+            c=obj.Controller; if c.Busy, return; end
+            obj.Preview.cancel(); c.Frame.Value=min(c.Source.nt,max(1,round(frame)));
+            try
+                c.render();
+            catch ME
+                if c.CacheFrame>0, c.Frame.Value=c.CacheFrame; end
+                c.Status.Text=ME.message; uialert(c.App.CELL_ID,ME.message,'Frame navigation');
+            end
         end
         function fitAxes(~,ax)
             Program.Helpers.fill_axes_parent(ax);
@@ -153,17 +172,17 @@ classdef ReferenceView < handle
             title(c.Axes,sprintf('%s%s · Frame %d · C%d · Z %d',name,extension,c.Frame.Value,c.Channel.Value,z),'Interpreter','none');
             obj.updateList();
             setappdata(c.Axes,'reference_label_boxes',zeros(0,4));
-            obj.drawMarkers(c.Axes,c.Rows,false,z); obj.drawMarkers(c.Axes,c.Candidates,true,z);
+            obj.drawMarkers(c.Axes,obj.ListRows(obj.ListRows(:,8)==0,1:7),false,z); obj.drawMarkers(c.Axes,c.Candidates,true,z);
             obj.drawROI(c.Axes,z);
             projection_key = {key,obj.ListRows,obj.Selection,obj.Labels.Value,obj.LabelMode.Value,c.Excluded,obj.ShowROI.Value,c.Analysis.options()};
             if ~isequaln(obj.ProjectionKey,projection_key)
                 obj.drawImage(obj.Projection,obj.ProjectionPixels);
                 setappdata(obj.Projection,'reference_label_boxes',zeros(0,4));
-                obj.drawMarkers(obj.Projection,c.Rows,false,[]); obj.drawMarkers(obj.Projection,c.Candidates,true,[]);
+                obj.drawMarkers(obj.Projection,obj.ListRows(obj.ListRows(:,8)==0,1:7),false,[]); obj.drawMarkers(obj.Projection,c.Candidates,true,[]);
                 obj.drawROI(obj.Projection,[]);
                 obj.ProjectionKey = projection_key;
             end
-            if ~isequaln(c.Table.Data,c.Rows), c.Table.Data = c.Rows; end
+            if ~isequaln(obj.TableRows,c.Rows), c.Table.Data=c.Rows; obj.TableRows=c.Rows; end
             c.Status.Text = sprintf('Frame %d / %d · C%d · %d neurons · %d candidates', ...
                 c.Frame.Value,c.Source.nt,c.Channel.Value,numel(unique(c.Rows(:,1))),size(c.Candidates,1));
             c.Analysis.render();
@@ -175,7 +194,13 @@ classdef ReferenceView < handle
             c = obj.Controller;
             scale = [1 1];
             if c.Source.spacing_measured, scale = c.Source.spacing_um_xyz(1:2); end
-            [image,configure] = Program.Helpers.main_slice_image(ax,pixels,scale,false);
+            image=getappdata(ax,'main_slice_image');
+            if isgraphics(image,'image')
+                image.CData=pixels; configure=false;
+                delete(findobj(ax,'Tag','reference_label'));
+            else
+                [image,configure] = Program.Helpers.main_slice_image(ax,pixels,scale,false);
+            end
             if configure
                 obj.fitAxes(ax); ax.YDir = 'reverse';
                 Program.Helpers.configure_image_axes_ticks(ax,size(pixels),scale,'XLim',[.5 c.Source.nx+.5],'YLim',[.5 c.Source.ny+.5]);
@@ -192,6 +217,8 @@ classdef ReferenceView < handle
             image.HitTest = 'on'; image.ButtonDownFcn = @(~,~) obj.imageClick(ax);
         end
         function drawMarkers(obj,ax,rows,pending,z)
+            points=findobj(ax,'Tag',sprintf('reference_neurons_%d',pending));
+            if ~isempty(points), points.Visible='off'; end
             if isempty(rows), return; end
             c = obj.Controller;
             keep = rows(:,2)==c.Frame.Value;
@@ -210,9 +237,15 @@ classdef ReferenceView < handle
             excluded=ismember(rows(:,[1 2]),c.Excluded,'rows');
             colors(excluded,:)=repmat([.55 .55 .55],nnz(excluded),1);
             order=[find(~selected);find(selected)];
-            points=scatter(ax,rows(order,3),rows(order,4),sizes(order)*size_scale,colors(order,:),'filled', ...
-                'MarkerEdgeColor',c.App.neuron_marker.color.edge,'LineWidth',prefs.line*line_scale, ...
-                'MarkerFaceAlpha',.8,'Tag','reference_neurons');
+            if isempty(points)
+                points=scatter(ax,rows(order,3),rows(order,4),sizes(order)*size_scale,colors(order,:),'filled', ...
+                    'MarkerEdgeColor',c.App.neuron_marker.color.edge,'LineWidth',prefs.line*line_scale, ...
+                    'MarkerFaceAlpha',.8,'Tag',sprintf('reference_neurons_%d',pending));
+            else
+                set(points,'XData',rows(order,3),'YData',rows(order,4),'SizeData',sizes(order)*size_scale, ...
+                    'CData',colors(order,:),'Visible','on','MarkerEdgeColor',c.App.neuron_marker.color.edge, ...
+                    'LineWidth',prefs.line*line_scale);
+            end
             points.ButtonDownFcn=@(~,~) obj.markerClick(ax,rows,pending);
             if obj.Labels.Value
                 for i=[find(selected);find(~selected)]'
@@ -246,7 +279,8 @@ classdef ReferenceView < handle
             if fits, setappdata(ax,'reference_label_boxes',[boxes;box]); end
         end
         function drawROI(obj,ax,z)
-            c=obj.Controller;
+            c=obj.Controller; outline=findobj(ax,'Tag','reference_roi');
+            if ~isempty(outline), outline.Visible='off'; end
             if ~obj.ShowROI.Value || isempty(obj.Selection), return; end
             index=find(obj.ListRows(:,1)==obj.Selection(2),1);
             radius=sscanf(c.Analysis.Controls.radius.Value,'%f')';
@@ -258,8 +292,12 @@ classdef ReferenceView < handle
                 factor=sqrt(1-fraction^2);
             end
             theta=linspace(0,2*pi,64);
-            plot(ax,row(3)+radius(1)*factor*cos(theta),row(4)+radius(2)*factor*sin(theta), ...
-                'Color',[1 1 1],'LineWidth',.75,'HitTest','off','Tag','reference_roi');
+            x=row(3)+radius(1)*factor*cos(theta); y=row(4)+radius(2)*factor*sin(theta);
+            if isempty(outline)
+                plot(ax,x,y,'Color',[1 1 1],'LineWidth',.75,'HitTest','off','Tag','reference_roi');
+            else
+                set(outline,'XData',x,'YData',y,'Visible','on');
+            end
         end
         function exclude(obj)
             c=obj.Controller;
@@ -273,8 +311,12 @@ classdef ReferenceView < handle
             c = obj.Controller;
             key = {c.Frame.Value,c.Channel.Value,c.Rows,c.Candidates,obj.Selection,c.Excluded};
             if isequaln(obj.ListKey,key), return; end
-            obj.ListRows = [c.Rows,zeros(size(c.Rows,1),1);c.Candidates,ones(size(c.Candidates,1),1)];
-            obj.ListRows = obj.ListRows(obj.ListRows(:,2)==c.Frame.Value,:);
+            if ~isequaln(obj.IndexedRows,c.Rows) || isempty(obj.FrameIndices)
+                obj.FrameIndices=accumarray(c.Rows(:,2),(1:size(c.Rows,1))',[c.Source.nt 1],@(indices) {indices},{[]});
+                obj.IndexedRows=c.Rows;
+            end
+            rows=c.Rows(obj.FrameIndices{c.Frame.Value},:); candidates=c.Candidates(c.Candidates(:,2)==c.Frame.Value,:);
+            obj.ListRows=[rows,zeros(size(rows,1),1);candidates,ones(size(candidates,1),1)];
             count = size(obj.ListRows,1);
             obj.Summary.Text = sprintf('%d neurons · %d candidates',nnz(obj.ListRows(:,8)==0),nnz(obj.ListRows(:,8)==1));
             if count==0
