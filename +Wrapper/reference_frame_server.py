@@ -9,7 +9,7 @@ import time
 import h5py
 import numpy as np
 
-from reference_video import source_info
+from reference_video import source_info, frame_from_file
 
 
 def publish(path, value):
@@ -42,11 +42,7 @@ def serve(directory, parent):
                 frame = message['frame']
                 if not isinstance(frame, int) or not 0 <= frame < info['nt']:
                     raise ValueError('Frame index is outside recording')
-                raw = source['data'][frame]
-                if info['axis_order'] == 'TCZXY':
-                    raw = raw.transpose(0, 1, 3, 2)
-                if not np.isfinite(raw).all():
-                    raise ValueError('Selected frame contains nonfinite values')
+                raw = frame_from_file(source,info,frame)
                 # MATLAB receives YXZC in column-major order, including singleton axes.
                 raw.transpose(2, 3, 1, 0).ravel(order='F').tofile(directory / 'frame.bin')
                 del raw

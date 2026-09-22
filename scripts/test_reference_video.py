@@ -71,6 +71,14 @@ class ReferenceTests(unittest.TestCase):
         self.assertEqual(result[0]['channel'],1)
         self.assertEqual(result[0]['track_id'],3)
 
+    def test_subpixel_image_footprint(self):
+        rows=[dict(track_id=i+1,t=1,x=x,y=2,z=2,confidence=0,provenance='zephir') for i,x in enumerate((.5,.75,9.495,9.5))]
+        result=bridge.export_seeds(dict(source=self.info,observations=rows,output_dir=str(self.root),provenance={}))
+        restored=bridge.read_seeds(result['directory'],self.info)
+        self.assertEqual([r['x'] for r in restored],[r['x'] for r in rows])
+        for x in (.49,9.51):
+            with self.assertRaises(ValueError):bridge.validate_observations([dict(rows[0],x=x)],self.info)
+
     def test_invalid_inputs(self):
         row=dict(track_id=1,t=1,x=1,y=1,z=1,confidence=1)
         for change in (dict(x=0),dict(z=5),dict(t=0),dict(x=float('nan')),dict(track_id=0)):

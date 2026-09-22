@@ -35,11 +35,15 @@ classdef FrameReader < handle
             else
                 if strcmp(obj.Backend,'native')
                     try
-                        if strcmp(s.axis_order,'TCZYX')
-                            raw=h5read(s.file,'/data',[1 1 1 1 frame],[s.nx s.ny s.nz s.nc 1]);
+                        data_path='/data'; if isfield(s,'data_path'), data_path=s.data_path; end
+                        if strcmp(s.axis_order,'TXYZC')
+                            raw=h5read(s.file,data_path,[1 1 1 1 frame],[s.nc s.nz s.ny s.nx 1]);
+                            pixels=permute(reshape(raw,[s.nc s.nz s.ny s.nx]),[3 4 2 1]);
+                        elseif strcmp(s.axis_order,'TCZYX')
+                            raw=h5read(s.file,data_path,[1 1 1 1 frame],[s.nx s.ny s.nz s.nc 1]);
                             pixels=permute(reshape(raw,[s.nx s.ny s.nz s.nc]),[2 1 3 4]);
                         else
-                            raw=h5read(s.file,'/data',[1 1 1 1 frame],[s.ny s.nx s.nz s.nc 1]);
+                            raw=h5read(s.file,data_path,[1 1 1 1 frame],[s.ny s.nx s.nz s.nc 1]);
                             pixels=reshape(raw,[s.ny s.nx s.nz s.nc]);
                         end
                     catch

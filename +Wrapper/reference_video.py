@@ -14,6 +14,9 @@ import h5py
 
 def source_info(path):
     path = Path(path).resolve()
+    if path.suffix.lower() == '.nwb':
+        from reference_nwb import source_info as nwb_info
+        return nwb_info(path)
     sidecar = path.parent / 'metadata.json'
     metadata = json.loads(sidecar.read_text()) if sidecar.is_file() else {}
     with h5py.File(path, 'r') as f:
@@ -67,12 +70,29 @@ def read_frame(info, frame, channel=None):
     frame = int(frame)
     if channel is not None: channel = int(channel)
     with h5py.File(info['file'], 'r') as f:
-        raw = f['data'][frame] if channel is None else f['data'][frame, channel:channel+1]
-    if info['axis_order'] == 'TCZXY':
-        raw = raw.transpose(0, 1, 3, 2)
+        return frame_from_file(f, info, frame, channel)
+
+
+
+def frame_from_file(source, info, frame, channel=None):
+    data = source[info.get('data_path', '/data')]
+    if info['axis_order'] == 'TXYZC':
+        raw = data[frame] if channel is None else data[frame, :, :, :, channel:channel+1]
+        raw = raw.transpose(3, 2, 1, 0)
+    else:
+        raw = data[frame] if channel is None else data[frame, channel:channel+1]
+        if info['axis_order'] == 'TCZXY': raw = raw.transpose(0, 1, 3, 2)
     if not np.isfinite(raw).all():
         raise ValueError('Selected frame contains nonfinite values')
     return raw
+
+
+
+def frame_times(source, info, first, last):
+    if not info.get('has_times'): return np.full(last-first+1, np.nan)
+    if 'frame_interval_seconds' in info:
+        return info.get('time_start', 0) + np.arange(first,last+1)*info['frame_interval_seconds']
+    return source[info.get('times_path','/times')][first:last+1]
 
 
 def validate_observations(rows, info):
@@ -88,7 +108,8 @@ def validate_observations(rows, info):
         if int(row['t']) != row['t'] or not 1 <= row['t'] <= info['nt']:
             raise ValueError('Frame must be a one-based integer')
         for key in 'xyz':
-            if not 1 <= row[key] <= info['n'+key]:
+            # Integer values are voxel centers; subpixel positions can reach outer edges.
+            if not .5 <= row[key] <= info['n'+key]+.5:
                 raise ValueError('Seed outside source volume: ' + key)
         if not 0 <= row['confidence'] <= 1:
             raise ValueError('Invalid confidence')
@@ -213,6 +234,9 @@ def run(request):
             raise ValueError('Incomplete tracking output has no source frame mapping')
         validate_observations(rows,info)
         return dict(observations=rows, provenance=saved.get('detection',{}) if saved else {})
+    if action == 'align_neuropal':
+        from reference_nwb import align_reference
+        return align_reference(request)
     if action == 'track': return track(request)
     if action in ('track_sequence','activity'):
         import reference_analysis
@@ -262,7 +286,7 @@ def track(request):
         for i,t in enumerate(range(first,last+1)):
             d[i] = read_frame(info,t,channel)
         with h5py.File(info['file'],'r') as src:
-            if info.get('has_times'): f['times'] = src['times'][first:last+1]
+            if info.get('has_times'): f['times'] = frame_times(src,info,first,last)
     write_seed_files(stage,rows,local,request.get('provenance',{}))
     # Supplied coordinates anchor this window; the sidecar retains their provenance.
     with h5py.File(stage/'annotations.h5','r+') as annotations:

@@ -11,7 +11,7 @@ import sys
 import tempfile
 import numpy as np
 import h5py
-from reference_video import source_info, read_frame, validate_observations, write_seed_files
+from reference_video import source_info, read_frame, validate_observations, write_seed_files, frame_from_file, frame_times
 
 
 def atomic_json(path, value):
@@ -229,7 +229,7 @@ def activity(request):
     if shell_budget>250000 or core_budget>1000000:
         raise MemoryError('ROI neighborhoods exceed the analysis memory budget; use smaller radii or fewer neurons')
     with h5py.File(info['file'],'r') as source:
-        times=source['times'][first:last+1] if info.get('has_times') else np.full(nt,np.nan)
+        times=frame_times(source,info,first,last)
         for ti,t in enumerate(range(first,last+1)):
             current=by_frame.get(t,{})
             cores={}; owners={}; occupied=set()
@@ -248,9 +248,7 @@ def activity(request):
                     if previous is not None:
                         flags[ti,j]|=FLAGS['overlap']; flags[ti,previous[1]]|=FLAGS['overlap']
                     if previous is None or distance<previous[0]: owners[int(voxel)]=(distance,j)
-            volume=np.asarray(source['data'][t])
-            if info['axis_order']=='TCZXY': volume=volume.transpose(0,1,3,2)
-            if not np.isfinite(volume).all(): raise ValueError(f'Nonfinite image values at frame {t+1}')
+            volume=frame_from_file(source,info,t)
             values=volume[channels].reshape(len(channels),-1)
             ceiling=np.iinfo(volume.dtype).max if volume.dtype.kind in 'ui' else np.inf
             for j,core in cores.items():
