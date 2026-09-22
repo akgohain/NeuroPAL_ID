@@ -9,9 +9,12 @@ end
 
 switch layout
     case 'data'
-        plane = squeeze(h5read(file, '/data', ...
-            [1 1 z c t], [video_info.ny video_info.nx 1 1 1]));
-        plane = reshape(plane, video_info.ny, video_info.nx);
+        dims = [video_info.ny video_info.nx];
+        swapped = isfield(video_info, 'transpose_xy') && video_info.transpose_xy;
+        if swapped, dims = fliplr(dims); end
+        plane = h5read(file, '/data', [1 1 z c t], [dims 1 1 1]);
+        plane = reshape(plane, dims);
+        if swapped, plane = plane'; end
     case 'grouped-tc'
         time_idx = local_index_value(video_info, 'time_indices', t);
         channel_idx = local_index_value(video_info, 'channel_indices', c);

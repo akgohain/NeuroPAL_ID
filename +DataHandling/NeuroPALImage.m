@@ -29,16 +29,18 @@ classdef NeuroPALImage
     
     %% Public methods.
     methods (Static)
-        function [data, info, prefs, worm, mp, neurons, np_file, id_file] = open(file)
+        function [data, info, prefs, worm, mp, neurons, np_file, id_file] = open(file, parent_token)
             %OPEN Open an image in NeuroPAL format.
-            np_file = DataHandling.NeuroPALImage.prepare(file);
+            if nargin < 2, parent_token = ''; end
+            np_file = DataHandling.NeuroPALImage.prepare(file, parent_token);
             [data, info, prefs, worm, mp, neurons, id_file] = ...
                 DataHandling.NeuroPALImage.loadNP(np_file);
             Program.Validation.fill_channels(data);
         end
 
-        function np_file = prepare(file)
+        function np_file = prepare(file, parent_token)
             %PREPARE Resolve a NeuroPAL MAT path without reopening converted pixels.
+            if nargin < 2, parent_token = ''; end
             file = char(file);
             % Initialize the packages.
             import DataHandling.*;
@@ -82,7 +84,7 @@ classdef NeuroPALImage
                         error('DataHandling:NeuroPALImage:MissingFile', ...
                             'File not found: "%s"', file);
                     case '.czi' % Zeiss format
-                        NeuroPALImage.convertCZI(file);
+                        NeuroPALImage.convertCZI(file, parent_token);
                     case '.nd2' % Nikon format
                         DataHandling.Helpers.nd2.to_npal(file);
                         % NeuroPALImage.convertND2(file);
@@ -285,6 +287,8 @@ classdef NeuroPALImage
             % First, try to load from NWB file if it exists and companion ID file doesn't
             nwb_file = fullfile(image_dir, [image_stem, '.nwb']);
             if exist(nwb_file, 'file') && ~exist(id_file, 'file')
+                [neurons, nwb_mp] = DataHandling.Helpers.read_nwb_annotations(nwb_file, info.scale);
+                if ~isempty(nwb_mp), mp = nwb_mp; end
                 if DataHandling.Helpers.nwb.has_neuropal_segmentation(nwb_file)
                     Program.Helpers.debug_event('NWB', ...
                         ['NWB segmentation metadata found in "%s", but automatic ' ...
@@ -410,7 +414,7 @@ classdef NeuroPALImage
             end
         end
 
-        function np_file = convertCZI(czi_file)
+        function np_file = convertCZI(czi_file, parent_token)
             %CONVERTCZI Convert a CZI file to NeuroPAL format.
             %
             % czi_file = the CZI file to convert
@@ -421,7 +425,7 @@ classdef NeuroPALImage
             import DataHandling.*;
             
             % Open the file.
-            [image_data, ~] = DataHandling.imreadCZI(czi_file);
+            [image_data, ~] = DataHandling.imreadCZI(czi_file, parent_token);
             data = image_data.data;
             image_data.data = [];
             
@@ -433,8 +437,8 @@ classdef NeuroPALImage
             data_order(1) = 2;
             data_order(2) = 1;
             data = permute(data, data_order);
-            image_data.scale(1) = image_data.scale(2);
-            image_data.scale(2) = image_data.scale(2);
+            % Physical spacing is stored in X, Y, Z order.
+            image_data.scale = double(image_data.scale(:).');
             
             % Setup the NP file data.
             info.file = czi_file;
@@ -584,6 +588,15 @@ classdef NeuroPALImage
             prefs.z_center = ceil(layout.output_dims(3) / 2);
             prefs.is_Z_LR = true;
             prefs.is_Z_flip = true;
+            try
+                saved_prefs = jsondecode(h5readatt(nwb_file, image_info.data_path, 'neuropal_preferences'));
+                for field = fieldnames(saved_prefs)'
+                    prefs.(field{1}) = saved_prefs.(field{1});
+                end
+                prefs.RGBW = double(prefs.RGBW(:)');
+                prefs.gamma = double(prefs.gamma(:)');
+            catch
+            end
 
             [folder, name] = fileparts(nwb_file);
             np_file = fullfile(folder, [name '.mat']);
@@ -993,8 +1006,8 @@ classdef NeuroPALImage
             data_order(1) = 2;
             data_order(2) = 1;
             data = permute(data, data_order);
-            image_data.scale(1) = image_data.scale(2);
-            image_data.scale(2) = image_data.scale(2);
+            % Physical spacing is stored in X, Y, Z order.
+            image_data.scale = double(image_data.scale(:).');
             
             % Setup the NP file data.
             info.file = any_file;

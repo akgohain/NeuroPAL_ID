@@ -3,6 +3,8 @@ function load_file(mode, path)
             if isempty(path) || strlength(string(path)) == 0
                 return
             end
+            app = Program.app;
+            if ~Program.ProcessingSession.prepareOpen(app), return; end
             job = Program.HeavyJob.acquire('Processing source loading');
             job_cleanup = onCleanup(@() delete(job));
             app = Program.app;
@@ -51,14 +53,36 @@ function load_file(mode, path)
             switch mode
                 case "image"
                     Program.Routines.GUI.add_volume('Colormap')
-                    mat_file = DataHandling.NeuroPALImage.prepare(path);
+                    mat_file = DataHandling.NeuroPALImage.prepare(path, job.Token);
                     path = mat_file;
                     source = DataHandling.Helpers.npal_mat.open_source(mat_file);
                     Program.HeavyJob.assertIdle(job.Token);
                     app.proc_image = source.reader;
                     prefs = source.metadata.prefs;
+                    % Old imports can refer to channels that are no longer present.
+                    for field = {'RGBW', 'DIC', 'GFP'}
+                        name = field{1};
+                        if ~isfield(prefs, name), prefs.(name) = NaN; end
+                        indices = double(prefs.(name));
+                        indices(~isfinite(indices) | indices < 1 | ...
+                            indices > source.dims(4) | indices ~= round(indices)) = NaN;
+                        prefs.(name) = indices;
+                    end
                     current_path = string(app.image_file);
+                    had_main_image = had_main_image && current_path == string(mat_file);
                     if isempty(app.image_data) || current_path ~= string(mat_file)
+                        Program.ProcessingSession.clear(app);
+                        [id_folder, id_name] = fileparts(mat_file);
+                        app.id_file = fullfile(id_folder, [id_name '_ID.mat']);
+                        app.image_neurons = Neurons.Image([]);
+                        if isfile(app.id_file)
+                            saved_ids = load(app.id_file, 'neurons', 'mp_params');
+                            if isfield(saved_ids,'neurons'), app.image_neurons = saved_ids.neurons; end
+                            if isfield(saved_ids,'mp_params'), app.mp_params = saved_ids.mp_params; end
+                        end
+                        app.mp_params.k = numel(app.image_neurons.neurons);
+                        app.selected_neuron = [];
+                        if isfield(source.metadata,'worm'), app.worm = source.metadata.worm; end
                         app.image_file = mat_file;
                         app.image_prefs = prefs;
                         app.image_gamma = Program.Helpers.expand_gamma( ...
@@ -67,10 +91,11 @@ function load_file(mode, path)
                         try
                             app.image_info = app.proc_image.info;
                             if isfield(app.image_info, 'scale')
-                                app.image_um_scale = app.image_info.scale;
+                                app.image_um_scale = double(app.image_info.scale(:).');
                             end
                         catch
                         end
+                        app.image_neurons.scale = app.image_um_scale;
                         if local_should_materialize_colormap(app.proc_image)
                             app.image_data = app.proc_image.data;
                             app.image_data_zscored = [];
@@ -204,27 +229,12 @@ function load_file(mode, path)
             d.Message = sprintf('Drawing image...');
             Program.Routines.Processing.render();
             Program.GUIHandling.capture_processing_defaults(app, lower(string(app.VolumeDropDown.Value)), true);
+            if mode == "image", Program.ProcessingSession.capture(app); end
             clear progress_cleanup
             clear job_cleanup
 
-            skip_crop_prompt = ~usejava('desktop') || mode == "video";
-            if isappdata(app.CELL_ID, 'proc_skip_crop_recommendation')
-                skip_crop_prompt = skip_crop_prompt || ...
-                    logical(getappdata(app.CELL_ID, 'proc_skip_crop_recommendation'));
-            end
-
-            if ~skip_crop_prompt
-                check = uiconfirm(app.CELL_ID, "We recommend starting by cropping your image to ensure that there is no superfluous space taking up memory. Do you want to do so now?", "NeuroPAL_ID", "Options", ["Yes", "No, skip cropping."]);
-                switch check
-                    case "Yes"
-                        Program.GUIHandling.crop_routine(app);
-                        Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
-                    case "No, skip cropping."
-                        Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
-                end
-            end
-
             Program.GUIHandling.gui_lock(app, 'unlock', 'processing_tab');
+            Program.GUIHandling.update_processing_commit_state(app);
 end
 
 function tf = local_should_materialize_colormap(proc_image)

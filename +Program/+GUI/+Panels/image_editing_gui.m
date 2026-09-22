@@ -78,7 +78,7 @@ classdef image_editing_gui
                 structfun(@(x)(set(x, 'Enable', 'on')), obj.buttons);
 
                 % Set the main panel height back to its default.
-                obj.set_panel_height(72);
+                obj.set_panel_height(100);
 
             else
                 % If we're switching to a particular interface,
@@ -89,18 +89,18 @@ classdef image_editing_gui
                 % according to the mode requested.
                 switch mode
                     case 'crop'
-                        obj.set_panel_height(108);
+                        obj.set_panel_height(150);
                         obj.panels.crop.Visible = 'on';
     
                     case 'rotate'
-                        obj.set_panel_height(200);
+                        obj.set_panel_height(270);
                         obj.panels.rotate.Visible = 'on';
     
                     case 'downsample'
                         if Program.ProgramInfo.is_video
-                            obj.set_panel_height(192);
+                            obj.set_panel_height(225);
                         else
-                            obj.set_panel_height(147);
+                            obj.set_panel_height(225);
                         end
     
                         obj.panels.downsample.Visible = 'on';
@@ -204,4 +204,3 @@ classdef image_editing_gui
         end
     end
 end
-

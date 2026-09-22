@@ -37,7 +37,8 @@ classdef histograms
 
             for n = 1:numel(rows)
                 row = rows(n);
-                chan_hist = Program.Helpers.to_user_uint8(raw.array(:, :, :, row.source_idx));
+                chan_hist = Program.Helpers.to_user_uint8(raw.array(:, :, :, row.source_idx), ...
+                    Program.Helpers.processing_intensity_range(app));
                 [h_panel, h_label, h_axes] = Program.Handlers.histograms.get_gui(row.row);
                 h_panel.Visible = 'on';
                 h_label.Text = sprintf("%s Channel", row.role_name);

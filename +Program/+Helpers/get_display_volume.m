@@ -56,7 +56,11 @@ switch target
         error('Unknown display target: %s', target);
 end
 
-[display_volume, rgb_channels] = Program.Helpers.compose_display_volume(raw_volume, channels);
+range = [];
+if target == "processing"
+    range = Program.Helpers.processing_intensity_range(app);
+end
+[display_volume, rgb_channels] = Program.Helpers.compose_display_volume(raw_volume, channels, range);
 display_volume = Program.Helpers.finalize_display_volume(display_volume, rgb_channels, threshold_raw);
 
 package = struct( ...

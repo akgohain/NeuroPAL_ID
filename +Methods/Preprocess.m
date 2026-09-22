@@ -147,9 +147,12 @@ classdef Preprocess < handle
             end
 
             percentiles = [double(background_percentile), double(max_percentile)];
-            invalid = ~isfinite(percentiles);
-            percentiles(invalid) = defaults(invalid);
-            percentiles = min(max(percentiles, 0), 100);
+            if numel(percentiles) ~= 2 || any(~isfinite(percentiles)) || ...
+                    percentiles(1) < 0 || percentiles(1) >= 100 || ...
+                    percentiles(2) <= 0 || percentiles(2) > 100
+                error('NeuroPAL:NormalizePercentiles', ...
+                    'Background percentile must be at least 0 and less than 100. Max percentile must be greater than 0 and at most 100.');
+            end
        end
         
        function volume = area_filter(volume, point, threshold, dim)

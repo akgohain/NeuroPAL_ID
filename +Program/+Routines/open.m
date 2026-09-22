@@ -7,6 +7,7 @@ function open(path)
     if app.is_opening_file
         return;
     end
+    if ~Program.ProcessingSession.prepareOpen(app), return; end
     app.is_opening_file = true;
     opening_guard = onCleanup(@() local_finish_open(app));
     
@@ -26,9 +27,10 @@ function open(path)
         path = GUI_prefs.image_dir;
 
         % Ask the user which file they want.
-        file_info = [path ';*.mat;*.czi;*.nd2;*.tif;*.tiff;*.h5;*.nwb'];
+        file_info = {'*.mat;*.czi;*.nd2;*.tif;*.tiff;*.h5;*.nwb', 'Worm images'; ...
+            '*.*', 'All files'};
         app.CELL_ID.Visible = 'off'; % Hack On! * Matlab can't seem to put the modal dialogue in the foreground
-        [name, path, ~] = uigetfile(file_info, 'Select Worm Image');
+        [name, path, ~] = uigetfile(file_info, 'Select Worm Image', path);
         app.CELL_ID.Visible = 'on'; % Hack Off! * Matlab can't seem to put the modal dialogue in the foreground
         if name == 0
             app.is_opening_file = false;
@@ -46,6 +48,10 @@ function open(path)
 
         filename = [path, name];
         close(d)
+        if Tracking.ReferenceWorkflow.supports(filename)
+            local_open_reference(app, filename);
+            return;
+        end
         try
             proc_code = app.proc_check("image", filename);
         catch ME
@@ -67,8 +73,8 @@ function open(path)
             return
         end
     else
-        [~, name] = fileparts(path);
         filename = path;
+        [path, name] = fileparts(filename);
 
         % Load the file.
         d = uiprogressdlg(app.CELL_ID,'Title','Reloading processed file...', 'Indeterminate','on');
@@ -77,6 +83,12 @@ function open(path)
             app.DisplayNeuronActivityMenu.Checked = ~app.DisplayNeuronActivityMenu.Checked;
             app.TabGroup4.SelectedTab = app.MaximumIntensityProjectionTab;
         end
+    end
+
+    if Tracking.ReferenceWorkflow.supports(filename)
+        close(d);
+        local_open_reference(app, filename);
+        return;
     end
 
     progress_cleanup = onCleanup(@() local_close_progress(d));
@@ -90,7 +102,7 @@ function open(path)
     job_cleanup = onCleanup(@() delete(job));
     try                
         [data, info, prefs, worm, mp, neurons, np_file, id_file] = ...
-            DataHandling.NeuroPALImage.open(filename);
+            DataHandling.NeuroPALImage.open(filename, job.Token);
     catch ME
         Program.Helpers.debug_event('OpenFile', ...
             'Cannot read "%s": %s', filename, getReport(ME, 'extended', 'hyperlinks', 'off'));
@@ -138,6 +150,7 @@ function open(path)
     % Setup the image.
     app.image_name = name; %strrep(name, '_', '\_');
     app.image_data = data;
+    Program.ProcessingSession.clear(app);
     if isappdata(app.CELL_ID, 'proc_runtime_dirty')
         rmappdata(app.CELL_ID, 'proc_runtime_dirty');
     end
@@ -256,12 +269,6 @@ function open(path)
 
     % Restrict the slider to the z stack.
     num_z_slices = size(app.image_data, 3);
-    if num_z_slices <= 1
-        uialert(app.CELL_ID, 'The image is not a volume!', ...
-            'Image Not a Volume', 'Icon', 'error');
-        app.is_opening_file = false;
-        return;
-    end
     initial_z_slice = round(num_z_slices / 2);
     Program.Helpers.configure_main_zslider(app, num_z_slices, initial_z_slice);
 
@@ -301,9 +308,7 @@ function open(path)
     app.selected_neuron = [];
 
     % Draw everything.
-    app.UserNeuronIDsListBox.Items = {};
-    app.UserNeuronIDsListBox.ItemsData = [];
-    app.UserNeuronIDsListBox.Value = {};
+    app.refreshAutoIDList();
 
     if ismember('is_matched', fieldnames(app.image_prefs))
         if app.image_prefs.is_matched == 1
@@ -363,5 +368,15 @@ try
         app.CELL_ID.Visible = 'on';
     end
 catch
+end
+end
+
+function local_open_reference(app, filename)
+% Report a video import failure without leaving the file opener latched.
+try
+    Tracking.ReferenceWorkflow.open(app, filename);
+catch ME
+    Program.Helpers.debug_event('OpenFile', '%s', getReport(ME, 'extended', 'hyperlinks', 'off'));
+    uialert(app.CELL_ID, ME.message, 'Cannot Open Recording');
 end
 end

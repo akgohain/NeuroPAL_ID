@@ -7,6 +7,7 @@ function reset()
         "Title", "NeuroPAL_ID", ...
         "Indeterminate", "on");
 
+    cleanup = onCleanup(@() close(d));
     current_mode = lower(string(app.VolumeDropDown.Value));
     snapshot = Program.GUIHandling.get_processing_defaults(app, current_mode);
 
@@ -14,18 +15,13 @@ function reset()
     switch current_mode
         case "colormap"
             app.volume_crop_roi = [];
-            if isa(app.proc_image, 'matlab.io.MatFile')
-                try
-                    app.image_prefs = app.proc_image.prefs;
-                    app.image_gamma = Program.Helpers.expand_gamma( ...
-                        app.image_prefs.gamma, ...
-                        length(Program.GUIHandling.pos_prefixes));
-                catch
-                end
-                if ~isempty(app.image_data)
-                    app.image_data = app.proc_image.data;
-                    app.image_data_zscored = [];
-                end
+            restored = Program.ProcessingSession.discard(app);
+            if ~restored && isa(app.proc_image, 'matlab.io.MatFile')
+                app.image_prefs = app.proc_image.prefs;
+                app.image_gamma = Program.Helpers.expand_gamma(app.image_prefs.gamma, 6);
+                app.image_info = app.proc_image.info;
+                app.image_um_scale = app.image_info.scale;
+                if ~isempty(app.image_data), app.image_data = app.proc_image.data; end
             end
             if isappdata(app.CELL_ID, 'proc_runtime_dirty')
                 rmappdata(app.CELL_ID, 'proc_runtime_dirty');
@@ -69,5 +65,12 @@ function reset()
         Program.Helpers.sync_main_display_from_processing(app, true);
     end
 
-    close(d);
+    if strcmp(current_mode, "colormap")
+        app.refreshAutoIDList();
+        Program.Routines.ID.hot_neuron_reset();
+        Program.ProcessingSession.capture(app);
+    end
+    Program.GUIHandling.install_processing_slider_callbacks(app);
+    Program.GUIHandling.update_processing_commit_state(app);
+    clear cleanup;
 end

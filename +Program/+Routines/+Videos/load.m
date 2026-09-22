@@ -75,25 +75,25 @@ function load(file, parent_token)
 
     Program.Helpers.clear_video_view_state(app);
 
-    app.xyAxes.XLim = [1, app.video_info.nx];
-    app.xyAxes.YLim = [1, app.video_info.ny];
+    app.xyAxes.XLim = [1, max(2, app.video_info.nx)];
+    app.xyAxes.YLim = [1, max(2, app.video_info.ny)];
     %xy_aspectRatio = app.video_info.nx / app.video_info.ny;
     %app.xyAxes.DataAspectRatio = [1, 1/xy_aspectRatio, 1];
 
     % Define slider limits and values based on video
-    app.tSlider.Limits = [1, app.video_info.nt];
+    app.tSlider.Limits = [1, max(2, app.video_info.nt)];
     Program.Helpers.configure_video_controls(app);
 
-    app.vert_zSlider.Limits = [1, app.video_info.nz];
+    app.vert_zSlider.Limits = [1, max(2, app.video_info.nz)];
     app.vert_zSlider.Value = round(app.video_info.nz/2);
 
-    app.hor_zSlider.Limits = [1, app.video_info.nz];
+    app.hor_zSlider.Limits = [1, max(2, app.video_info.nz)];
     app.hor_zSlider.Value = round(app.video_info.nz/2);
 
-    app.xSlider.Limits = [1, app.video_info.nx];
+    app.xSlider.Limits = [1, max(2, app.video_info.nx)];
     app.xSlider.Value = round(app.video_info.nx/2);
 
-    app.ySlider.Limits = [1, app.video_info.ny];
+    app.ySlider.Limits = [1, max(2, app.video_info.ny)];
     app.ySlider.Value = round(app.video_info.ny/2);
 
     tx = round(app.video_info.nx/2);

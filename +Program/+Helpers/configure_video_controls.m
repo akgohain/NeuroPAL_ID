@@ -7,7 +7,8 @@ if nargin < 1 || isempty(app) || ~isvalid(app) || ...
 end
 
 nt = max(1, round(double(app.video_info.nt)));
-app.tSlider.Limits = [1 nt];
+app.tSlider.Limits = [1 max(2, nt)];
+app.tSlider.Enable = matlab.lang.OnOffSwitchState(nt > 1);
 app.tSlider.Value = 1;
 app.tEditField.Limits = [1 nt];
 app.tEditField.Value = 1;

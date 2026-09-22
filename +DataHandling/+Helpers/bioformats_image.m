@@ -28,7 +28,8 @@ classdef bioformats_image
 
         function data = read(reader, filename)
             dims = DataHandling.Helpers.bioformats_image.check(reader, filename);
-            data = zeros(dims, 'uint16');
+            first_plane = bfGetPlane(reader, reader.getIndex(0, 0, 0) + 1);
+            data = zeros(dims, 'like', first_plane);
             for c = 1:dims(4)
                 for z = 1:dims(3)
                     index = reader.getIndex(z - 1, c - 1, 0) + 1;

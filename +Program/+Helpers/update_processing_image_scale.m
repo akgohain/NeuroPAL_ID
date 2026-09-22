@@ -47,8 +47,8 @@ for n = 1:numel(actions)
 
     switch action
         case 'ds'
-            scale(1) = local_preserve_extent_scale(scale(1), dims(2), next_dims(2));
-            scale(2) = local_preserve_extent_scale(scale(2), dims(1), next_dims(1));
+            scale(1) = scale(1) * dims(2) / next_dims(2);
+            scale(2) = scale(2) * dims(1) / next_dims(1);
             scale(3) = local_preserve_extent_scale(scale(3), dims(3), next_dims(3));
 
         case {'cc', 'acc'}
@@ -56,12 +56,11 @@ for n = 1:numel(actions)
 
         case 'rotate'
             angle = local_processing_rotation_angle(app);
-            if ismember(angle, [90, 270])
-                scale(1:2) = scale([2 1]);
-            else
-                scale(1) = local_preserve_extent_scale(scale(1), dims(2), next_dims(2));
-                scale(2) = local_preserve_extent_scale(scale(2), dims(1), next_dims(1));
-                scale(3) = local_preserve_extent_scale(scale(3), dims(3), next_dims(3));
+            if ~isempty(angle)
+                % Rotation adds padding; it does not reduce the pixel spacing.
+                xy = scale(1:2);
+                scale(1) = hypot(xy(1)*cosd(angle), xy(2)*sind(angle));
+                scale(2) = hypot(xy(1)*sind(angle), xy(2)*cosd(angle));
             end
     end
 

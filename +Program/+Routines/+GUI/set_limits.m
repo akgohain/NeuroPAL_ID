@@ -1,8 +1,8 @@
 function set_limits(nx, ny, nz, nt)
     app = Program.app;
 
-    app.proc_xSlider.Limits = [1 nx];
-    app.proc_ySlider.Limits = [1 ny];
+    app.proc_xSlider.Limits = [1 max(2, nx)];
+    app.proc_ySlider.Limits = [1 max(2, ny)];
 
     middle_x = round(nx/2);
     middle_y = round(ny/2);
@@ -12,6 +12,7 @@ function set_limits(nx, ny, nz, nt)
     app.proc_ySlider.Value = middle_y;
 
     Program.Helpers.configure_processing_zsliders(app, nz, middle_z);
+    app.ProcZSlicesEditField.Limits = [1 max(2, nz)];
     app.ProcZSlicesEditField.Value = nz;
 
     if nargin >= 4 && ~isempty(nt)

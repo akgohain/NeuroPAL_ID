@@ -61,11 +61,7 @@ function hot_neuron_reset()
     neurons = {};
     for i = 1:length(selectedNodes)
         node = selectedNodes(i);
-        if isempty(node.Children) % Child node on the tree.
-            neurons = union(neurons, GetChildNodeNeurons(app, node));
-        else % Parent node on the tree.
-            neurons = union(neurons, GetParentNodeNeurons(app, node));
-        end
+        neurons = union(neurons, app.ganglionNeurons(node));
     end
     neurons = sort(neurons);
 

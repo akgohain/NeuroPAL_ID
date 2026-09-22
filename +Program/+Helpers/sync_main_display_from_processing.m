@@ -9,7 +9,7 @@ if nargin < 2
 end
 
 synced = false;
-if isempty(app.image_data)
+if ~strcmp(app.VolumeDropDown.Value, 'Colormap')
     return
 end
 
@@ -59,13 +59,17 @@ if isfield(app.image_prefs, 'RGBW')
     end
 end
 
+nc = Program.Helpers.processing_colormap_context(app).dims(4);
+existing_rgbw(existing_rgbw<1 | existing_rgbw>nc) = NaN;
 app.image_prefs.RGBW = [ ...
-    local_required_idx(state.r, 1), ...
-    local_required_idx(state.g, 2), ...
-    local_required_idx(state.b, 3), ...
+    local_required_idx(state.r, min(1, nc)), ...
+    local_required_idx(state.g, min(2, nc)), ...
+    local_required_idx(state.b, min(3, nc)), ...
     local_optional_idx(state.white, existing_rgbw(4))];
 app.image_prefs.DIC = local_optional_idx(state.dic, NaN);
 app.image_prefs.GFP = local_optional_idx(state.gfp, NaN);
+app.image_prefs.processing_channels = struct('indices',[state.rows.source_idx], ...
+    'enabled',[state.rows.enabled],'roles',{{state.rows.role_name}});
 
 gammas = zeros(1, length(Program.GUIHandling.pos_prefixes));
 for n = 1:length(Program.GUIHandling.pos_prefixes)

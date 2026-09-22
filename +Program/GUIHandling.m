@@ -536,6 +536,8 @@ classdef GUIHandling
             id_settings_button.Layout.Column = 3;
 
             header_grid = app.GridLayout24_2;
+            header_grid.ColumnWidth = {0, 0, 0, 0, 0, 0, 0, 0, 52, 100, 70, ...
+                12, 0, 0, 0, 82, 24, 12, 0, '1x', 0, 80, 24};
             app.UserLabel.Parent = header_grid;
             app.UserLabel.Text = 'Review:';
             app.UserLabel.FontWeight = 'bold';
@@ -1512,6 +1514,7 @@ classdef GUIHandling
                             'Device', Program.GUIHandling.param_value(params, 'device', 'cpu'), ...
                             'OutputDir', Program.GUIHandling.method_output_dir(app, 'moe'), ...
                             'KeepArtifacts', true);
+                        detected_params = moe_params;
                         if ~isempty(sp)
                             prepared_moe_neurons = Neurons.Image(sp, source_context.worm.body, 'scale', source_context.scale');
                         end
@@ -3369,13 +3372,17 @@ classdef GUIHandling
             % loaded and checks their associated nodes in the passed uitree.
 
             files_to_check = fieldnames(app.data_flags);
-            loaded_files = [];
+            if nargin >= 2
+                loaded_files = gobjects(0, 1);
+            else
+                loaded_files = {};
+            end
 
-            if app.image_neurons.num_neurons > 1
+            if ~isempty(app.image_neurons) && app.image_neurons.num_neurons > 0
                 app.data_flags.('Neurons') = 1;
             end
 
-            if app.image_neurons.is_any_annotated
+            if ~isempty(app.image_neurons) && app.image_neurons.is_any_annotated
                 app.data_flags.('Neuronal_Identities') = 1;
             end
 
@@ -3700,6 +3707,7 @@ classdef GUIHandling
             end
 
             Program.Routines.GUI.set_manipulation_panel('closed');
+            Program.GUIHandling.configure_processing_sidebar_layout(app);
         end
 
         function histogram_handler(~, mode, ~)
@@ -4458,16 +4466,16 @@ classdef GUIHandling
             end
             if isprop(app, 'ProcCropImageButton') && isvalid(app.ProcCropImageButton)
                 app.ProcCropImageButton.ButtonPushedFcn = @(src, event) ...
-                    Program.Routines.Processing.crop();
+                    Program.ProcessingSession.run(app, 'crop');
             end
             Program.GUIHandling.ensure_processing_mirror_z_controls(app);
             if isprop(app, 'ProcSaveButton') && isvalid(app.ProcSaveButton)
                 app.ProcSaveButton.ButtonPushedFcn = @(src, event) ...
-                    Program.Routines.Processing.save();
+                    Program.ProcessingSession.run(app, 'save');
             end
             if isprop(app, 'ProcResetButton') && isvalid(app.ProcResetButton)
                 app.ProcResetButton.ButtonPushedFcn = @(src, event) ...
-                    Program.Routines.Processing.reset();
+                    Program.ProcessingSession.run(app, 'reset');
             end
             if isprop(app, 'ProcShowMIPCheckBox') && isvalid(app.ProcShowMIPCheckBox)
                 app.ProcShowMIPCheckBox.ValueChangedFcn = @(src, event) ...
@@ -4582,7 +4590,7 @@ classdef GUIHandling
             apply_button = uibutton(button_grid, 'push', ...
                 'Text', 'Apply', ...
                 'ButtonPushedFcn', @(src, event) ...
-                    Program.GUIHandling.commit_processing_normalize_colors(app));
+                    Program.ProcessingSession.run(app, 'normalize'));
             apply_button.Layout.Row = 1;
             apply_button.Layout.Column = 2;
 
@@ -4684,10 +4692,10 @@ classdef GUIHandling
             end
 
             parsed = [double(controls.bg_field.Value), double(controls.max_field.Value)];
-            if any(~isfinite(parsed)) || parsed(1) < 0 || parsed(1) > 100 || ...
-                    parsed(2) < 0 || parsed(2) > 100
+            if any(~isfinite(parsed)) || parsed(1) < 0 || parsed(1) >= 100 || ...
+                    parsed(2) <= 0 || parsed(2) > 100
                 uialert(app.CELL_ID, ...
-                    'Normalize Colors percentiles must be finite values between 0 and 100.', ...
+                    'Background percentile must be at least 0 and less than 100. Max percentile must be greater than 0 and at most 100.', ...
                     'Invalid Normalize Colors Parameters', 'Icon', 'warning');
                 return
             end
@@ -4760,6 +4768,12 @@ classdef GUIHandling
         end
 
         function handle_processing_volume_changed(app, event)
+            requested = app.VolumeDropDown.Value;
+            if isprop(event, 'PreviousValue') || (isstruct(event) && isfield(event,'PreviousValue'))
+                app.VolumeDropDown.Value = event.PreviousValue;
+                if ~Program.ProcessingSession.prepareOpen(app), return; end
+                app.VolumeDropDown.Value = requested;
+            end
             Program.Handlers.loading.start('Swapping volumes...');
             cleanup = onCleanup(@() Program.Handlers.loading.done());
             Program.GUIHandling.hide_percentile_noise_editor(app);
@@ -4885,6 +4899,7 @@ classdef GUIHandling
             Program.GUIHandling.update_processing_threshold_target_options(app);
             setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
             Program.Helpers.sync_main_display_from_processing(app, false);
+            Program.ProcessingSession.refreshColors(app);
             if ~rendered_processing
                 Program.Routines.Processing.render();
             end
@@ -4901,80 +4916,23 @@ classdef GUIHandling
         function install_processing_commit_callbacks(app)
             if isprop(app, 'confirm_rotation') && isvalid(app.confirm_rotation)
                 app.confirm_rotation.ButtonPushedFcn = @(src, event) ...
-                    Program.GUIHandling.confirm_processing_rotation(app);
+                    Program.ProcessingSession.run(app, 'rotate');
             end
         end
 
         function confirm_processing_rotation(app)
             Program.HeavyJob.assertIdle();
-            rotate_actions = {};
-            should_rotate_neurons = false;
-
-            try
-                rotate_angle = Program.GUIHandling.canonical_rotation_angle(app.proc_rot_spinner.Value);
-            catch
-                rotate_angle = 0;
+            actions = {};
+            if app.flip_lr.Value, actions{end+1} = 'hori'; end
+            if app.flip_ud.Value, actions{end+1} = 'vert'; end
+            if app.proc_rot_spinner.Value ~= 0, actions{end+1} = 'rotate'; end
+            if ~isempty(actions)
+                if ~Program.Helpers.apply_processing_preview_action(app, actions), return; end
             end
-
-            if isprop(app, 'ProcRotateNeuronsCheckBox') && isvalid(app.ProcRotateNeuronsCheckBox)
-                should_rotate_neurons = logical(app.ProcRotateNeuronsCheckBox.Value);
-            end
-
-            if app.flip_lr.Value
-                rotate_actions{end+1} = 'hori';
-            end
-            if app.flip_ud.Value
-                rotate_actions{end+1} = 'vert';
-            end
-            if app.proc_rot_spinner.Value ~= 0
-                rotate_actions{end+1} = 'rotate';
-            end
-
-            if isempty(rotate_actions)
-                app.proc_xyAxes.XLim(2) = app.proc_xSlider.Limits(2);
-                app.proc_xyAxes.YLim(2) = app.proc_ySlider.Limits(2);
-                Program.Routines.GUI.set_manipulation_panel('closed');
-                return
-            end
-
-            if should_rotate_neurons && any(strcmpi(rotate_actions, 'rotate')) ...
-                    && ~ismember(rotate_angle, [90, 180, 270])
-                uialert(app.CELL_ID, ...
-                    'Neuron geometry rotation is limited to 90, 180, and 270 degrees in processing. Choose one of those angles, or disable Rotate Neurons before applying.', ...
-                    'Unsupported Neuron Rotation', 'Icon', 'warning');
-                return
-            end
-
-            context = Program.Helpers.processing_colormap_context(app);
-            if should_rotate_neurons
-                [neurons_rotatable, neurons_msg] = Program.Helpers.apply_processing_rotation_to_neurons( ...
-                    app, rotate_actions, rotate_angle, context.dims, true);
-                if ~neurons_rotatable
-                    if isempty(neurons_msg)
-                        neurons_msg = 'Neuron geometry could not be validated for the requested processing rotation.';
-                    end
-                    uialert(app.CELL_ID, neurons_msg, 'Neuron Rotation Not Possible', 'Icon', 'error');
-                    return
-                end
-            end
-            applied = Program.Helpers.apply_processing_preview_action(app, rotate_actions);
-            if ~applied
-                return
-            end
-
-            if should_rotate_neurons
-                neurons_rotated = Program.Helpers.apply_processing_rotation_to_neurons( ...
-                    app, rotate_actions, rotate_angle, context.dims);
-                if ~neurons_rotated
-                    uialert(app.CELL_ID, ...
-                        'Neuron geometry rotation did not complete correctly. Rotation was not applied.', ...
-                        'Neuron Rotation Failed', 'Icon', 'error');
-                    return
-                end
-            end
-
             Program.Routines.GUI.set_manipulation_panel('closed');
+            Program.Routines.Processing.render();
         end
+
 
         function controls = ensure_processing_mirror_z_controls(app)
             controls = Program.GUIHandling.processing_mirror_z_controls(app);
@@ -5019,13 +4977,13 @@ classdef GUIHandling
             panel.Layout.Column = [1 2];
 
             grid = uigridlayout(panel, ...
-                'ColumnWidth', {'1x', 80, 80}, ...
+                'ColumnWidth', {0, '1x', '1x'}, ...
                 'RowHeight', {'1x'}, ...
                 'ColumnSpacing', 6, ...
                 'Padding', [0 0 0 0]);
 
             include_neurons = uicheckbox(grid, ...
-                'Text', 'Include neurons', ...
+                'Text', 'Include neurons', 'Visible', 'off', 'Value', true, ...
                 'Tooltip', 'Mirror neuron Z coordinates along with the image volume.');
             include_neurons.Layout.Row = 1;
             include_neurons.Layout.Column = 1;
@@ -5040,7 +4998,7 @@ classdef GUIHandling
             apply_button = uibutton(grid, 'push', ...
                 'Text', 'Apply', ...
                 'ButtonPushedFcn', @(src, event) ...
-                    Program.GUIHandling.apply_processing_mirror_z(app));
+                    Program.ProcessingSession.run(app, 'mirrorz'));
             apply_button.Layout.Row = 1;
             apply_button.Layout.Column = 3;
 
@@ -5108,50 +5066,13 @@ classdef GUIHandling
 
         function apply_processing_mirror_z(app)
             Program.HeavyJob.assertIdle();
-            controls = Program.GUIHandling.processing_mirror_z_controls(app);
-            include_neurons = false;
-            if ~isempty(controls)
-                include_neurons = logical(controls.include_neurons.Value);
+            if ~strcmp(app.VolumeDropDown.Value, 'Colormap')
+                error('NeuroPAL:MirrorVideo', 'Open a NeuroPAL image to mirror its Z axis.');
             end
-
-            if ~strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap')
-                uialert(app.CELL_ID, ...
-                    'Mirror Z is currently available for NeuroPAL image volumes only.', ...
-                    'Mirror Z Not Available', 'Icon', 'warning');
-                return
-            end
-
-            context = Program.Helpers.processing_colormap_context(app);
-            if include_neurons && ~Program.GUIHandling.can_mirror_processing_neurons(app)
-                uialert(app.CELL_ID, ...
-                    'Neuron geometry is not available for Z mirroring.', ...
-                    'Mirror Z Not Possible', 'Icon', 'warning');
-                return
-            end
-
-            applied = Program.Helpers.apply_processing_preview_action(app, {'mirrorz'});
-            if ~applied
-                return
-            end
-
-            if include_neurons
-                dims = double(context.dims(:).');
-                if numel(dims) < 3
-                    dims(end+1:3) = 1;
-                end
-                mirror_proxy = zeros(round(dims(1)), round(dims(2)), round(dims(3)));
-                try
-                    app.image_neurons.mirror_neurons_Z(mirror_proxy);
-                    Program.Routines.ID.render();
-                catch
-                    uialert(app.CELL_ID, ...
-                        'The image was mirrored, but neuron Z mirroring failed.', ...
-                        'Neuron Mirror Failed', 'Icon', 'warning');
-                end
-            end
-
+            if ~Program.Helpers.apply_processing_preview_action(app, {'mirrorz'}), return; end
             Program.Routines.GUI.set_manipulation_panel('closed');
         end
+
 
         function tf = can_mirror_processing_neurons(app)
             tf = false;
@@ -5409,13 +5330,39 @@ classdef GUIHandling
             advanced_button.Enable = Program.GUIHandling.on_off(is_image_mode);
             if is_expanded
                 spectral_height = 212;
-                advanced_button.Text = 'Hide Spectral Unmixing';
+                advanced_button.Text = 'Spectral unmixing ▾';
             else
                 spectral_height = 0;
-                advanced_button.Text = 'Show Spectral Unmixing';
+                advanced_button.Text = 'Spectral unmixing ▸';
             end
 
-            app.ProcSideGrid.RowHeight = {95, 'fit', 'fit', spectral_height, 34, 116};
+            geometry_height = 100;
+            if strcmp(app.proc_crop_panel.Visible,'on'), geometry_height = 150; end
+            if strcmp(app.proc_rot_panel.Visible,'on'), geometry_height = 270; end
+            if strcmp(app.proc_ds_panel.Visible,'on'), geometry_height = 225; end
+            mirror = Program.GUIHandling.processing_mirror_z_controls(app);
+            if ~isempty(mirror) && strcmp(mirror.panel.Visible,'on'), geometry_height = 150; end
+            app.ProcSideGrid.RowHeight = {128, 190, geometry_height, spectral_height, 30, 112, '1x'};
+            panels = {app.ProcToggleVolumePanel, app.VolumeChannelsPanel, ...
+                app.ImageManipulationPanel, app.ProcSavePanel, app.SpectralUnmixingPanel};
+            for k = 1:numel(panels)
+                panels{k}.BorderType = 'none';
+                panels{k}.TitlePosition = 'lefttop';
+                panels{k}.FontSize = 12;
+            end
+            if isprop(app,'ProcRotateNeuronsCheckBox')
+                app.ProcRotateNeuronsCheckBox.Visible = 'off';
+            end
+            Program.GUIHandling.install_processing_units(app);
+            app.OKButton.Text = 'Apply crop';
+            app.OKButton.FontSize = 12;
+            app.OKButton.BackgroundColor = [0.24 0.24 0.24];
+            app.OKButton.FontColor = [1 1 1];
+            app.OKButton.ButtonPushedFcn = @(~,~) Program.ProcessingSession.run(app, 'applycrop');
+            app.CancelButton_3.BackgroundColor = [0.94 0.94 0.94];
+            app.CancelButton_3.FontSize = 12;
+            app.CancelButton_3.FontColor = [0.12 0.12 0.12];
+            app.CancelButton_3.ButtonPushedFcn = @(~,~) Program.crop_rotate_gui.close(app);
             Program.GUIHandling.update_processing_commit_state(app);
         end
 
@@ -5442,17 +5389,17 @@ classdef GUIHandling
             app.ProcResetButton.Text = 'Discard Preview';
             app.ProcResetButton.FontSize = 12;
             app.ProcResetButton.FontWeight = 'normal';
-            app.ProcResetButton.BackgroundColor = [0.86 0.87 0.88];
+            app.ProcResetButton.BackgroundColor = [0.94 0.94 0.94];
             app.ProcResetButton.FontColor = [0.12 0.14 0.16];
-            app.ProcResetButton.Tooltip = 'Discard preview changes and restore the loaded data settings.';
+            app.ProcResetButton.Tooltip = 'Restore the image, neuron positions, and settings from before processing.';
 
             app.ProcSaveButton.Layout.Row = 3;
             app.ProcSaveButton.Text = 'Save Changes';
             app.ProcSaveButton.FontSize = 13;
             app.ProcSaveButton.FontWeight = 'bold';
-            app.ProcSaveButton.BackgroundColor = [0.10 0.43 0.66];
+            app.ProcSaveButton.BackgroundColor = [0.24 0.24 0.24];
             app.ProcSaveButton.FontColor = [1 1 1];
-            app.ProcSaveButton.Tooltip = 'Commit the current processing preview to the active dataset.';
+            app.ProcSaveButton.Tooltip = 'Save the processed image and its matching neuron IDs together.';
         end
 
         function update_processing_commit_state(app)
@@ -5464,19 +5411,15 @@ classdef GUIHandling
 
             label = Program.GUIHandling.ensure_processing_commit_ui(app);
             is_ready = Program.GUIHandling.processing_tab_rendered(app);
-            is_dirty = isappdata(app.CELL_ID, 'proc_runtime_dirty') && ...
-                logical(getappdata(app.CELL_ID, 'proc_runtime_dirty'));
-
-            if ~is_ready
-                label.Text = 'Open data to begin';
-                label.FontColor = [0.45 0.47 0.50];
-            elseif is_dirty
-                label.Text = 'Preview has unsaved changes';
-                label.FontColor = [0.72 0.38 0.02];
+            is_dirty = Program.ProcessingSession.dirty(app);
+            label.FontColor = [0.45 0.45 0.45];
+            if is_ready && is_dirty
+                label.Text = 'Unsaved changes';
             else
-                label.Text = 'No pending changes';
-                label.FontColor = [0.30 0.48 0.34];
+                label.Text = '';
             end
+            app.ProcSaveButton.Enable = Program.GUIHandling.on_off(is_ready && is_dirty);
+            app.ProcResetButton.Enable = Program.GUIHandling.on_off(is_ready && is_dirty);
         end
 
         function install_processing_advanced_callback(app)
@@ -6070,12 +6013,25 @@ classdef GUIHandling
             end
         end
 
+        function install_processing_units(app)
+            key = 'proc_units_control';
+            app.ProcToggleVolumeGrid.RowHeight = {24, 26, 26};
+            if ~isappdata(app.CELL_ID, key)
+                units = uidropdown(app.ProcToggleVolumeGrid, ...
+                    'Items', {'Pixels', 'µm'}, 'ItemsData', {'pixels','physical'}, ...
+                    'Value', 'physical', 'Tooltip', 'Viewer coordinate units', ...
+                    'ValueChangedFcn', @(src,event) Program.Routines.Processing.render());
+                units.Layout.Row = 3; units.Layout.Column = [1 2];
+                setappdata(app.CELL_ID, key, units);
+            end
+        end
+
         function configure_processing_color_panel(app)
-            app.Panel_57.Title = 'Color Preview';
+            app.Panel_57.Title = 'Channel contrast';
             app.Panel_57.BorderType = 'line';
             app.Panel_57.FontWeight = 'bold';
             if isprop(app.Panel_57, 'TitlePosition')
-                app.Panel_57.TitlePosition = 'centertop';
+                app.Panel_57.TitlePosition = 'lefttop';
             end
 
             app.ProcHistogramManipulationLabel.Visible = 'off';
@@ -6115,7 +6071,7 @@ classdef GUIHandling
                 app.ProcMeasure90pthNoiseButton.ButtonPushedFcn = @(src, event) ...
                     Program.GUIHandling.measure_threshold_from_percentile(app);
             end
-            app.ProcNormalizeColorsButton.Text = 'Normalize channel ranges...';
+            app.ProcNormalizeColorsButton.Text = 'Normalize channels ▸';
             app.HidezerointensitypixelsCheckBox.Text = 'Ignore zero pixels';
             app.HidezerointensitypixelsCheckBox.Tooltip = ...
                 'Exclude zero-valued pixels when drawing channel histograms.';
@@ -7429,8 +7385,9 @@ classdef GUIHandling
 
         %% Saving GUI
 
-        function nwb_init(app)          
-            Program.GUIHandling.loaded_file_check(app.parent_app, app.Tree)
+        function nwb_init(app)
+            allow_save = false;
+            Program.GUIHandling.loaded_file_check(app.parent_app, app.Tree);
             worm_properties = {
                 'AgeDropDown', ...
                 'BodyDropDown', ...
@@ -7444,7 +7401,7 @@ classdef GUIHandling
                 switch file
                     case 'NeuroPAL Volume'
                         allow_save = 1;
-                        for child=1:length(app.NPALVolumeGrid)
+                        for child=1:numel(app.NPALVolumeGrid.Children)
                             app.NPALVolumeGrid.Children(child).Enable = 'on';
                         end
 
@@ -7453,7 +7410,7 @@ classdef GUIHandling
 
                     case {'Video Volume', 'Tracking ROIs'}
                         allow_save = 1;
-                        for child=1:length(app.VideoVolumeGrid)
+                        for child=1:numel(app.VideoVolumeGrid.Children)
                             app.VideoVolumeGrid.Children(child).Enable = 'on';
                         end
 
@@ -7475,84 +7432,103 @@ classdef GUIHandling
                 for prop=1:length(worm_properties)
                     app.(worm_properties{prop}).Value = app.parent_app.(worm_properties{prop}).Value;
                 end
+                scale = app.parent_app.image_um_scale;
+                if numel(scale) == 3
+                    app.EditField.Value = scale(1);
+                    app.EditField_2.Value = scale(2);
+                    app.EditField_3.Value = scale(3);
+                end
 
             else
-                uiconfirm(app.parent_app.CELLID, "You need to load a volume before you can save to an NWB file.", "Error!");
+                uialert(app.parent_app.CELL_ID, 'Load a volume before exporting an NWB file.', 'NWB export');
                 delete(app);
             end
         end
         
         function device_handler(app, action, device)
-            device_table = app.DeviceUITable.Data;
-
+            data = app.DeviceUITable.Data;
+            if ~strcmp(action, 'add') && isempty(device), return; end
             switch action
                 case 'add'
-                    for comp=1:length(Program.GUIHandling.device_lists)
-                        app.(sprintf('%sHardwareDeviceDropDown', Program.GUIHandling.device_lists{comp})).Items{end+1} = device.name;
-                        app.(sprintf('%sHardwareDeviceDropDown', Program.GUIHandling.device_lists{comp})).ItemsData{end+1} = device.name;
+                    name = strtrim(device.name);
+                    if isempty(name) || contains(name, '/')
+                        uialert(app.SaveasNWBFileUIFigure, 'Enter a device name without slashes.', 'Microscope');
+                        return
                     end
-
+                    row = app.DeviceUITable.UserData;
+                    if isempty(row), row = size(data, 1)+1; end
+                    duplicate = find(strcmp(string(data(:, 1)), name));
+                    if any(duplicate ~= row)
+                        uialert(app.SaveasNWBFileUIFigure, 'This device name already exists.', 'Microscope');
+                        return
+                    end
+                    data(row, :) = {name, device.manu, device.desc};
+                    app.DeviceUITable.Data = data;
+                    app.DeviceUITable.UserData = [];
+                    app.AddHardwareDeviceButton.Text = 'Add Hardware Device';
                     app.NameEditField.Value = '';
                     app.ManufacturerEditField.Value = '';
                     app.HardwareDescriptionTextArea.Value = '';
-
-                    app.DeviceUITable.Data = [device_table; {device.name, device.manu, device.desc}];
-
                 case 'edit'
-                    logged_device = struct(...
-                        'name', char(device_table(device, 1)), ...
-                        'manu', char(device_table(device, 2)), ...
-                        'desc', char(device_table(device, 3)));
-
-                    app.NameEditField.Value = logged_device.name;
-                    app.ManufacturerEditField.Value = logged_device.manu;
-                    app.HardwareDescriptionTextArea.Value = logged_device.desc;
-                    
-                    Program.GUIHandling.device_handler(app, 'remove', device);
-
+                    row = device(1);
+                    app.NameEditField.Value = char(string(data{row, 1}));
+                    app.ManufacturerEditField.Value = char(string(data{row, 2}));
+                    app.HardwareDescriptionTextArea.Value = char(string(data{row, 3}));
+                    app.DeviceUITable.UserData = row;
+                    app.AddHardwareDeviceButton.Text = 'Update Hardware Device';
+                    return
                 case 'remove'
-                    app.DeviceUITable.Data(device, :) = [];
-
-                    for comp=1:length(Program.GUIHandling.device_lists)
-                        app.(sprintf('%sHardwareDeviceDropDown', Program.GUIHandling.device_lists{comp})).Items(device) = [];
-                        app.(sprintf('%sHardwareDeviceDropDown', Program.GUIHandling.device_lists{comp})).ItemsData(device) = [];
-                    end
-
+                    data(device, :) = [];
+                    app.DeviceUITable.Data = data;
+                    app.DeviceUITable.UserData = [];
+                    app.AddHardwareDeviceButton.Text = 'Add Hardware Device';
             end
-
+            for index = 1:numel(Program.GUIHandling.device_lists)
+                control = app.(sprintf('%sHardwareDeviceDropDown', Program.GUIHandling.device_lists{index}));
+                selected = control.Value;
+                control.ItemsData = {};
+                control.Items = cellstr(string(data(:, 1)));
+                control.ItemsData = control.Items;
+                if any(strcmp(control.Items, selected)), control.Value = selected; end
+            end
         end
-        
-        function channel_handler(app, action, channel)
-            channel_table = app.OpticalUITable.Data;
 
+        function channel_handler(app, action, channel)
+            data = app.OpticalUITable.Data;
+            if ~strcmp(action, 'add') && isempty(channel), return; end
             switch action
                 case 'add'
-                    columns = fieldnames(channel);
-
-                    new_row = cell(1, length(columns));
-                    for comp=1:length(columns)
-                        new_row{comp} = channel.(columns{comp});
+                    row = app.OpticalUITable.UserData;
+                    if isempty(row), row = size(data, 1)+1; end
+                    fields = fieldnames(channel);
+                    entry = cellfun(@(field) channel.(field), fields, 'UniformOutput', false)';
+                    if isempty(strtrim(entry{1})) || contains(entry{1}, '/')
+                        uialert(app.SaveasNWBFileUIFigure, 'Enter a channel name without slashes.', 'Optical channel');
+                        return
                     end
-
-                    app.OpticalUITable.Data = [channel_table; new_row];
-
-                    for comp=1:length(Program.GUIHandling.optical_fields)
-                        try
-                            app.(sprintf('%sEditField', Program.GUIHandling.optical_fields{comp})).Value = ''; 
-                        catch 
-                            app.(sprintf('%sEditField', Program.GUIHandling.optical_fields{comp})).Value = 0; 
-                        end
+                    data(row, :) = entry;
+                    app.OpticalUITable.Data = data;
+                    app.OpticalUITable.UserData = [];
+                    app.AddOpticalChannelButton.Text = 'Add Optical Channel';
+                    for index = 1:numel(Program.GUIHandling.optical_fields)
+                        control = app.([Program.GUIHandling.optical_fields{index} 'EditField']);
+                        if isnumeric(control.Value), control.Value = 0; else, control.Value = ''; end
                     end
                 case 'edit'
-                    for comp=1:length(Program.GUIHandling.optical_fields)
-                        app.(Program.GUIHandling.optical_fields{comp}).Value = channel_table(channel, comp); 
+                    row = channel(1);
+                    for index = 1:numel(Program.GUIHandling.optical_fields)
+                        control = app.([Program.GUIHandling.optical_fields{index} 'EditField']);
+                        value = data{row, index};
+                        if isnumeric(control.Value), value = str2double(string(value)); end
+                        control.Value = value;
                     end
-                    
-                    Program.GUIHandling.device_handler(app, 'remove', channel);
+                    app.OpticalUITable.UserData = row;
+                    app.AddOpticalChannelButton.Text = 'Update Optical Channel';
                 case 'remove'
                     app.OpticalUITable.Data(channel, :) = [];
+                    app.OpticalUITable.UserData = [];
+                    app.AddOpticalChannelButton.Text = 'Add Optical Channel';
             end
-
         end
 
 

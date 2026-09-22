@@ -76,9 +76,19 @@ classdef channels
 
             names = Program.Handlers.channels.ensure_none_channel(names);
             order = struct('names', {names}, 'idx', {idx}, 'gammas', {gammas});
+            if mode == "colormap" && isfield(prefs,'processing_channels')
+                saved=prefs.processing_channels;
+                if isstruct(saved) && all(isfield(saved,{'indices','enabled','roles'})) && ...
+                        numel(saved.indices)==max_nc && numel(saved.enabled)==max_nc && numel(saved.roles)==max_nc
+                    order.idx=saved.indices;
+                    order.idx(~isfinite(order.idx) | order.idx<1 | order.idx>=numel(names))=0;
+                    order.enabled=logical(saved.enabled);
+                    order.roles=saved.roles;
+                end
+            end
             Program.Handlers.channels.populate(order);
 
-            if mode == "colormap" && exist('info', 'var') && isstruct(info)
+            if mode == "colormap" && exist('info', 'var') && isstruct(info) && ~isfield(order,'roles')
                 try
                     Program.Handlers.channels.set_references(info);
                 catch
@@ -87,60 +97,14 @@ classdef channels
             end
         end
 
-        function set_references(info)
-            %  set_references   Updates item properties of reference dropdowns.
-            % ┌─────────────────────────────────────────────────────────────┐
-            % │ Description:                                                │
-            % │     This function sets the item property of every reference │
-            % │     related dropdown component in accordance with the info  │
-            % │     struct that was loaded from a given NeuroPAL file.      │
-            % │                                                             │
-            % │ ----------------------------------------------------------- │
-            % │                                                             │
-            % │ Args:                                                       │
-            % │   - info (struct): info field loaded from a NeuroPAL file.  │
-            % └─────────────────────────────────────────────────────────────┤ Reminder:
-            %                                                               ↓ Please don't forget to add comments!
-
-            % Grab variables to be referenced below.
-            app = Program.app;                                              % Grab application handle.
-            ref_handle = Program.Handlers.channels.handles{'pp_ref'};       % Grab component handle string pattern for reference dropdowns.
-            references = app.(sprintf(ref_handle, 4)).Items;                % Grab all currently loaded references (by default, this is {'White', 'GFP', 'DIC'}).
-            loaded_fluos = app.(sprintf( ...                                % Grab all loaded fluorophores.
-                Program.Handlers.channels.handles{'pp_dd'}, 1)).Items; 
-            generic_channel_names = Program.Handlers.channels.is_generic_channel_list(loaded_fluos);
-
-            % From the array of loaded references, remove unused ones.
-            for r=4:3+length(references)                                    % For every known reference...
-                reference = references{r-3};                                % Get its name.
-
-                if isfield(info, reference) && info.(reference) == 0        % If this reference is optional & not present...
-                    references{r-3} = 'None';                               % Rename it to None.
-
-                elseif ~generic_channel_names                               % Otherwise...
-                    related_fluos = ...                                     % Grab a cell array of valid fluorophores associated with this reference.
-                        Program.Handlers.channels.fluorophore_map{lower(reference)};
-
-                    if ~isempty(related_fluos) && ...                       % If we don't know of fluorophores related to this reference...
-                        ~any(ismember(related_fluos, lower(loaded_fluos)))  % ...or such a fluorophore is not currently loaded...
-                        references{r-3} = '???';                            % Set the reference name to ???.
-                    end
-                end
-            end
-
-            references = references(~strcmp(references, 'None'));           % Remove any loaded references we've set to None.
-
-            % Update reference dropdowns.
-            for r=length(app.proc_channel_grid.RowHeight):-1:4              % For every reference channel dropdown...
-
-                if r-3 <= length(references)                                 % If there is a reference for this dropdown...
-                    handle = sprintf(ref_handle, r);                        % Get the component handle.
-                    app.(handle).Items = references;                        % Update its items property.
-                    app.(handle).Value = references{r-3};                   % Set its value to the appropriate reference name.
-
-                else                                                        % If there isn't a reference for this dropdown...
-                    Program.Handlers.channels.delete(r);                    % Delete the excess channel.
-                end
+        function set_references(~)
+            % Keep the fixed display roles available when switching source channels.
+            app = Program.app;
+            roles = {'White', 'DIC', 'GFP'};
+            for row = 4:6
+                handle = sprintf(Program.Handlers.channels.handles{'pp_ref'}, row);
+                app.(handle).Items = roles;
+                app.(handle).Value = roles{row-3};
             end
         end
 
@@ -327,6 +291,7 @@ classdef channels
                 cb_handle = sprintf(Program.Handlers.channels.handles{'pp_cb'}, c);
                 idx = round(indices(c));
                 app.(cb_handle).Value = c <= 3 && idx > 0;
+                if isfield(order,'enabled'), app.(cb_handle).Value=order.enabled(c) && idx>0; end
 
                 dd_handle = sprintf(Program.Handlers.channels.handles{'pp_dd'}, c);
 
@@ -349,6 +314,9 @@ classdef channels
                         target_role = string(role_defaults{min(c, numel(role_defaults))});
                         if any(ref_items == target_role)
                             app.(ref_handle).Value = char(target_role);
+                        end
+                        if isfield(order,'roles') && any(ref_items==string(order.roles{c}))
+                            app.(ref_handle).Value=order.roles{c};
                         end
                     end
                 end
@@ -960,7 +928,8 @@ classdef channels
             try
                 if isa(app.proc_image, 'matlab.io.MatFile')
                     dims = size(app.proc_image, 'data');
-                    if numel(dims) >= 4
+                    if ~isempty(dims) && all(dims > 0)
+                        dims(end+1:4) = 1;
                         nc = dims(4);
                     end
                 end
@@ -970,7 +939,8 @@ classdef channels
             if nc < 1
                 try
                     dims = size(app.image_data);
-                    if numel(dims) >= 4
+                    if ~isempty(dims) && all(dims > 0)
+                        dims(end+1:4) = 1;
                         nc = dims(4);
                     end
                 catch
@@ -981,7 +951,8 @@ classdef channels
                 try
                     mat_file = matfile(path);
                     dims = size(mat_file, 'data');
-                    if numel(dims) >= 4
+                    if ~isempty(dims) && all(dims > 0)
+                        dims(end+1:4) = 1;
                         nc = dims(4);
                     end
                 catch

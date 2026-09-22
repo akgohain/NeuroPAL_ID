@@ -18,6 +18,8 @@ classdef ChunkyMethods
                 og_dims = size(vol);
             end
 
+            og_dims(end+1:4) = 1;
+
             switch action
                 case 'crop'
                     rotated_mask = imrotate( ...
@@ -111,6 +113,11 @@ classdef ChunkyMethods
             % Apply operation to a volume.
 
             switch action
+                case 'zscore'
+                    % Use the same black and white points throughout the Z stack.
+                    percentiles = Methods.ChunkyMethods.proc_normalize_percentiles(app);
+                    processed_vol = Methods.Preprocess.normalize_frame(vol, percentiles(1), percentiles(2));
+
                 case 'debleed'
                     processed_vol = Methods.ChunkyMethods.debleed(app, vol);
 
@@ -157,55 +164,20 @@ classdef ChunkyMethods
         end
 
         function apply_colormap(app, actions)
-            % Apply set of operations to a colormap.
-
-            if nargin < 2 || isempty(actions)
-                return
+            % Share the preview path so image edits also transform neuron positions.
+            if nargin < 2 || isempty(actions), return; end
+            if Program.Helpers.apply_processing_preview_action(app, actions)
+                Program.Routines.Processing.save();
             end
-
-            actions = cellstr(lower(string(actions)));
-            actions = actions(~cellfun('isempty', actions));
-            if isempty(actions)
-                return
-            end
-
-            % Calculate new colormap dimensions
-            Program.Handlers.dialogue.step('Calculating new dimensions...');
-            context = Program.Helpers.processing_colormap_context(app);
-            if isempty(context.volume)
-                Program.Helpers.apply_processing_preview_action(app, actions);
-                return
-            end
-
-            source_dims = size(context.volume);
-            if numel(source_dims) < 4
-                source_dims(end+1:4) = 1;
-            end
-            new_dims = size(context.volume);
-            for a=1:length(actions)
-                new_dims = Methods.ChunkyMethods.calc_pp_size(app, actions{a}, new_dims);
-            end
-
-            current_vol = context.volume;
-            for a=1:length(actions)
-                Program.Handlers.dialogue.add_task(sprintf("Applying %s", actions{a}));
-                Program.Handlers.dialogue.set_value(a/length(actions));
-                processed_vol = Methods.ChunkyMethods.apply_vol(app, actions{a}, current_vol);
-                current_vol = processed_vol;
-            end
-
-            app.image_data = current_vol;
-            Program.Helpers.update_processing_image_scale(app, actions, source_dims);
-            app.image_data_zscored = [];
-            setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
-            Program.Helpers.write_processing_colormap_to_file(app);
         end
 
-        function apply_video(app, actions, progress)
+        function applied = apply_video(app, actions, progress)
+            applied = false;
             % Apply set of operations to a video.
             %#ok<INUSD>
 
             if nargin < 2 || isempty(actions)
+                applied = true;
                 return
             end
 
@@ -229,12 +201,14 @@ classdef ChunkyMethods
             % ...Set up necessary paths.
             source_path = Methods.ChunkyMethods.video_source_path(app);
             ppath = fileparts(source_path); % Get current file's parent path.
-            temp_path = sprintf('%s/cache_video.h5', ppath); % Create cache file to which we'll be writing.
-            processed_path = sprintf('%s/processed_video.h5', ppath); % Create new video file to avoid overwriting original.
-
-            % If a cache file already exists, delete it.
-            if exist(temp_path, 'file')==2
-                delete(temp_path);
+            temp_path = [tempname(ppath) '.h5'];
+            temp_cleanup = onCleanup(@() Methods.ChunkyMethods.remove_video_cache(temp_path));
+            [~, source_name] = fileparts(source_path);
+            processed_path = fullfile(ppath, [source_name '_processed.h5']);
+            index = 1;
+            while isfile(processed_path)
+                processed_path = fullfile(ppath, sprintf('%s_processed_%03d.h5', source_name, index));
+                index = index + 1;
             end
 
             % Calculate new video dimensions
@@ -263,8 +237,23 @@ classdef ChunkyMethods
             h5create(temp_path, '/data', [new_dims(1:4) nt], ...
                 "Chunksize", [new_dims(1) new_dims(2) 1 1 1], ...
                 "Datatype", source_class);
+            h5writeatt(temp_path, '/data', 'axes', 'TCZXY');
             h5create(temp_path, '/times', nt, "Datatype", "double");
-            h5write(temp_path, '/times', 1:nt);
+            times = 1:nt;
+            if endsWith(lower(source_path), '.h5')
+                datasets = h5info(source_path);
+                if any(strcmp({datasets.Datasets.Name}, 'times'))
+                    times = h5read(source_path, '/times');
+                    if numel(times) ~= nt
+                        error('NeuroPAL:VideoTimes', 'The video timestamps do not match its frame count.');
+                    end
+                    time_info = h5info(source_path, '/times');
+                    for attribute = time_info.Attributes'
+                        h5writeatt(temp_path, '/times', attribute.Name, attribute.Value);
+                    end
+                end
+            end
+            h5write(temp_path, '/times', double(times(:)));
 
             old_nz = app.video_info.nz;
             reverse_z = Methods.ChunkyMethods.video_actions_reverse_z(actions);
@@ -308,22 +297,19 @@ classdef ChunkyMethods
                     h5write(temp_path, '/data', slice, [1 1 out_z 1 t], write_size);
                 end
 
-                app.video_frame_cache = [];
-                app.video_frame_cache_key = struct('file', '', 't', NaN);
-                if ismethod(app, 'resetVideoViewCache')
-                    app.resetVideoViewCache();
-                end
-
                 Program.Handlers.dialogue.resolve();
-            end
-
-            if exist(processed_path, 'file')==2
-                delete(processed_path);
             end
 
             movefile(temp_path, processed_path);
             app.video_info.nt = nt;
+            app.flags = struct();
+            Program.GUIHandling.set_thresholds(app, 255);
             Program.Routines.Videos.reload(processed_path);
+            applied = true;
+        end
+
+        function remove_video_cache(path)
+            if isfile(path), delete(path); end
         end
 
         function source_path = video_source_path(app)
@@ -346,7 +332,7 @@ classdef ChunkyMethods
 
         function reverse_z = video_actions_reverse_z(actions)
             actions = cellstr(lower(string(actions)));
-            reverse_count = sum(strcmp(actions, 'hori') | strcmp(actions, 'vert'));
+            reverse_count = sum(strcmp(actions, 'mirrorz'));
             reverse_z = mod(reverse_count, 2) == 1;
         end
 
@@ -357,10 +343,8 @@ classdef ChunkyMethods
             video_file_lower = lower(video_file);
 
             if endsWith(video_file_lower, '.h5')
-                slice = h5read(video_file, '/data', ...
-                    [1 1 z 1 t], ...
-                    [app.video_info.ny app.video_info.nx 1 app.video_info.nc 1]);
-                slice = Methods.ChunkyMethods.ensure_4d(slice);
+                slice = Program.Helpers.read_h5_video_slice(app.video_info, t, z);
+                slice = reshape(slice, app.video_info.ny, app.video_info.nx, 1, app.video_info.nc);
                 return
             end
 
@@ -453,6 +437,7 @@ classdef ChunkyMethods
                     cache.bg_px = target.pixels;
                     cache.bg_val = measured_vector;
                     Methods.ChunkyMethods.update_spectral_fields(app, 'background', measured_vector);
+                    app.flags.debleed = 1;
                 otherwise
                     role_idx = Methods.ChunkyMethods.spectral_role_index(channel, role_names);
                     if isempty(role_idx)
@@ -496,7 +481,8 @@ classdef ChunkyMethods
             %#ok<INUSD>
             cache = Methods.ChunkyMethods.ensure_spectral_cache(app);
             coefficients = cache.coefficients;
-            if isempty(coefficients) || ~any(isfinite(coefficients), 'all')
+            if (isempty(coefficients) || ~any(isfinite(coefficients), 'all')) && ...
+                    ~all(isfinite(cache.background_vector))
                 output = vol;
                 return
             end
@@ -622,9 +608,7 @@ classdef ChunkyMethods
 
         function rgb_apply_idx = spectral_apply_indices(vol, rgb_source_idx)
             n_channels = size(vol, 4);
-            if n_channels == 3
-                rgb_apply_idx = 1:3;
-            elseif numel(rgb_source_idx) == 3 && all(rgb_source_idx >= 1) && all(rgb_source_idx <= n_channels)
+            if numel(rgb_source_idx) == 3 && all(rgb_source_idx >= 1) && all(rgb_source_idx <= n_channels)
                 rgb_apply_idx = rgb_source_idx;
             else
                 rgb_apply_idx = [];
@@ -658,7 +642,11 @@ classdef ChunkyMethods
             end
 
             for i = 1:3
-                filtered_vol(:, :, :, i) = imgaussfilt3(filtered_vol(:, :, :, i), sigma_gauss);
+                if size(vol,3)==1
+                    filtered_vol(:, :, :, i) = imgaussfilt(filtered_vol(:, :, :, i), sigma_gauss);
+                else
+                    filtered_vol(:, :, :, i) = imgaussfilt3(filtered_vol(:, :, :, i), sigma_gauss);
+                end
             end
         end
 
@@ -679,27 +667,15 @@ classdef ChunkyMethods
         end
 
         function [normalized_vol, channel_maxima] = spectral_normalized_rgb_volume(vol, rgb_source_idx)
+            % Calibration and application use the same units on every slice.
+            normalization = 1;
+            if isinteger(vol), normalization = double(intmax(class(vol))); end
+            channel_maxima = repmat(normalization, 1, 3);
             normalized_vol = zeros([size(vol, 1), size(vol, 2), size(vol, 3), 3], 'double');
-            channel_maxima = ones(1, 3);
-
             for i = 1:3
                 channel = double(vol(:, :, :, rgb_source_idx(i)));
-                finite_mask = isfinite(channel);
-                if ~any(finite_mask, 'all')
-                    continue
-                end
-
-                channel(~finite_mask) = 0;
-                min_val = min(channel(finite_mask), [], 'all');
-                if min_val < 0
-                    channel = channel - min_val;
-                end
-
-                max_val = max(channel, [], 'all');
-                channel_maxima(i) = max(max_val, 1);
-                if max_val > 0
-                    normalized_vol(:, :, :, i) = channel / max_val;
-                end
+                channel(~isfinite(channel)) = 0;
+                normalized_vol(:, :, :, i) = max(channel, 0) / normalization;
             end
         end
 
@@ -940,10 +916,6 @@ classdef ChunkyMethods
 
         function output = apply_channel_windows(app, volume)
             output = volume;
-            if ndims(output) < 4
-                return
-            end
-
             window_settings = Methods.ChunkyMethods.proc_window_settings(app, size(output, 4));
             if isempty(window_settings)
                 return
@@ -953,7 +925,8 @@ classdef ChunkyMethods
                 source_idx = window_settings(n).source_idx;
                 output(:, :, :, source_idx) = Methods.ChunkyMethods.apply_channel_window( ...
                     output(:, :, :, source_idx), ...
-                    window_settings(n).low_high_in);
+                    window_settings(n).low_high_in, ...
+                    Program.Helpers.processing_intensity_range(app));
             end
         end
 
@@ -1007,10 +980,17 @@ classdef ChunkyMethods
             window_settings = window_settings(assigned);
         end
 
-        function output = apply_channel_window(channel, low_high_in)
+        function output = apply_channel_window(channel, low_high_in, range)
             low_high_in = Methods.ChunkyMethods.normalize_window_range(low_high_in);
             if all(abs(low_high_in - [0 1]) <= (0.5 / 255))
                 output = channel;
+                return
+            end
+
+            if nargin > 2 && numel(range)==2
+                normalized = min(max((double(channel)-range(1))/diff(range),0),1);
+                adjusted = imadjustn(normalized,low_high_in,[0 1],1);
+                output = cast(adjusted*diff(range)+range(1),class(channel));
                 return
             end
 

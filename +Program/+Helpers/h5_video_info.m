@@ -23,6 +23,11 @@ if any(dataset_names == "data")
     info.nz = dims(3);
     info.nc = dims(4);
     info.nt = dims(5);
+    info.transpose_xy = local_transpose(path, data_info, dims);
+    if info.transpose_xy
+        info.ny = dims(2);
+        info.nx = dims(1);
+    end
     info.aspect_ratio = info.ny / info.nx;
     info.ChunkSize = data_info.ChunkSize;
     info.cached = 1;
@@ -86,5 +91,28 @@ if isempty(token)
     idx = NaN;
 else
     idx = str2double(token{1});
+end
+end
+
+function swapped = local_transpose(path, dataset, dims)
+% Prefer explicit axes; older app exports used TCZXY without metadata.
+swapped = false;
+for attribute = dataset.Attributes'
+    if any(strcmpi(attribute.Name, {'axes', 'axis_order'}))
+        order = upper(char(string(attribute.Value)));
+        if strcmp(order, 'TCZYX'), swapped = true; return; end
+        if strcmp(order, 'TCZXY'), return; end
+    end
+end
+metadata = fullfile(fileparts(path), 'metadata.json');
+if ~isfile(metadata), return; end
+value = jsondecode(fileread(metadata));
+fields = {'shape_x', 'shape_y', 'shape_z', 'shape_c', 'shape_t'};
+if ~all(isfield(value, fields)), return; end
+shape = cellfun(@(field) double(value.(field)), fields);
+if isequal(dims, shape)
+    swapped = true;
+elseif ~isequal(dims, shape([2 1 3 4 5]))
+    error('Program:Video:MetadataShape', 'Video dimensions do not match metadata.json.');
 end
 end

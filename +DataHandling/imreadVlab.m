@@ -56,18 +56,17 @@ else
     image.scale = [0.4, 0.4, 1.5];
 end
 
-image.channels = {'red', 'green', 'blue', 'RFP', 'GCaMP'};
-image.colors(1,:) = [1,0,0];
-image.colors(2,:) = [0,1,0];
-image.colors(3,:) = [0,0,1];
-image.colors(4,:) = [1,1,1];
-image.colors(5,:) = [1,0,1];
-
+nc = vlab_meta.shape_c;
+channel_names = {'red', 'green', 'blue', 'RFP', 'GCaMP'};
+channel_colors = [1 0 0; 0 1 0; 0 0 1; 1 1 1; 1 0 1];
+image.channels = arrayfun(@(c) sprintf('Channel %d', c), 1:nc, 'UniformOutput', false);
+image.colors = ones(nc, 3);
+known = min(nc, numel(channel_names));
+image.channels(1:known) = channel_names(1:known);
+image.colors(1:known,:) = channel_colors(1:known,:);
 image.dicChannel = nan;
-
-% Initialize the image excitation/emission information.
-image.lasers = nan(5,1);
-image.emissions = nan(5,1);
+image.lasers = nan(nc,1);
+image.emissions = nan(nc,1);
 
 %write metadata
 hashtable = java.util.Hashtable;

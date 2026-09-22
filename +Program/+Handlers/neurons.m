@@ -4,6 +4,13 @@ classdef neurons
     end
     
     methods (Static)
+        function finish_id_save(app)
+            % Release the edit guard even when saving raises an error.
+            if isvalid(app)
+                app.is_saving_ID = false;
+            end
+        end
+
         function initialize(neurons)
             app = Program.app;
 

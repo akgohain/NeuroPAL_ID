@@ -10,24 +10,35 @@ classdef nwb_stream_export
             dims = size(data);
             dims(end+1:4) = 1;
             source = struct('path', '/acquisition/NeuroPALImageRaw/data', ...
-                'dims', dims, 'read_plane', @(t, z, c) data(:, :, z, c));
+                'dims', dims, 'permutation', [4 3 1 2], ...
+                'read_plane', @(t, z, c) data(:, :, z, c));
         end
 
         function source = video_source(app)
             info = app.video_info;
             dims = [info.ny info.nx info.nz info.nc info.nt];
             source = struct('path', '/acquisition/CalciumImageSeries/data', ...
-                'dims', dims, ...
+                'dims', dims, 'permutation', [4 3 1 2 5], ...
                 'source_file', info.file, ...
                 'source_signature', DataHandling.Helpers.large_file.source_signature(info.file), ...
                 'read_plane', @(t, z, c) DataHandling.Helpers.nwb_stream_export.read_video_plane(app, info, t, z, c));
         end
 
         function pipe = make_pipe(dims)
+            permutation = [];
+            if isstruct(dims)
+                source = dims;
+                dims = source.dims;
+                if isfield(source, 'permutation'), permutation = source.permutation; end
+            end
             validateattributes(dims, {'numeric'}, ...
                 {'vector', 'finite', 'positive', 'integer'});
             chunk = ones(size(dims));
             chunk(1:2) = min(dims(1:2), [256 256]);
+            if ~isempty(permutation)
+                dims = dims(permutation);
+                chunk = chunk(permutation);
+            end
             pipe = types.untyped.DataPipe('maxSize', dims, ...
                 'dataType', 'uint16', 'axis', numel(dims), ...
                 'chunkSize', chunk, 'compressionLevel', 3);
@@ -81,6 +92,11 @@ classdef nwb_stream_export
                 source = sources{i};
                 conversions{i} = DataHandling.Helpers.nwb_stream_export.write_source( ...
                     partial, source, progress, p.Results.CancelFcn);
+                if isfield(source, 'metadata')
+                    for field = fieldnames(source.metadata)'
+                        h5writeatt(partial, source.path, field{1}, source.metadata.(field{1}));
+                    end
+                end
             end
             if ~isempty(conversions)
                 DataHandling.Helpers.nwb_stream_export.write_conversion_notes(partial, conversions);
@@ -95,11 +111,17 @@ classdef nwb_stream_export
 
         function conversion = write_source(path, source, progress, cancel_fcn)
             dims = source.dims;
+            permutation = 1:numel(dims);
+            if isfield(source, 'permutation'), permutation = source.permutation; end
+            if ~isequal(sort(permutation), 1:numel(dims))
+                error('DataHandling:NWBExport:InvalidDimensions', 'Invalid storage axis permutation.');
+            end
+            storage_dims = dims(permutation);
             shape = dims;
             shape(end+1:5) = 1;
             count = prod(shape(3:5));
             DataHandling.Helpers.nwb_stream_export.check_source(source);
-            DataHandling.Helpers.nwb_stream_export.allocate(path, source.path, dims);
+            DataHandling.Helpers.nwb_stream_export.allocate(path, source.path, storage_dims);
 
             sample = DataHandling.Helpers.nwb_stream_export.read_plane(source, 1, 1, 1, progress, cancel_fcn);
             source_class = class(sample);
@@ -154,7 +176,9 @@ classdef nwb_stream_export
                         end
                         start = [1 1 z c t];
                         slab = [shape(1:2) 1 1 1];
-                        h5write(path, source.path, plane, start(1:numel(dims)), slab(1:numel(dims)));
+                        % MATLAB reverses dataset dimensions in HDF5.
+                        plane = permute(plane, permutation);
+                        h5write(path, source.path, plane, start(permutation), slab(permutation));
                         written = written + 1;
                         DataHandling.Helpers.nwb_stream_export.update_progress(progress, ...
                             sprintf('Exporting plane %d/%d...', written, count), written / count);
@@ -169,7 +193,7 @@ classdef nwb_stream_export
                 conversion.source_max = high;
             end
             info = h5info(path, source.path);
-            if ~isequal(double(info.Dataspace.Size), double(dims))
+            if ~isequal(double(info.Dataspace.Size), double(storage_dims))
                 error('DataHandling:NWBExport:VerificationFailed', 'Exported volume dimensions do not match the source.');
             end
             probe = h5read(path, source.path, ones(size(dims)), ones(size(dims)));

@@ -55,11 +55,26 @@ classdef Illustration
             color = squeeze(median(patch, 1:3));
         end
 
-        function saveIDImage(file, data, neurons, um_scale, is_Z_flip)
+        function slabs = idImageSlabs(start_z, end_z, thickness, max_z, is_Z_flip)
+            %IDIMAGESLABS Map non-overlapping display slabs to source slices.
+            values = [start_z end_z thickness max_z];
+            if any(~isfinite(values) | values < 1 | values ~= round(values)) || ...
+                    start_z > end_z || end_z > max_z
+                error('Output:Illustration:InvalidParameters', 'Invalid image export slice range.');
+            end
+            starts = (start_z:thickness:end_z)';
+            slabs = [starts min(starts + thickness - 1, end_z)];
+            if is_Z_flip
+                slabs = max_z - slabs(:, [2 1]) + 1;
+            end
+        end
+
+        function files = saveIDImage(file, data, neurons, um_scale, is_Z_flip)
             %SAVEIDIMAGE save an image with neuron IDs to a PDF.
             
             % Initialize.
             import Output.*;
+            files = {};
             
             % What is the z limit?
             if isstruct(data) && isfield(data, 'read_slice')
@@ -116,6 +131,10 @@ classdef Illustration
             is_circle_weak = ~isempty(answer{7}) && lower(answer{7}(1)) == 'y';
             is_circle_all = ~isempty(answer{8}) && lower(answer{8}(1)) == 'y';
             
+            if any(~isfinite([start_z end_z z_MIP z_ID_offset image_size font_size]))
+                error('Output:Illustration:InvalidParameters', 'Image export parameters must be finite numbers.');
+            end
+
             % Sanitize the input values.
             if start_z < 1 || start_z > max_z
                 start_z = 1;
@@ -144,22 +163,17 @@ classdef Illustration
                 font_size = 10;
             end
             
-            % Is Z flipped?
-            if is_Z_flip
-                user_start_z = start_z;
-                start_z = max_z - end_z + 1;
-                end_z = max_z - user_start_z + 1;
-            end
-            
             % Get the the screen size.
             screen_size = get(0, 'Screensize');
             
             % Compute the scale bar.
             max_y = data_dims(1);
             scale_bar_width = 1;
-            scale_bar_size = 10;
+            target_length = min(10, data_dims(2) * um_scale(1) / 4);
+            scale_steps = [1 2 5] * 10^floor(log10(target_length));
+            scale_bar_size = max(scale_steps(scale_steps <= target_length));
             scale_bar_str = [num2str(scale_bar_size) ' \mum'];
-            scale_bar_off = [10,10];
+            scale_bar_off = min([10,10], data_dims([2 1]) * image_size / 20);
             scale_bar_len = (scale_bar_size / um_scale(1)) * image_size;
             scale_bar_x = [0, scale_bar_len] + scale_bar_off(1);
             scale_bar_y = max_y * image_size - [scale_bar_off(2),scale_bar_off(2)];
@@ -202,22 +216,12 @@ classdef Illustration
                 neuron_emphasized = arrayfun(@(x) x.is_emphasized, neurons);
             end
             
-            % Determine the Z MIPs.
-            Z_MIPs = start_z:z_MIP:end_z;
-            if Z_MIPs(end) < end_z
-                Z_MIPs = [Z_MIPs, end_z];
-            end
-            if is_Z_flip
-                Z_MIPs = end_z - fliplr(Z_MIPs) + 1; 
-            end
-            
-            % Save the PDFs.
-            for page = 1:(length(Z_MIPs) - 1)
-                
-                % Determine the Z slices to show.
-                Z_start = Z_MIPs(page);
-                Z_end = Z_MIPs(page + 1);
-                
+            % Divide the selected display range into non-overlapping slabs.
+            slabs = Output.Illustration.idImageSlabs(start_z, end_z, z_MIP, max_z, is_Z_flip);
+            for page = 1:size(slabs, 1)
+                Z_start = slabs(page, 1);
+                Z_end = slabs(page, 2);
+
                 % Draw the image.
                 fig = figure('Visible', 'off', 'NumberTitle', 'off', 'Name', file);
                 figure_cleanup = onCleanup(@() Output.Illustration.deleteFigure(fig));
@@ -316,14 +320,8 @@ classdef Illustration
                     'HorizontalAlignment', 'center', ...
                     'VerticalAlignment', 'bottom');
                 
-                % Compute the page number.
-                page_num = page;
-                if is_Z_flip
-                    page_num = length(Z_MIPs) - page;
-                end
-                
-                % Save the file.
-                save_file = [file '_' num2str(page_num) '.' file_format];
+                % Save the file in display order.
+                save_file = [file '_' num2str(page) '.' file_format];
                 fig.Renderer = 'Painters';
                 
                 if strcmp(file_format, 'svg')
@@ -346,6 +344,7 @@ classdef Illustration
                     print(fig, '-dpdf', '-fillpage', save_file);
                 end
                 
+                files{end+1} = save_file;
                 close(fig);
                 clear figure_cleanup
             end

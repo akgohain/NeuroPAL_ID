@@ -48,7 +48,7 @@ classdef TransformerAutoId
                     'ProgressFcn', @(message) Methods.TransformerAutoId.updateProgress(progress, message));
             else
                 Methods.TransformerAutoId.updateProgress(progress, ...
-                    'No NWB found; staging current app volume for transformer auto-ID...');
+                    'Staging current image and neuron centers for transformer auto-ID...');
                 [volume_rgbw, labels] = Methods.TransformerAutoId.appTransformerVolume(app);
                 positions_yxz = Methods.TransformerAutoId.appNeuronPositions(app);
                 predictions = Wrapper.runTransformerAutoIDFromVolume(volume_rgbw, positions_yxz, app.image_um_scale', ...
@@ -69,32 +69,39 @@ classdef TransformerAutoId
                     'ProgressFcn', @(message) Methods.TransformerAutoId.updateProgress(progress, message));
             end
 
+            if strlength(nwb_path) == 0
+                predictions = Methods.TransformerAutoId.normalizeInputPredictions(predictions, size(positions_yxz, 1));
+            end
             Program.Helpers.assert_main_job_context(app, input_context);
             Methods.TransformerAutoId.applyPredictions(app, predictions);
             Methods.TransformerAutoId.refreshAppUI(app);
         end
 
-        function nwb_path = resolveNWBPath(app, explicit_path)
+        function nwb_path = resolveNWBPath(~, explicit_path)
+            % Current image pixels and edited centers are the default input.
             nwb_path = string(explicit_path);
-            if strlength(nwb_path) > 0 && exist(nwb_path, 'file') == 2
-                return
+            if strlength(nwb_path) > 0 && exist(nwb_path, 'file') ~= 2
+                error('Methods:TransformerAutoId:MissingNWB', 'The requested NWB file does not exist.');
             end
-            nwb_path = "";
-            try
-                image_file = string(app.image_file);
-                if strlength(image_file) > 0
-                    [folder, name, ext] = fileparts(image_file);
-                    if strcmpi(ext, '.nwb') && exist(image_file, 'file') == 2
-                        nwb_path = image_file;
-                        return
-                    end
-                    candidate = fullfile(folder, [name, '.nwb']);
-                    if exist(candidate, 'file') == 2
-                        nwb_path = string(candidate);
-                    end
-                end
-            catch
+        end
+
+        function predictions = normalizeInputPredictions(predictions, count)
+            required = {'neuron_idx', 'predicted_class', 'confidence'};
+            if ~istable(predictions) || ~all(ismember(required, predictions.Properties.VariableNames))
+                error('Methods:TransformerAutoId:BadPredictions', 'Auto-ID returned an invalid prediction table.');
             end
+            indices = double(predictions.neuron_idx(:));
+            if height(predictions) == count && isequal(sort(indices), (0:count-1)')
+                indices = indices + 1;
+            end
+            if ~isequal(sort(indices), (1:count)')
+                error('Methods:TransformerAutoId:InputIndices', 'Auto-ID did not preserve the input neuron indices.');
+            end
+            predictions.neuron_idx = indices;
+            failed = strcmpi(string(predictions.predicted_class), 'FAILED');
+            predictions.confidence(failed) = 0;
+            predictions = Methods.MethodContract.identity(predictions);
+            predictions.Properties.UserData = struct('app_input_indices', true);
         end
 
         function checkpoint_path = defaultCheckpointPath()
@@ -136,6 +143,7 @@ classdef TransformerAutoId
                     end
                     neuron = app.image_neurons.neurons(round(idx));
                     predicted_class = char(string(predictions.predicted_class(r)));
+                    if strcmpi(predicted_class, 'FAILED'), continue; end
                     if isempty(strtrim(predicted_class)) || strcmpi(predicted_class, 'nan')
                         predicted_class = 'Artifact';
                     end
@@ -394,6 +402,14 @@ classdef TransformerAutoId
 
             coord_fields = {'coord_x_um', 'coord_y_um', 'coord_z_um'};
             has_coords = all(ismember(coord_fields, predictions.Properties.VariableNames));
+            metadata = predictions.Properties.UserData;
+            if isstruct(metadata) && isfield(metadata, 'app_input_indices') && metadata.app_input_indices
+                prediction_to_neuron = double(predictions.neuron_idx(:));
+                stats.matched = n_predictions;
+                stats.unmatched_predictions = 0;
+                stats.unmatched_neurons = n - n_predictions;
+                return
+            end
             if has_coords
                 try
                     neuron_positions = app.image_neurons.get_positions();
