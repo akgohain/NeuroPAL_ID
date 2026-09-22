@@ -111,6 +111,11 @@ classdef ChunkyMethods
             % Apply operation to a volume.
 
             switch action
+                case 'zscore'
+                    % Use the same black and white points throughout the Z stack.
+                    percentiles = Methods.ChunkyMethods.proc_normalize_percentiles(app);
+                    processed_vol = Methods.Preprocess.normalize_frame(vol, percentiles(1), percentiles(2));
+
                 case 'debleed'
                     processed_vol = Methods.ChunkyMethods.debleed(app, vol);
 
