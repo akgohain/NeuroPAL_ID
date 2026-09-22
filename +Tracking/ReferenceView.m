@@ -384,7 +384,7 @@ classdef ReferenceView < handle
             if ~isempty(outline), outline.Visible='off'; end
             if ~obj.ShowROI.Value || isempty(obj.Selection), return; end
             index=find(obj.ListRows(:,1)==obj.Selection(2),1);
-            radius=sscanf(c.Analysis.Controls.radius.Value,'%f')';
+            options=c.Analysis.options(); radius=options.radius_xyz;
             if isempty(index) || numel(radius)~=3 || any(~isfinite(radius) | radius<=0), return; end
             row=obj.ListRows(index,:); factor=1;
             if ~isempty(z)

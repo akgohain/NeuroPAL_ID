@@ -228,7 +228,7 @@ classdef ReferenceWorkflow < handle
             if ~obj.Calibration.Value
                 obj.View.openSettings(); obj.Status.Text='Confirm voxel spacing in Image settings, then run detection.'; return;
             end
-            scale = sscanf(obj.Spacing.Value,'%f')';
+            scale = Tracking.ImageUnits.spacing(obj);
             if numel(scale)~=3 || any(~isfinite(scale) | scale<=0), error('Tracking:Spacing','Enter three positive XYZ spacings.'); end
             mode='single_channel'; channel=obj.DetectionChannel.Value; mapping=[];
             if strcmp(obj.DetectionMode.Value,'RGBW')
@@ -481,8 +481,12 @@ classdef ReferenceWorkflow < handle
             obj.Status.Text=sprintf('Loaded %d completed tracking windows.',numel(response.manifest.completed));
         end
         function extractActivity(obj)
+            options=obj.Analysis.options();
+            if numel(options.radius_xyz)~=3 || any(~isfinite(options.radius_xyz) | options.radius_xyz<=0)
+                error('Tracking:ActivityRadius','Enter three positive X Y Z sampling radii in pixels.');
+            end
             response=obj.bridge(struct('action','activity','source',obj.Source,'observations',obj.observations(), ...
-                'frame_range',[obj.First.Value-1 obj.Last.Value-1],'options',obj.Analysis.options(), ...
+                'frame_range',[obj.First.Value-1 obj.Last.Value-1],'options',options, ...
                 'output_dir',obj.OutputRoot,'provenance',struct('jobs',{obj.History},'tracking',obj.TrackDirectory)), ...
                 @() obj.Cancelled || ~isvalid(obj.App),@(message) obj.progress(message));
             obj.ActivityDirectory=response.directory; obj.ActivityRows=obj.Rows; obj.ActivityExcluded=obj.Excluded;
