@@ -1,217 +1,162 @@
----
+# NeuroPAL ID
 
-# NeuroPAL_ID
+MATLAB software for viewing NeuroPAL images, detecting neuron centers, assigning and editing neuron identities, and tracking calcium activity through time.
 
-##### Research software to perform (semi-) automated detection and identification of neurons in images of NeuroPAL, extract ID’d neural activity traces from NeuroPAL;GCaMP animals, and upload these datasets to public repositories.
+**Current source for this fork: [akgohain/NeuroPAL_ID · main](https://github.com/akgohain/NeuroPAL_ID/tree/main).** This fork builds on [Yemini-Lab/NeuroPAL_ID](https://github.com/Yemini-Lab/NeuroPAL_ID). The instructions below launch the source version with the recent manual-ID, image-processing, and tracking fixes.
 
-![GenImg](https://i.imgur.com/wpz7LKf.png)
+[Quick start](#quick-start) · [Manual identification](#manual-identification) · [Save and export](#save-and-export) · [Other workflows](#other-workflows) · [Documentation](#documentation)
 
-[![Citation Badge](https://api.juleskreuer.eu/citation-badge.php?doi=10.1016/j.cell.2020.12.012)](https://juleskreuer.eu//projects/citation-badge)  ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/Yemini-Lab/NeuroPAL_ID/total) 
- ![GitHub contributors](https://img.shields.io/github/contributors-anon/Yemini-Lab/NeuroPAL_ID) ![GitHub Issues or Pull Requests](https://img.shields.io/github/issues/Yemini-Lab/NeuroPAL_ID) [![CC BY-NC-SA 4.0][cc-by-nc-sa-shield]][cc-by-nc-sa] 
+## Quick start
 
-### Authors
+### Requirements
 
-<a href="https://github.com/Yemini-Lab/NeuroPAL_ID/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Yemini-Lab/NeuroPAL_ID" />
-</a>
-                 
-\+ **Venkatachalam Lab:** James Yu, Vivek Venkatachalam,  Maedeh Seyedolmohadesin.       
-\+ **Kimura Lab:** Chentao Wen, Koutarou D Kimura.
+The current source has been tested with **MATLAB R2024a on macOS**. Compatibility with older MATLAB releases and other operating systems has not been revalidated for the current changes.
 
-Made with [contrib.rocks](https://contrib.rocks).
-Please review our [contributors page](https://github.com/Yemini-Lab/NeuroPAL_ID/graphs/contributors) for more information.
+Install these MATLAB toolboxes used by the app:
 
----
+- Image Processing Toolbox
+- Statistics and Machine Learning Toolbox
+- Optimization Toolbox
+- Parallel Computing Toolbox — optional for supported parallel operations
 
-## Background
+Bio-Formats, MatNWB, and mlapptools are included under `External_Dependencies`; startup adds them and the bundled reference data to the MATLAB path.
 
-### Paper
+**Manual annotation does not require MoE or GAT checkpoints.** Python environments and external models are needed for the corresponding automated methods, video workers, and some importer fallbacks. See [Optional automated methods](#optional-automated-methods) when using those features.
 
-> Comprehensively resolving neuronal identities in whole-brain images is a major challenge. We achieve this in C. elegans by engineering a multicolor transgene called NeuroPAL (a neuronal polychromatic atlas of landmarks). NeuroPAL worms share a stereotypical multicolor fluorescence map for the entire hermaphrodite nervous system that resolves all neuronal identities. Neurons labeled with NeuroPAL do not exhibit fluorescence in the green, cyan, or yellow emission channels, allowing the transgene to be used with numerous reporters of gene expression or neuronal dynamics. We showcase three applications that leverage NeuroPAL for nervous-system-wide neuronal identification. First, we determine the brainwide expression patterns of all metabotropic receptors for acetylcholine, GABA, and glutamate, completing a map of this communication network. Second, we uncover changes in cell fate caused by transcription factor mutations. Third, we record brainwide activity in response to attractive and repulsive chemosensory cues, characterizing multimodal coding for these stimuli.
+### Download and launch
 
-For further details regarding the experimental set up and the methodology involved, please read [the full paper](https://www.cell.com/cell/fulltext/S0092-8674(20)31682-2).
+In a terminal:
 
-```
-@article{PMID:33378642, Title= {NeuroPAL: A Multicolor Atlas for Whole-Brain Neuronal Identification in C.&nbsp;elegans}, Author= {Yemini, Eviatar and Lin, Albert and Nejatbakhsh, Amin and Varol, Erdem and Sun, Ruoxi and Mena, Gonzalo E and Samuel, Aravinthan D T and Paninski, Liam and Venkatachalam, Vivek and Hobert, Oliver}, DOI= {10.1016/j.cell.2020.12.012}, Number= {1}, Volume= {184}, Month= {January}, Year= {2021}, Journal= {Cell}, ISSN= {0092-8674}, Pages= {272—288.e11}, URL= {https://doi.org/10.1016/j.cell.2020.12.012}}
+```sh
+git clone --branch main https://github.com/akgohain/NeuroPAL_ID.git
+cd NeuroPAL_ID
 ```
 
-### Related Publications
+Alternatively, use **Code → Download ZIP** on this fork's `main` branch and extract it.
 
-- [NeuroPAL: A Multicolor Atlas for Whole-Brain Neuronal Identification in C. elegans](https://www.cell.com/cell/fulltext/S0092-8674(20)31682-2)
-- [3DeeCellTracker, a deep learning-based pipeline for segmenting and tracking cells in 3D time lapse images eLife](https://elifesciences.org/articles/59187)
-- [Versatile Multiple Object Tracking in Sparse 2D/3D Videos Via Diffeomorphic Image Registration](https://www.biorxiv.org/content/10.1101/2022.07.18.500485v1)
+In MATLAB, set **Current Folder** to the extracted or cloned `NeuroPAL_ID` directory, then run:
 
---- 
+```matlab
+run(fullfile('scripts', 'launch_visualize_light.m'))
+```
 
-## Installation
+On macOS or Linux, the terminal launcher is also available:
 
-For the latest compiled release that can be run independently of MATLAB, please check [here](https://github.com/Yemini-Lab/NeuroPAL_ID/releases), but please note that these may be outdated. To utilize the latest version live on Github, please follow these instructions:
+```sh
+./scripts/launch_visualize_light.sh
+```
 
-### User Mode
+It uses `MATLAB_BIN` when set, checks the standard macOS R2024a location, then looks for `matlab` on `PATH`. To select another installation:
 
-1. Download [the latest release](https://github.com/Yemini-Lab/NeuroPAL_ID/releases).
-2. Extract the contents of the downloaded .zip to a location of your choosing.
+```sh
+MATLAB_BIN="/path/to/matlab" ./scripts/launch_visualize_light.sh
+```
 
-### Developer Mode
+[Upstream compiled releases](https://github.com/Yemini-Lab/NeuroPAL_ID/releases) are a separate distribution and may not include this fork's changes. Use the source instructions above for this version.
 
-**(Requires Python 3.9+ and MATLAB 2020b+.)**
+### Update an existing checkout
 
-1. Install the following dependencies:
-   a. [Mlapptools](https://github.com/StackOverflowMATLABchat/mlapptools)
-   b. [Bioformats Toolbox](https://downloads.openmicroscopy.org/bio-formats/5.3.4/)
-   c. [Image Processing Toolbox](https://www.mathworks.com/products/image.html)
-   d. [Statistics and Machine Learning Toolbox](https://www.mathworks.com/products/statistics.html)
-   e. [Optimization Toolbox](https://www.mathworks.com/products/optimization.html)
-   f. [Parallel Computing Toolbox](https://www.mathworks.com/products/parallel-computing.html) (optional; enables parallel Auto-ID)
-   g. [requirements.txt](https://github.com/Yemini-Lab/NeuroPAL_ID/blob/master/requirements.txt) or [requirements-macos.txt](https://github.com/Yemini-Lab/NeuroPAL_ID/blob/master/requirements-macos.txt)
-3. Open Git Bash to your preferred working directory.
-4. Use `git clone https://github.com/Yemini-Lab/NeuroPAL_ID.git`
-5. Open `visualize_light.mlapp` in MATLAB's AppDesigner.
-6. Alternative terminal / VS Code launch:
-   a. Run `./scripts/launch_visualize_light.sh`
-   b. Or in VS Code use `Terminal` -> `Run Task...` -> `Launch NeuroPAL App`
+Confirm that `git remote -v` points to **akgohain/NeuroPAL_ID** for `origin`, then, with a clean working tree:
 
----
+```sh
+git switch main
+git pull --ff-only origin main
+```
 
-## Usage Guide
+Restart the app after updating so MATLAB loads the new callbacks.
 
-#### Main GUI
+## Manual identification
 
-The main NeuroPAL GUI is the window that will appear when you open `visualize_light.mlapp` or run our compiled executable file. Though complex, we've written up a quick guide to help you find your way around below:
+1. Open a structural image through **File → Open** and use the **NeuroPAL ID** tab. Recent checks covered NeuroPAL MAT files, NWB, ND2, CZI, and TIFF/OME-TIFF examples; supported dimensions and metadata vary by importer.
+2. Check the animal's body region, sex, age, and channel assignments. Confirm physical spacing when the importer asks for it. Use the Z slider and channel controls to inspect the image.
+3. Select an existing neuron marker, or double-click an unmarked location in the slice viewer to add a center. Detection and **Neurons → Import neurons from…** are optional ways to populate centers.
+4. Enter the name in **Neuron ID** beside **Review**, then click **Assign**. Select the neuron again to correct its name. A trailing `?`, such as `AVAL?`, records an uncertain identification.
+5. Continue through the volume. Use **Help → Keyboard Shortcuts** for navigation and editing shortcuts.
 
-![GUI](https://i.imgur.com/OxrAu1i.png)
+Assigning names saves the annotation state to the companion `<image>_ID.mat` file. Reopen the image to resume. Keep the converted image MAT file and its `_ID.mat` companion together when moving your working session.
 
-|Label|Description|
-|:-:|:-|
-|**x**|Z-stacks of the NeuroPAL image and neuron labels. Green dots indicate named neurons, red dots unnamed ones.|
-|**y**|The maximum intensity projection of the entire image.|
-|**z**|This slider allows you to move through different z-stacks.|
-|||
-|**a**|This is NeuroPAL's main menu. From left to right, it contains the `File` menu, the pre-processing menu (where you can downsample or adjust the threshold), the `Image` menu (where you can manipulate the image and adjust its gamma or histogram), the `Neurons` menu (where you can import neurons and perform batch actions), the `Display` menu (where you can adjust what information NeuroPAL displays), the `Analysis` menu (where you can save your work), and a `Help` menu with convenient links.|
-|**b**|This is the metadata menu. From left to right, you can open a NeuroPAL image, save your work, and view and edit metadata related to the worm you're currently viewing, such as the body part on display, the worm's age, its sex, its strain, and any additional notes.|
-|**c**|This is the ID menu. From left to right, you can begin auto-IDing, you can define the details of your manual ID, and you can change what happens if you click anywhere on x.|
-|||
-|**d**|Here you can select the color channels NeuroPAL_ID uses to visualize its images.|
-|**e**|If you're using our (as yet WIP) auto-identification function, this space is where you can designate the specific method you'd like the program to use. You'll also see a list of neurons the program believes to be nearby as well as an indication of how confident it is in its ID.|
-|**f**|This is where you can easily navigate various ganglia and browse lists of neurons you've identified as well as neurons that should exist in the selected region but that have yet to be ID'd. |
+## Save and export
 
-#### Image Manipulation
+| Purpose | Control or file | Result |
+| --- | --- | --- |
+| Resume editing | `<image>_ID.mat`, saved during annotation edits | Neuron centers, manual IDs, predictions, and detector parameters; used with the image MAT file. |
+| Share a table of IDs | **Save: IDs**, or **Analysis → Save ID Info** | A CSV beside the image, using the same basename, with IDs, positions, and color measurements. |
+| Share an annotated image | **Analysis → Save ID Image** | An illustration export for the selected slices/slabs. |
+| Export an NWB file | **Analysis → Save .NWB** | Image and selected annotation content, with acquisition metadata entered in the save dialog. |
 
-The `Image` sub-menu in NeuroPAL's main menu ("a" in the main GUI) contains a number of options. If you select "Adjust Histogram", a separate window will pop up in which you can adjust the luminosity of individual channels with the guidance of a histogram. Below is a quick guide to that window.
+The CSV export asks whether to rerun Auto-ID first. Choose **No** to export the current manual annotations without running a model. The `_ID.mat` file is the editable annotation state; the CSV is an analysis/export table. Auto-ID-dependent columns may be unavailable when no Auto-ID has been run.
 
-![Hist](https://i.imgur.com/MkPPw8P.png)
+Image import can create a converted `.mat` file alongside the source. Use a writable working folder with room for that conversion and subsequent exports. See [large-file handling](LARGE_FILE_IO.md) for memory, disk, and format limits.
 
-|Label|Description|
-|:-:|:-|
-|**x**|Maximum intensity projection of your NeuroPAL image.|
-|**y**|A (Pixel Number x Pixel Intensity) histogram of all visible channels.|
-|**z**|A tab group displaying the individual channel gammas and their curves.|
-|||
-|**a**|This is a list of all currently supported channels. Checking a channel will render it both in the image and in all plots.|
-|**b**|This is the min/max menu. Here you can define the minimum and maximum intensities represented in any given channel.|
-|**c**|Clicking on a given channel's lock toggle will prevent it from being edited.|
-|**d**|Clicking on a given channel's reset button will restore it to what it was before the histogram window was opened.|
-|**e**|This is the settings menu. Here you can adjust the gamma across all channels, save your histogram in a guide file, and load and display saved guide files.|
+## Other workflows
 
-#### Neuron Segmentation
+| Tab | Workflow | Guide |
+| --- | --- | --- |
+| **NeuroPAL ID** | Detect centers, run optional Auto-ID, and review or assign identities manually. | [Method integration](AUTO_ID_INTEGRATION.md) |
+| **Image Processing** | Inspect channels and histograms; preview processing and geometry changes; save the processed image and associated annotations. | [Processing and large-file behavior](LARGE_FILE_IO.md#main-image-loading-and-processing) |
+| **Video Tracking** | Detect reference neurons → track with ZephIR → review coordinates and extract/export activity. | [Calcium workflow](docs/bedant-reference-detection.md) |
+| **Log** | Inspect messages and errors from the current session. | Include relevant messages when reporting a problem. |
 
-The `Neurons` sub-menu in NeuroPAL's main menu ("a" in the main GUI) contains a number of options. If you select "Auto Segmentation", a separate window will pop up allowing you to segment the image and obtain a list of automatically detected neuron centers. Below is a quick guide to that window.
+For recordings with both structural NeuroPAL and calcium data, see the [paired NeuroPAL/calcium workflow](docs/paired-neuropal-calcium.md). It covers reference detection, Auto-ID, alignment, named tracking, and activity export.
 
-![Hist](https://i.imgur.com/iQ7lv0y.png)
+### Optional automated methods
 
-|Label|Description|
-|:-:|:-|
-|**x**|By default, a maximum intensity projection of your NeuroPAL image. Can also be set to display a particular z-slice.|
-|**y**|A slider allowing you to browse specific z-slices.|
-|||
-|**a**|This panel features 3 sub-menus: "Neuron", which displays information on neurons post-segmentation (unpopulated by default) and allows users to either export neuron centers or pass them back into the main NeuroPAL_ID window, "Image", which allows you to select a specific range of slices to segment or to switch back to the maximum projection, and "Credit", which features information regarding the origins of the particular segmentation module being used.|
-|**b**|This panel features the core controls of the auto-segmentation window. The black out tool allows you to zero out specific sections of the image (such as the gut) to minimize false positives. The histogram tool will open the histogram window described earlier. The "Generate" button starts the segmentation process and the "Reset" button undoes all changes made to the image since the window was opened.|
-|**c**|This panel allows users to edit the parameters of the segmentation process. Hovering over each label will show information regarding what each parameter means.|
-|**d**|These panels allow users to change some of the segmentation settings. By default, the noise filter level is calculated automatically using the 95th percentile of pixels, but it can also be set manually. The cell filter specifies the measure by which all detected segments are filtered -- either by the minimum size (in microns) or by the neuron count (in which case only the n biggest segments are kept).|
+Choose a method in the app and configure its interpreter/model paths through **Settings…**. Checkpoint-backed methods need their model assets installed separately; cloning this repository does not install those weights.
 
-#### Working with NWB Files
+- **MoE detection:** [installation, bundle requirements, and validation](MOE_INTEGRATION.md).
+- **Other detectors and Auto-ID:** [adapter configuration and method status](AUTO_ID_INTEGRATION.md), plus [model bundle manifests](method_bundles/README.md).
+- **ZephIR and activity extraction:** [calcium workflow and validation](docs/bedant-reference-detection.md).
 
-**NeuroPAL_ID** natively supports loading, viewing, editing, and saving data in the [NWB](https://www.nwb.org/nwb-neurophysiology/) format using the [ndx-multichannel-volume](https://github.com/focolab/ndx-multichannel-volume/tree/main) extension. Future software expansions will build on this support as well.
+Python requirements depend on the selected method. The repository includes [general requirements](requirements.txt), [macOS requirements](requirements-macos.txt), [detection requirements](requirements-detection.txt), and [MoE requirements](requirements-moe.txt); use the relevant method guide and a dedicated environment. Review model suggestions and tracks before interpreting them biologically.
 
-Click on each of the previews below to view them in full resolution.
+## Documentation
 
+- [Bundled software instructions](Data/Documents/Instructions.pdf) and [keyboard shortcuts](Data/Documents/Keyboard.pdf).
+- [Earlier interface screenshots and guide](docs/legacy-interface-guide.md) — retained for reference; some menus have changed.
+- [Large-file conversion and export](LARGE_FILE_IO.md).
+- [Performance notes](PERFORMANCE.md).
+- [UI development](UI_DEVELOPMENT.md).
+- [Contributing](CONTRIBUTIONS.md) and [code of conduct](CONDUCT.md).
 
-#### Loading Activity
+### NeuroPAL references and example data
 
-![NWB_Activity](https://imgur.com/wGXsSCT.gif)
-
-
-#### Loading Video
-
-![NWB_Video](https://imgur.com/9PWTw6u.gif)
-
-#### Saving NWB Files
-
-![NWB_Save](https://imgur.com/rGbQOPQ.gif)
-
-#### Technical Details
-
-#### Class, Package, and Usecase Diagrams
-
-> To build a fast and scalable system we followed object oriented design practices. We identified internally coherent and externally independent classes in our environment and established their properties and behavior, as well as their interactions with other modules. We have separate packages for data handling, methods, logging, biological objects, and user interface. Each of these packages contains relevant classes and the functionalities of the system is built upon the interactions between the classes. For reusability purposes we tried to develop a modular system with independent modules. This allows the users of the system to reuse different compartments of the system for other purposes.
-
-> ![Class](https://dl.dropboxusercontent.com/s/ngtlg5q4k7vlqcs/Class.png)
-
-> ![Package](https://dl.dropboxusercontent.com/s/6en1q28tfdze7h9/Package.png)
-
-> ![Usecase](https://dl.dropboxusercontent.com/s/xmapjhtnlfylozz/Usecase.png)
-
----
-
-## Further Reading
-
-NeuroPAL_ID is a complex piece of software that can be daunting at first but proves worthwhile if you put in the time to learn how to use it. There are several manuals that explore both NeuroPAL and the IDing process at various depths, and we strongly recommend that new users read these to get a sense of how to get the most out of NeuroPAL. If you're new and making use of our introductory manuals, you may also want to practice with the [specific image volumes they feature](https://zenodo.org/record/4516558).
-
-##### Manuals
-- [README 1st: A Quick Start Guide](https://www.dropbox.com/s/t8c0tv073z8p9c8/README%201st%20-%20Quick%20Start%20Guide%20to%20NeuroPAL%20v1.pdf?dl=0)
+- [Quick Start Guide to NeuroPAL](https://www.dropbox.com/s/t8c0tv073z8p9c8/README%201st%20-%20Quick%20Start%20Guide%20to%20NeuroPAL%20v1.pdf?dl=0)
 - [NeuroPAL Software Manual](https://www.dropbox.com/s/idjkptbwrysj6t1/NeuroPAL%20Software%20Manual%20v1.pdf?dl=0)
-- [Using NeuroPAL for ID](https://www.dropbox.com/s/idjkptbwrysj6t1/NeuroPAL%20Software%20Manual%20v1.pdf?dl=0)
 - [Configuring Your Microscope for NeuroPAL](https://www.dropbox.com/s/8ku51tg7oc00ah6/Configuring%20Your%20Microscope%20for%20NeuroPAL%20v3.pdf?dl=0)
-
-
-##### References
-
 - [NeuroPAL Reference Manual](https://www.dropbox.com/s/pxnvow2464m5pcu/NeuroPAL%20Reference%20Manual%20v1.pdf?dl=0)
 - [OH15500 ID Reference Manual](https://www.dropbox.com/s/swhb063ybjbdls1/OH15500%20ID%20Reference%20Manual%20v1.pdf?dl=0)
-- [NeuroPAL Settings for Zeiss LSM Microscopes](https://www.dropbox.com/s/eerdh8ef294vq1l/NeuroPAL%20Microscope%20Settings.zip?dl=0)
-- [NeuroPAL Reporters + Neuron Colors](https://www.yeminilab.com/s/NeuroPAL-Colors-dd2t.pdf)
-- [Reporters + Expression tested for NeuroPAL](https://www.yeminilab.com/s/Reporters-Tested-for-NeuroPAL-v2.pdf)
-- [Metabotropic Receptor Reporters](https://www.dropbox.com/s/qiptk26yqkncyq0/Metabotropic-Receptors.zip?dl=0)
-- [NeuroPAL Reporter-Fluorophore Landmarks](https://www.dropbox.com/s/vo2br4q527lymwt/Landmarks.zip?dl=0)
-- [Panneuronal GCaMP6s + TagRFP-T Reporters](https://www.dropbox.com/s/aumzqge4b60jmqj/Panneuronal.zip?dl=0)
+- [NeuroPAL microscope settings](https://www.dropbox.com/s/eerdh8ef294vq1l/NeuroPAL%20Microscope%20Settings.zip?dl=0)
+- [Reporters and neuron colors](https://www.yeminilab.com/s/NeuroPAL-Colors-dd2t.pdf), [tested reporters](https://www.yeminilab.com/s/Reporters-Tested-for-NeuroPAL-v2.pdf), and [fluorophore landmarks](https://www.dropbox.com/s/vo2br4q527lymwt/Landmarks.zip?dl=0)
+- [Metabotropic receptor reporters](https://www.dropbox.com/s/qiptk26yqkncyq0/Metabotropic-Receptors.zip?dl=0) and [panneuronal GCaMP6s/TagRFP-T reporters](https://www.dropbox.com/s/aumzqge4b60jmqj/Panneuronal.zip?dl=0)
+- [Practice images from the manuals](https://zenodo.org/record/4516558), [NeuroPAL example volumes](https://zenodo.org/record/3906530), and the [NeuroPAL Zenodo community](https://zenodo.org/communities/neuropal/)
+- [3D NeuroPAL atlas](https://www.opensourcebrain.org/projects/neuropal)
 
+## Citation and credits
 
-##### Images & Datasets
+Please cite [Yemini et al., *NeuroPAL: A Multicolor Atlas for Whole-Brain Neuronal Identification in C. elegans*, Cell (2021)](https://doi.org/10.1016/j.cell.2020.12.012). Software citation metadata is available in [CITATION.cff](CITATION.cff).
 
-- [NeuroPAL Zenodo Community](https://zenodo.org/communities/neuropal/?page=1&size=20)
-- [Image Volumes Shown in the ID Manuals (To Practice ID’ing)](https://zenodo.org/record/4516558)
-- [10 Young-Adult otIs669 (OH15262) Animals](https://zenodo.org/record/3906530)
-- [3D NeuroPAL Atlas (NeuroML - Open Source Brain)](https://www.opensourcebrain.org/projects/neuropal)
-- [OH16230 (21 heads & 21 tails) + OH15500 (7 heads) Data](https://zenodo.org/record/3906530)
+```bibtex
+@article{Yemini2021NeuroPAL,
+  title = {NeuroPAL: A Multicolor Atlas for Whole-Brain Neuronal Identification in {C. elegans}},
+  author = {Yemini, Eviatar and Lin, Albert and Nejatbakhsh, Amin and Varol, Erdem and Sun, Ruoxi and Mena, Gonzalo E. and Samuel, Aravinthan D. T. and Paninski, Liam and Venkatachalam, Vivek and Hobert, Oliver},
+  journal = {Cell},
+  year = {2021},
+  volume = {184},
+  number = {1},
+  pages = {272--288.e11},
+  doi = {10.1016/j.cell.2020.12.012}
+}
+```
 
-You can also take a look at some of the published work done using NeuroPAL [here](https://www.sciencedirect.com/science/article/pii/S0092867420316822?via%3Dihub#section-cited-by).
+See the [upstream contributors](https://github.com/Yemini-Lab/NeuroPAL_ID/graphs/contributors) and [contributors to this fork](https://github.com/akgohain/NeuroPAL_ID/graphs/contributors).
 
----
+Additional contributions acknowledged by the original project:
 
-### Contributing
+- **Venkatachalam Lab:** James Yu, Vivek Venkatachalam, Maedeh Seyedolmohadesin.
+- **Kimura Lab:** Chentao Wen, Koutarou D. Kimura.
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTIONS.md) for details on how to get started and make your first contribution.
+Related methods: [3DeeCellTracker](https://elifesciences.org/articles/59187) and [ZephIR](https://www.biorxiv.org/content/10.1101/2022.07.18.500485v1).
 
-### Code of Conduct
+## License
 
-To maintain a respectful and inclusive community, all contributors are expected to adhere to our [Code of Conduct](CONDUCT.md).
-
-### Licensing
-
-This work is licensed under a [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License][cc-by-nc-sa].
-
-[![CC BY-NC-SA 4.0][cc-by-nc-sa-image]][cc-by-nc-sa]
-
-[cc-by-nc-sa]: http://creativecommons.org/licenses/by-nc-sa/4.0/
-[cc-by-nc-sa-image]: https://licensebuttons.net/l/by-nc-sa/4.0/88x31.png
-[cc-by-nc-sa-shield]: https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg
+[Creative Commons Attribution-NonCommercial-ShareAlike 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). See [LICENSE.txt](LICENSE.txt).
