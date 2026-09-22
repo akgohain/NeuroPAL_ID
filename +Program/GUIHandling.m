@@ -1514,6 +1514,7 @@ classdef GUIHandling
                             'Device', Program.GUIHandling.param_value(params, 'device', 'cpu'), ...
                             'OutputDir', Program.GUIHandling.method_output_dir(app, 'moe'), ...
                             'KeepArtifacts', true);
+                        detected_params = moe_params;
                         if ~isempty(sp)
                             prepared_moe_neurons = Neurons.Image(sp, source_context.worm.body, 'scale', source_context.scale');
                         end
