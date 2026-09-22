@@ -37,6 +37,25 @@ class NWBTests(unittest.TestCase):
         with h5py.File(self.path,'r') as f:np.testing.assert_array_equal(video.frame_times(f,self.info,1,3),[5.5,6,6.5])
         self.assertEqual(self.info['spacing_um_xyz'],[.4,.6,1.5])
 
+    def test_named_activity_and_roundtrip(self):
+        rows=[dict(track_id=8,t=t,x=5.,y=4.,z=2.,confidence=.9,channel=0,name='AVAL',
+                   identity_source='auto-id',identity_confidence=.8,provenance='reviewed') for t in range(1,5)]
+        result=analysis.activity(dict(source=self.info,observations=rows,frame_range=[0,3],output_dir=str(self.root),
+            options=dict(radius_xyz=[1,1,.5],background=False)))
+        directory=Path(result['directory'])
+        with h5py.File(directory/'activity.h5') as f:
+            self.assertEqual(f['neuron_name'].asstr()[0],'AVAL')
+            np.testing.assert_array_equal(f['source_time'][:],[5,5.5,6,6.5])
+        with (directory/'activity.csv').open() as f:self.assertEqual(next(csv.DictReader(f))['neuron_name'],'AVAL')
+        seeds=video.export_seeds(dict(source=self.info,observations=rows,output_dir=str(self.root),provenance={}))
+        restored=video.read_seeds(seeds['directory'],self.info)
+        self.assertEqual(restored[0]['name'],'AVAL');self.assertEqual(restored[0]['identity_source'],'auto-id')
+        self.assertEqual(restored[0]['identity_confidence'],.8)
+        analysis.update_activity_names(directory,[dict(r,name='AVAR',identity_source='reviewed',identity_confidence=1) for r in rows])
+        with h5py.File(directory/'activity.h5') as f:
+            self.assertEqual(f['neuron_name'].asstr()[0],'AVAR')
+            self.assertEqual(f['identity_source'].asstr()[0],'reviewed')
+        with (directory/'activity.csv').open() as f:self.assertEqual(next(csv.DictReader(f))['neuron_name'],'AVAR')
 
     def test_alignment_uses_images_and_checks_bounds(self):
         from reference_nwb import align_reference
@@ -55,6 +74,13 @@ class NWBTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'no signal'):align_reference(dict(request,reference_channel=1))
         with self.assertRaises(ValueError):align_reference(dict(request,scale_mode='unknown'))
 
+    def test_invalid_names_are_rejected(self):
+        row=dict(track_id=1,t=1,x=2,y=2,z=2,confidence=1)
+        for change in (dict(name='x'*65),dict(name=['AVAL']),dict(identity_confidence=float('nan'))):
+            with self.assertRaises(ValueError):video.validate_observations([dict(row,**change)],self.info)
+        name='α'*64
+        exported=video.export_seeds(dict(source=self.info,observations=[dict(row,name=name)],output_dir=str(self.root),provenance={}))
+        self.assertEqual(video.read_seeds(exported['directory'],self.info)[0]['name'],name)
 
     def test_changed_source(self):
         previous=self.info['source_id']

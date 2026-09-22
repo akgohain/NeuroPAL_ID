@@ -320,7 +320,7 @@ classdef ReferenceWorkflow < handle
             row = event.Indices(1); column = event.Indices(2); value = event.NewData;
             if ischar(value) || isstring(value), value = str2double(value); end
             bounds = [obj.Source.nx obj.Source.ny obj.Source.nz];
-            if ~isscalar(value) || ~isfinite(value) || value<1 || value>bounds(column-2)
+            if ~isscalar(value) || ~isfinite(value) || value<.5 || value>bounds(column-2)+.5
                 obj.Table.Data = obj.Rows; error('Tracking:EditBounds','Coordinates must lie inside the volume.');
             end
             obj.View.Review.checkpoint(obj.Rows(row,1));
@@ -328,13 +328,16 @@ classdef ReferenceWorkflow < handle
             obj.Rows(row,column) = value; obj.Rows(row,6) = 1; obj.render();
         end
         function observations = observations(obj)
-            observations = struct('track_id',{},'parent_id',{},'t',{},'x',{},'y',{},'z',{},'confidence',{},'provenance',{},'channel',{},'excluded',{});
+            observations = struct('track_id',{},'parent_id',{},'t',{},'x',{},'y',{},'z',{},'confidence',{},'provenance',{},'channel',{},'excluded',{},'name',{},'identity_confidence',{},'identity_source',{});
+            identities=Tracking.NeuronNames.get(obj);
             for i=1:size(obj.Rows,1)
                 r = obj.Rows(i,:); origin = 'reviewed';
                 key = sprintf('%d:%d',r(1),r(2));
                 if isKey(obj.Origins,key), origin = obj.Origins(key); end
+                identity=find([identities.id]==r(1),1); name=sprintf('Neuron %d',r(1)); confidence=0; source='unnamed';
+                if ~isempty(identity), name=identities(identity).name; confidence=identities(identity).confidence; source=identities(identity).source; end
                 observations(i) = struct('track_id',r(1),'parent_id',0,'t',r(2),'x',r(3),'y',r(4),'z',r(5), ...
-                    'confidence',r(6),'provenance',origin,'channel',r(7),'excluded',ismember(r([1 2]),obj.Excluded,'rows'));
+                    'confidence',r(6),'provenance',origin,'channel',r(7),'excluded',ismember(r([1 2]),obj.Excluded,'rows'),'name',name,'identity_confidence',confidence,'identity_source',source);
             end
         end
         function response = save(obj,folder)
@@ -356,6 +359,7 @@ classdef ReferenceWorkflow < handle
             if ~isempty(obj.Rows), error('Tracking:ExistingSeeds','Open a fresh reference session before importing another seed set.'); end
             response = obj.bridge(struct('action','import','source',obj.Source,'file',file));
             obj.Candidates=zeros(0,7); obj.CandidateFrame=0;
+            Tracking.NeuronNames.set(obj,[]); setappdata(obj.Grid,'paired_reference_provenance',[]);
             obj.History={}; obj.Provenance=struct(); obj.TrackDirectory=''; obj.ActivityDirectory='';
             obj.ActivityRows=[]; obj.ActivityExcluded=[]; obj.ActivitySettings=struct();
             obj.setRows(response.observations);
@@ -385,6 +389,7 @@ classdef ReferenceWorkflow < handle
                 if isfield(r,'excluded') && r.excluded, obj.Excluded(end+1,:) = [r.track_id r.t]; end
                 rows(i,:) = [r.track_id,r.t,r.x,r.y,r.z,r.confidence,channel];
             end
+            Tracking.NeuronNames.import(obj,observations);
             obj.Rows = rows; obj.NextID = max(obj.NextID,max([0;rows(:,1);obj.Candidates(:,1)])+1);
         end
         function track(obj,resume)
@@ -453,7 +458,8 @@ classdef ReferenceWorkflow < handle
             stage=fullfile(folder,['.activity-' name]); cleanup=onCleanup(@() obj.removeFolder(stage));
             [ok,message]=copyfile(obj.ActivityDirectory,stage);
             if ~ok, error('Tracking:Export','%s',message); end
-            % Include review decisions made after the measurements were extracted.
+            % Include names and review decisions made after measurement.
+            obj.bridge(struct('action','name_activity','directory',stage,'observations',obj.observations()));
             snapshot=obj.bridge(struct('action','export','source',obj.Source,'observations',obj.observations(), ...
                 'output_dir',stage,'provenance',struct('jobs',{obj.History},'session',obj.Analysis.session())), ...
                 @() obj.Cancelled || ~isvalid(obj.App));

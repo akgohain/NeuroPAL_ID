@@ -118,8 +118,8 @@ class AnalysisTests(unittest.TestCase):
             self.assertTrue(np.all(f['quality_flags'][:]&analysis.FLAGS['invalid_ratio_baseline']))
 
     def test_tracking_preserves_each_neurons_detection_channel(self):
-        seeds=[dict(self.rows[3]),
-               dict(self.rows[3],track_id=8,x=16.,channel=1)]
+        seeds=[dict(self.rows[3],name='AVAL',identity_source='auto-id',identity_confidence=.7),
+               dict(self.rows[3],track_id=8,x=16.,channel=1,name='AVAR',identity_source='reviewed',identity_confidence=1)]
         def worker(request,directory,number):
             self.assertEqual(request['channel'],1)
             stage=directory/f'zephir-{number}';stage.mkdir()
@@ -131,6 +131,8 @@ class AnalysisTests(unittest.TestCase):
         with patch.object(analysis,'run_window',worker):
             result=analysis.track_sequence(request)
         self.assertEqual(len(result['observations']),14)
+        self.assertTrue(all(r['name']=={7:'AVAL',8:'AVAR'}[r['track_id']] for r in result['observations']))
+        self.assertTrue(all(r['identity_source']=={7:'auto-id',8:'reviewed'}[r['track_id']] for r in result['observations']))
         self.assertTrue(all(r['channel']=={7:0,8:1}[r['track_id']] for r in result['observations']))
         restored=read_seeds(Path(result['directory'])/'tracks',self.info)
         self.assertEqual(len(restored),14)

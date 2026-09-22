@@ -73,7 +73,6 @@ def read_frame(info, frame, channel=None):
         return frame_from_file(f, info, frame, channel)
 
 
-
 def frame_from_file(source, info, frame, channel=None):
     data = source[info.get('data_path', '/data')]
     if info['axis_order'] == 'TXYZC':
@@ -85,7 +84,6 @@ def frame_from_file(source, info, frame, channel=None):
     if not np.isfinite(raw).all():
         raise ValueError('Selected frame contains nonfinite values')
     return raw
-
 
 
 def frame_times(source, info, first, last):
@@ -115,6 +113,12 @@ def validate_observations(rows, info):
             raise ValueError('Invalid confidence')
         if 'channel' in row and (int(row['channel']) != row['channel'] or not 0 <= row['channel'] < info['nc']):
             raise ValueError('Annotation channel is outside the recording')
+        if 'name' in row and (not isinstance(row['name'],str) or len(row['name'])>64 or any(ord(c)<32 for c in row['name'])):
+            raise ValueError('Neuron names must be text of at most 64 characters without control characters')
+        if 'identity_confidence' in row and (not np.isfinite(row['identity_confidence']) or not 0<=row['identity_confidence']<=1):
+            raise ValueError('Invalid identity confidence')
+        if 'identity_source' in row and not isinstance(row['identity_source'],str):
+            raise ValueError('Identity source must be text')
         key = (int(row['track_id']), int(row['t']))
         if key in seen:
             raise ValueError('Duplicate worldline observation in the same frame')
@@ -139,12 +143,13 @@ def write_seed_files(directory, rows, info, provenance):
     with h5py.File(directory/'worldlines.h5', 'w') as f:
         f['id'] = np.array(ids, dtype='uint32')
         names = {int(r['track_id']): r.get('name', 'Neuron '+str(int(r['track_id']))) for r in rows}
-        f['name'] = np.array([names[i].encode() for i in ids], dtype='S64')
+        encoded=[names[i].encode('utf-8') for i in ids]
+        f['name'] = np.array(encoded, dtype=f'S{max(64,max(map(len,encoded)))}')
         f['color'] = np.array([b'#66cc99']*len(ids), dtype='S7')
     with (directory/'centers.csv').open('w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=['track_id','t','x','y','z','confidence'])
+        writer = csv.DictWriter(f, fieldnames=['track_id','t','x','y','z','confidence','name'])
         writer.writeheader()
-        writer.writerows({k:r[k] for k in writer.fieldnames} for r in rows)
+        writer.writerows({k:r.get(k,'') for k in writer.fieldnames} for r in rows)
     (directory/'observations.json').write_text(json.dumps(rows, indent=2))
     (directory/'provenance.json').write_text(json.dumps(dict(source=info, detection=provenance,
         coordinates='one-based MATLAB pixel centers; t is one-based', schema_version=1), indent=2))
@@ -201,6 +206,9 @@ def export_seeds(request):
 def run(request):
     if isinstance(request.get('observations'),dict): request['observations'] = [request['observations']]
     action = request['action']
+    if action == 'name_activity':
+        from reference_analysis import update_activity_names
+        return update_activity_names(request['directory'],request['observations'])
     if action == 'inspect': return source_info(request['file'])
     if action == 'frame':
         info = request['source']

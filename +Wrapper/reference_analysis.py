@@ -64,7 +64,8 @@ def run_window(request, directory, number):
 def canonical_rows(rows):
     return [dict(track_id=int(r['track_id']),parent_id=0,t=int(r['t']),x=float(r['x']),y=float(r['y']),z=float(r['z']),
                  confidence=float(r['confidence']),channel=int(r.get('channel',0)),provenance=r.get('provenance','reviewed'),
-                 excluded=bool(r.get('excluded',False)),name=r.get('name','Neuron '+str(int(r['track_id'])))) for r in rows]
+                 excluded=bool(r.get('excluded',False)),name=r.get('name','Neuron '+str(int(r['track_id']))),
+                 identity_confidence=float(r.get('identity_confidence',0)),identity_source=r.get('identity_source','unnamed')) for r in rows]
 
 
 def track_sequence(request):
@@ -95,6 +96,7 @@ def track_sequence(request):
     seeds=canonical_rows(seeds)
     seeds.sort(key=lambda r:(r['t'],r['track_id']))
     root_rows=[r for r in seeds if r['t']==reference+1]
+    identity_names = {r['track_id']: {k:r[k] for k in ('name','identity_confidence','identity_source')} for r in root_rows}
     annotation_channels = {r['track_id']: int(r.get('channel', channel)) for r in root_rows}
     parameters = dict(source_id=info['source_id'], frame_range=[first,last], reference_frame=reference,
                       channel=channel, window_size=size, epochs=epochs, observations=seeds)
@@ -142,6 +144,7 @@ def track_sequence(request):
                 raise ValueError('Tracking window returned incomplete or unexpected neuron IDs')
             for row in result:
                 row['channel'] = annotation_channels[row['track_id']]
+                row.update(identity_names[row['track_id']])
                 by_key[(row['track_id'],row['t'])] = row
             # Keep explicit manual coordinates and the original reference exactly.
             by_key.update({(r['track_id'],r['t']):r for r in seeds if (r['track_id'],r['t']) in by_key})
@@ -189,6 +192,34 @@ def roi_indices(center, radius, shape, inner=0., outer=1.):
     return flat,distance,clipped
 
 
+def update_activity_names(directory, rows):
+    """Refresh identity labels in an exported copy without remeasuring pixels."""
+    directory=Path(directory)
+    names={r['track_id']:r for r in canonical_rows(rows)}
+    with h5py.File(directory/'activity.h5','r+') as f:
+        ids=[int(i) for i in f['neuron_id'][:]]
+        if any(i not in names for i in ids): raise ValueError('Activity neuron IDs do not match the current tracks')
+        for key,field in (('neuron_name','name'),('identity_source','identity_source'),('identity_confidence','identity_confidence')):
+            if key in f: del f[key]
+            values=[names[i][field] for i in ids]
+            if key=='identity_confidence': f[key]=np.asarray(values,float)
+            else: f.create_dataset(key,data=np.asarray(values,dtype=object),dtype=h5py.string_dtype('utf-8'))
+    path=directory/'activity.csv'; temporary=directory/'.named-activity.csv'
+    with path.open(newline='') as source, temporary.open('w',newline='') as target:
+        reader=csv.DictReader(source)
+        columns=list(reader.fieldnames)
+        for column in ('neuron_name','identity_source','identity_confidence'):
+            if column not in columns: columns.append(column)
+        writer=csv.DictWriter(target,fieldnames=columns); writer.writeheader()
+        for row in reader:
+            identity=names[int(row['neuron_id'])]
+            row.update(neuron_name=identity['name'],identity_source=identity['identity_source'],identity_confidence=identity['identity_confidence'])
+            writer.writerow(row)
+    temporary.replace(path)
+    atomic_json(directory/'identities.json',[{key:names[i][key] for key in ('track_id','name','identity_confidence','identity_source')} for i in ids])
+    return dict(neuron_count=len(ids))
+
+
 def activity(request):
     info = request['source']; verify_source(info)
     rows = validate_observations(request['observations'],info)
@@ -214,6 +245,7 @@ def activity(request):
         raise ValueError('Invalid signal/reference channels; choose distinct channels or no reference')
     channels=[int(signal)] + ([int(reference)] if reference>=0 else [])
     ids=sorted({int(r['track_id']) for r in rows})
+    names={int(r['track_id']): r.get('name','Neuron '+str(int(r['track_id']))) for r in rows}
     nt,nn=last-first+1,len(ids)
     if nt*nn*len(channels)*8 > 128*2**20:
         raise MemoryError('Trace matrices exceed the 128 MiB analysis budget; shorten the range or reduce the seed set')
@@ -292,14 +324,15 @@ def activity(request):
             arrays=dict(frame=np.arange(first+1,last+2), neuron_id=ids, source_time=times, centers_xyz=centers,
                         signal=corrected[:,:,0], dff=dff, f0=f0, ratio=ratio, ratio_dff=ratio_dff, ratio_f0=ratio_f0,
                         roi_voxels=counts, quality_flags=flags, saturation_fraction=saturation)
+            f.create_dataset('neuron_name',data=np.array([names[i] for i in ids],dtype=object),dtype=h5py.string_dtype('utf-8'))
             for name,array in arrays.items(): f.create_dataset(name,data=array,compression='gzip')
             for ci,channel in enumerate(channels):
                 f[f'raw/channel_{channel}']=raw[:,:,ci]; f[f'background/channel_{channel}']=background[:,:,ci]
         with (stage/'activity.csv').open('w',newline='') as stream:
             writer=csv.writer(stream)
-            writer.writerow(['frame','source_time','neuron_id','x','y','z','raw_f','background_f','corrected_f','dff','ratio','ratio_dff','reference_raw_f','reference_background_f','roi_voxels','quality_flags'])
+            writer.writerow(['frame','source_time','neuron_id','neuron_name','x','y','z','raw_f','background_f','corrected_f','dff','ratio','ratio_dff','reference_raw_f','reference_background_f','roi_voxels','quality_flags'])
             for ti,t in enumerate(range(first,last+1)):
-                for j,identity in enumerate(ids): writer.writerow([t+1,times[ti],identity,*centers[ti,j],raw[ti,j,0],background[ti,j,0],corrected[ti,j,0],dff[ti,j],ratio[ti,j],ratio_dff[ti,j],raw[ti,j,1] if reference>=0 else np.nan,background[ti,j,1] if reference>=0 else np.nan,counts[ti,j],flags[ti,j]])
+                for j,identity in enumerate(ids): writer.writerow([t+1,times[ti],identity,names[identity],*centers[ti,j],raw[ti,j,0],background[ti,j,0],corrected[ti,j,0],dff[ti,j],ratio[ti,j],ratio_dff[ti,j],raw[ti,j,1] if reference>=0 else np.nan,background[ti,j,1] if reference>=0 else np.nan,counts[ti,j],flags[ti,j]])
         with (stage/'quality.csv').open('w',newline='') as stream:
             writer=csv.writer(stream);writer.writerow(['neuron_id','measured_frames','finite_dff_frames',*FLAGS])
             for j,identity in enumerate(ids):
@@ -313,6 +346,7 @@ def activity(request):
                         history=request.get('provenance',{}),numpy=np.__version__,h5py=h5py.__version__)
         atomic_json(stage/'analysis.json',provenance)
         tracks=stage/'tracks'; tracks.mkdir();write_seed_files(tracks,rows,info,request.get('provenance',{}))
+        update_activity_names(stage,rows)
         stage.rename(destination)
     finally:
         if stage.exists(): shutil.rmtree(stage)

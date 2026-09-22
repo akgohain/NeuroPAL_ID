@@ -165,6 +165,11 @@ classdef ReferenceView < handle
             end
         end
         function delete(obj)
+            grid=obj.Controller.Grid;
+            if isvalid(grid)
+                reference=getappdata(grid,'paired_reference_controller');
+                if ~isempty(reference) && isvalid(reference), delete(reference); end
+            end
             if isprop(obj,'Playback') && ~isempty(obj.Playback) && isvalid(obj.Playback), delete(obj.Playback); end
             if isprop(obj,'TableWindow') && ~isempty(obj.TableWindow) && isvalid(obj.TableWindow), delete(obj.TableWindow); end
             if isprop(obj,'Review') && ~isempty(obj.Review) && isvalid(obj.Review), obj.Review.clear(); delete(obj.Review); end
@@ -339,7 +344,8 @@ classdef ReferenceView < handle
             if obj.Labels.Value
                 for i=[find(selected);find(~selected)]'
                     if strcmp(obj.LabelMode.Value,'Selected') && ~selected(i), continue; end
-                    label=sprintf('#%d',rows(i,1));
+                    label=Tracking.NeuronNames.label(c,rows(i,1));
+                    if startsWith(label,'Neuron '), label=sprintf('#%d',rows(i,1)); end
                     if pending, label=sprintf('%s?',label); end
                     if ~obj.labelFits(ax,rows(i,3:4),label,selected(i)), continue; end
                     if rows(i,3)<=c.Source.nx/2
@@ -416,7 +422,9 @@ classdef ReferenceView < handle
                 labels = cell(count,1);
                 for i=1:count
                     kind = 'Neuron'; if obj.ListRows(i,8), kind = 'Candidate'; end
-                    labels{i} = sprintf('%s %d   ·   Z %.1f',kind,obj.ListRows(i,1),obj.ListRows(i,5));
+                    name=Tracking.NeuronNames.label(c,obj.ListRows(i,1),true);
+                    if obj.ListRows(i,8), name=sprintf('%s %d',kind,obj.ListRows(i,1)); end
+                    labels{i}=sprintf('%s   ·   Z %.1f',name,obj.ListRows(i,5));
                     if ismember(obj.ListRows(i,[1 2]),c.Excluded,'rows'), labels{i}=sprintf('%s  [excluded]',labels{i}); end
                 end
                 index = [];
@@ -433,6 +441,7 @@ classdef ReferenceView < handle
                 set(obj.NeuronList,'Items',labels,'ItemsData',1:count,'Value',index);
                 for i=1:3, obj.Position{i}.Value = row(i+2); end
             end
+            obj.NeuronList.Tooltip=Tracking.NeuronNames.tooltip(c,obj.PreferredID);
             obj.ListKey = {c.Frame.Value,c.Channel.Value,c.Rows,c.Candidates,obj.Selection,c.Excluded};
             c.Buttons.remove.Text='Delete track';
             if ~isempty(obj.Selection) && obj.Selection(1), c.Buttons.remove.Text='Delete candidate'; end
@@ -442,6 +451,8 @@ classdef ReferenceView < handle
         function setBusy(obj,busy)
             obj.Controller.Buttons.cancel.Visible=matlab.lang.OnOffSwitchState(busy);
             Tracking.DetectionChannels.setBusy(obj.Controller,busy);
+            reference=getappdata(obj.Controller.Grid,'paired_reference_controller');
+            if ~isempty(reference) && isvalid(reference), reference.setBusy(busy); end
             obj.Contrast.setBusy(busy); obj.Playback.setBusy(busy);
             if ~isempty(obj.Review) && ~isempty(obj.Review.Confirm)
                 obj.Review.Confirm.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(obj.Selection) && ~obj.Selection(1));
@@ -510,7 +521,7 @@ classdef ReferenceView < handle
         function move(obj,dimension)
             c = obj.Controller; if c.Busy || isempty(obj.Selection), return; end
             bounds = [c.Source.nx,c.Source.ny,c.Source.nz]; value = obj.Position{dimension}.Value;
-            if value<1 || value>bounds(dimension), obj.redraw(); return; end
+            if value<.5 || value>bounds(dimension)+.5, obj.redraw(); return; end
             pending = obj.Selection(1);
             if pending, rows = c.Candidates; else, rows = c.Rows; end
             index = find(rows(:,1)==obj.Selection(2) & rows(:,2)==obj.Selection(3),1);
@@ -521,7 +532,7 @@ classdef ReferenceView < handle
             else
                 c.Rows=rows; c.Origins(sprintf('%d:%d',rows(index,1),rows(index,2)))='reviewed';
             end
-            if dimension==3, c.Slice.Value=round(value); end
+            if dimension==3, c.Slice.Value=max(1,min(c.Source.nz,round(value))); end
             obj.redraw();
         end
         function removeSelection(obj)

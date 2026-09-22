@@ -130,7 +130,7 @@ classdef ReferenceAnalysisView < handle
                     pixels.AlphaData=isfinite(data); pixels.ButtonDownFcn=@(~,~) obj.seek(true);
                     obj.Axes.YDir='reverse'; colormap(obj.Axes,parula(256));
                     ticks=unique(round(linspace(1,numel(obj.IDs),min(8,numel(obj.IDs)))));
-                    obj.Axes.YTick=ticks; obj.Axes.YTickLabel=string(obj.IDs(ticks)); ylabel(obj.Axes,'Neuron ID');
+                    obj.Axes.YTick=ticks; obj.Axes.YTickLabel=arrayfun(@(id) string(Tracking.NeuronNames.label(c,id)),obj.IDs(ticks)); ylabel(obj.Axes,'Neuron ID');
                     title(obj.Axes,'Population ΔF/F'); obj.Colorbar=colorbar(obj.Axes); obj.Colorbar.Label.String='ΔF/F';
                 otherwise
                     dataset='/dff'; ylabel_text='ΔF/F';
@@ -151,8 +151,8 @@ classdef ReferenceAnalysisView < handle
                     % Review flags live on the shared timeline instead of covering the trace.
 
                     obj.Axes.YDir='normal'; obj.Axes.YTickMode='auto'; obj.Axes.YTickLabelMode='auto';
-                    ylabel(obj.Axes,ylabel_text); title(obj.Axes,sprintf('Neuron %d',identity));
-                    if ~any(isfinite(data)), title(obj.Axes,sprintf('Neuron %d · no usable samples',identity)); end
+                    ylabel(obj.Axes,ylabel_text); title(obj.Axes,Tracking.NeuronNames.label(c,identity,true));
+                    if ~any(isfinite(data)), title(obj.Axes,sprintf('%s · no usable samples',Tracking.NeuronNames.label(c,identity,true))); end
             end
             if ~c.activityCurrent(), title(obj.Axes,'Measurements out of date — extract again'); end
             xlim(obj.Axes,[obj.Frames(1)-.5 obj.Frames(end)+.5]); xlabel(obj.Axes,'Frame');
@@ -181,6 +181,8 @@ classdef ReferenceAnalysisView < handle
                 'detection_channel',c.DetectionChannel.Value,'detection_mode',c.DetectionMode.Value,'rgbw_channels',c.RGBW.Value, ...
                 'detector',c.Detector.Value,'spacing_text',c.Spacing.Value,'calibration_confirmed',c.Calibration.Value);
             value.detection_channels=Tracking.DetectionChannels.get(c);
+            value.neuron_names=Tracking.NeuronNames.get(c);
+            value.paired_reference=getappdata(c.Grid,'paired_reference_provenance');
         end
         function restoreTracking(obj,parameters)
             c=obj.Controller; c.First.Value=parameters.frame_range(1)+1; c.Last.Value=parameters.frame_range(2)+1;
@@ -207,6 +209,8 @@ classdef ReferenceAnalysisView < handle
             if isfield(value,'detection_channels'), Tracking.DetectionChannels.restore(c,value.detection_channels); end
             if isfield(value,'rgbw_channels'), c.RGBW.Value=value.rgbw_channels; end
             c.View.detectionModeChanged();
+            if isfield(value,'neuron_names'), Tracking.NeuronNames.set(c,value.neuron_names); end
+            if isfield(value,'paired_reference'), setappdata(c.Grid,'paired_reference_provenance',value.paired_reference); end
             options=value.activity_options;
             obj.Controls.signal.Value=options.signal_channel; obj.Controls.reference.Value=options.reference_channel;
             obj.Controls.radius.Value=num2str(options.radius_xyz(:)'); obj.Controls.background.Value=options.background;

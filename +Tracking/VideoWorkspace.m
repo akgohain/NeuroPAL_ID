@@ -81,7 +81,7 @@ classdef VideoWorkspace
 
             detection=uigridlayout(v.Panels{2},[9 2]); detection.Padding=[12 10 12 10];
             detection.ColumnWidth={75,'1x'}; detection.RowSpacing=10;
-            detection.RowHeight={28,28,28,28,38,32,28,28,'1x'};
+            detection.RowHeight={28,28,28,28,38,32,28,28,28,'1x'};
             heading=uilabel(detection,'Text','Detect reference neurons','FontWeight','bold'); heading.Layout.Column=[1 2];
             uilabel(detection,'Text','Method'); c.Detector=uidropdown(detection,'Items',{'MoE','Spotiflow'});
             uilabel(detection,'Text','Input');
@@ -103,6 +103,11 @@ classdef VideoWorkspace
             uibutton(actions,'Text','Review seeds','ButtonPushedFcn',@(~,~) v.setStage(4));
             uibutton(actions,'Text','Continue to tracking','ButtonPushedFcn',@(~,~) v.setStage(3));
 
+            if isfield(c.Source,'neuropal')
+                c.Buttons.paired=uibutton(detection,'Text','NeuroPAL reference…','ButtonPushedFcn',@(~,~) c.safe(@() Tracking.NeuroPALReference.open(c)));
+                c.Buttons.paired.Layout.Row=9; c.Buttons.paired.Layout.Column=[1 2]; detection.RowHeight{9}=28;
+            end
+
             review=uigridlayout(v.Panels{4},[11 2]); review.Padding=[12 10 12 10]; review.RowSpacing=6;
             review.Scrollable='on';
             review.RowHeight={24,28,28,32,'1x',32,28,28,28,24,28};
@@ -115,7 +120,7 @@ classdef VideoWorkspace
             dimensions=[c.Source.nx,c.Source.ny,c.Source.nz]; names={'X','Y','Z'};
             for i=1:3
                 uilabel(coordinates,'Text',names{i});
-                v.Position{i}=uispinner(coordinates,'Limits',[1 max(2,dimensions(i))],'Value',1,'Step',1,'ValueChangedFcn',@(~,~) v.move(i));
+                v.Position{i}=uispinner(coordinates,'Limits',[.5 dimensions(i)+.5],'Value',1,'Step',1,'ValueChangedFcn',@(~,~) v.move(i));
             end
             c.Buttons.add=uibutton(review,'Text','Add neuron','ButtonPushedFcn',@(~,~) v.armAdd()); c.Buttons.add.Layout.Row=7;
             c.Buttons.remove=uibutton(review,'Text','Delete track','ButtonPushedFcn',@(~,~) c.safe(@() c.remove())); c.Buttons.remove.Layout.Row=7; c.Buttons.remove.Layout.Column=2;
