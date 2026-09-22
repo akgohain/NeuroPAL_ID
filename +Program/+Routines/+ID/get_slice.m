@@ -155,7 +155,7 @@ function get_slice(~, view, ~, reset_limits, requested_z)
             end
 
             % Draw the labels.
-            DrawImageLabels(app, positions(is_label,:), labels);
+            app.DrawImageLabels(positions(is_label,:), labels);
         end
 
         % Setup the mouse-click callback.

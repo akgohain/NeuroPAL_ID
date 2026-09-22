@@ -536,6 +536,8 @@ classdef GUIHandling
             id_settings_button.Layout.Column = 3;
 
             header_grid = app.GridLayout24_2;
+            header_grid.ColumnWidth = {0, 0, 0, 0, 0, 0, 0, 0, 52, 100, 70, ...
+                12, 0, 0, 0, 82, 24, 12, 0, '1x', 0, 80, 24};
             app.UserLabel.Parent = header_grid;
             app.UserLabel.Text = 'Review:';
             app.UserLabel.FontWeight = 'bold';

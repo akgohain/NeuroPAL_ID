@@ -26,9 +26,10 @@ function open(path)
         path = GUI_prefs.image_dir;
 
         % Ask the user which file they want.
-        file_info = [path ';*.mat;*.czi;*.nd2;*.tif;*.tiff;*.h5;*.nwb'];
+        file_info = {'*.mat;*.czi;*.nd2;*.tif;*.tiff;*.h5;*.nwb', 'Worm images'; ...
+            '*.*', 'All files'};
         app.CELL_ID.Visible = 'off'; % Hack On! * Matlab can't seem to put the modal dialogue in the foreground
-        [name, path, ~] = uigetfile(file_info, 'Select Worm Image');
+        [name, path, ~] = uigetfile(file_info, 'Select Worm Image', path);
         app.CELL_ID.Visible = 'on'; % Hack Off! * Matlab can't seem to put the modal dialogue in the foreground
         if name == 0
             app.is_opening_file = false;
@@ -71,8 +72,8 @@ function open(path)
             return
         end
     else
-        [~, name] = fileparts(path);
         filename = path;
+        [path, name] = fileparts(filename);
 
         % Load the file.
         d = uiprogressdlg(app.CELL_ID,'Title','Reloading processed file...', 'Indeterminate','on');
@@ -311,9 +312,7 @@ function open(path)
     app.selected_neuron = [];
 
     % Draw everything.
-    app.UserNeuronIDsListBox.Items = {};
-    app.UserNeuronIDsListBox.ItemsData = [];
-    app.UserNeuronIDsListBox.Value = {};
+    app.refreshAutoIDList();
 
     if ismember('is_matched', fieldnames(app.image_prefs))
         if app.image_prefs.is_matched == 1

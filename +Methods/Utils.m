@@ -91,6 +91,10 @@ classdef Utils
         %
         % Amin Nejat
 
+            if isa(cube, 'Methods.ColorReadout')
+                patch = cube.subcube(loc, center);
+                return;
+            end
             sz = [size(cube, 1), size(cube, 2), size(cube, 3)];
 
             rel = round(center);

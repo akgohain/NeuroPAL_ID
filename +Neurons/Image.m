@@ -61,17 +61,18 @@ classdef Image < handle
         function add_neuron(obj, volume, position, nsz, scale)
             %ADD_NEURON Add a neuron to the list of neurons.
             %   by running one iteration of Matching Pursuit.
-            %   volume: the full z-scored image.
+            %   volume: the z-scored image or a sampled color readout.
             %   position: the location in the neighbourhood of which the
             %   neuron should be added.
             %   nsz: the window size around the patch for the  new neuron.
             %   trunc: the truncation value of the Gaussian function used
             %   for fitting.
 
-            try
+            if isa(volume, 'Methods.ColorReadout')
+                volume = volume.prepare();
+                color = volume.sample(round(position));
+            else
                 color = squeeze(volume(round(position(1)),round(position(2)),round(position(3)),:))';
-            catch
-                'test'
             end
             
             obj.scale = scale;
@@ -343,7 +344,12 @@ classdef Image < handle
             end
             
             % Determine the new data.
-            data = data(:,:,:,new_RGBW);
+            if isa(data, 'Methods.ColorReadout')
+                data = Methods.ColorReadout(data.Data, new_RGBW);
+                data = data.prepare();
+            else
+                data = data(:,:,:,new_RGBW);
+            end
             
             % Set the neuron patch size.
             patch_hsize = [3,3,0];

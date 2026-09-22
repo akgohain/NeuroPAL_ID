@@ -8,6 +8,21 @@ classdef ImageAnalysis
     
    % Public methods.
     methods (Static)
+        function exportID2CSV(csvfile, varargin)
+            % Replace the previous export only after the new file is complete.
+            temporary = [tempname(fileparts(csvfile)), '.csv'];
+            cleanup = onCleanup(@() Output.ImageAnalysis.deleteTemporaryCSV(temporary));
+            Output.ImageAnalysis.saveID2CSV(temporary, varargin{:});
+            [ok, message] = movefile(temporary, csvfile, 'f');
+            if ~ok
+                error('NeuroPAL:IDExport', '%s', message);
+            end
+        end
+
+        function deleteTemporaryCSV(filename)
+            if isfile(filename), delete(filename); end
+        end
+
         function saveID2CSV(csvfile, prefs, data, data_zscored, neurons, um_scale)
             %SAVEID2CSV save the IDs, position, & colors to a CSV file.
 
@@ -112,7 +127,7 @@ classdef ImageAnalysis
             if ~is_GFP_nan
                 GFP_sorted = sort(GFP_intensity);
                 
-                if ~anynan(GFP_sorted)
+                if ~anynan(GFP_sorted) && exist('findchangepts', 'file') == 2
                     [change_point, change_residual] = findchangepts(GFP_sorted, ...
                         'MaxNumChanges', 1, 'Statistic', 'linear');
                 else
@@ -146,6 +161,10 @@ classdef ImageAnalysis
             
             % Open the file.
             fileID = fopen(csvfile, 'w');
+            if fileID < 0
+                error('NeuroPAL:IDExport', 'Cannot write to %s.', csvfile);
+            end
+            close_file = onCleanup(@() fclose(fileID));
             
             % Write the background and Otsu thresholds.
             fprintf(fileID, ['Atlas Version,,' ...
@@ -228,8 +247,8 @@ classdef ImageAnalysis
                 end
 
                 % Determine the auto IDs.
-                probabilistic_id = [];
-                probabilistic_prob = [];
+                probabilistic_id = '';
+                probabilistic_prob = nan;
                 if ~isempty(n.probabilistic_ids)
                     probabilistic_id = n.probabilistic_ids{1};
                     probabilistic_prob = n.probabilistic_probs(1);
@@ -278,7 +297,7 @@ classdef ImageAnalysis
             end
             
             % Done.
-            fclose(fileID);
+            clear close_file;
         end
     end
 end
