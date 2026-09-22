@@ -9,6 +9,7 @@ though generic ZIP validation passes.
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -41,6 +42,12 @@ def parse_args() -> argparse.Namespace:
         "--check",
         action="store_true",
         help="Validate the existing mlapp without rebuilding it.",
+    )
+    parser.add_argument(
+        "--matlab",
+        default=os.environ.get("MATLAB_BIN") or shutil.which("matlab") or
+        "/Applications/MATLAB_R2024a.app/bin/matlab",
+        help="MATLAB executable for checking the editable App Designer source.",
     )
     return parser.parse_args()
 
@@ -100,14 +107,14 @@ def rebuild(repo_root: Path) -> Path:
     return target
 
 
-def matlab_smoke(repo_root: Path, mlapp: Path) -> None:
-    matlab = Path("/Applications/MATLAB_R2024a.app/bin/matlab")
-    if not matlab.exists():
-        return
+def matlab_smoke(repo_root: Path, mlapp: Path, matlab: str) -> None:
+    root = repo_root.as_posix().replace("'", "''")
     code = (
-        f"cd('{repo_root.as_posix()}'); "
+        f"cd('{root}'); "
         "addpath(pwd); "
+        "addpath(fullfile(pwd,'scripts')); "
         "assert(strcmp(which('visualize_light'), fullfile(pwd,'visualize_light.mlapp'))); "
+        "sync_mlapp_code(fullfile(pwd,'visualize_light.mlapp'), true); "
         "disp('mlapp_resolves_ok');"
     )
     subprocess.run([str(matlab), "-batch", code], check=True)
@@ -121,7 +128,7 @@ def main() -> int:
         validate_archive(mlapp)
     else:
         mlapp = rebuild(repo_root)
-    matlab_smoke(repo_root, mlapp)
+    matlab_smoke(repo_root, mlapp, args.matlab)
     print(f"OK: {mlapp}")
     return 0
 

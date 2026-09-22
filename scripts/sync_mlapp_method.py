@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Copy one missing App Designer method into the current mlapp document.
 
-This updates only ``matlab/document.xml`` and preserves every other archive
-member, including the current app model and metadata. It is deliberately more
-conservative than rebuilding from an extraction that may be stale.
+This updates ``matlab/document.xml`` and synchronizes App Designer's editable
+code with MATLAB before replacing the archive. Components and metadata are
+preserved instead of rebuilding them from an extraction that may be stale.
 """
 
 from __future__ import annotations
@@ -12,6 +12,7 @@ import argparse
 import os
 import re
 import shutil
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
@@ -28,6 +29,8 @@ def parse_args() -> argparse.Namespace:
         default=root / ".mlapp_extract" / "matlab" / "document.xml",
     )
     parser.add_argument("--no-backup", action="store_true")
+    parser.add_argument("--matlab", default=shutil.which("matlab") or
+                        "/Applications/MATLAB_R2024a.app/bin/matlab")
     return parser.parse_args()
 
 
@@ -73,7 +76,7 @@ def main() -> int:
             shutil.copy2(target, backup)
 
     with tempfile.NamedTemporaryFile(
-        dir=target.parent, prefix="visualize_light.", suffix=".mlapp.tmp", delete=False
+        dir=target.parent, prefix="visualize_light_", suffix=".mlapp", delete=False
     ) as handle:
         temporary = Path(handle.name)
 
@@ -90,6 +93,11 @@ def main() -> int:
             repaired = check.read("matlab/document.xml").decode("utf-8")
             if pattern.search(repaired) is None:
                 raise ValueError("method was not present after archive rebuild")
+        scripts = str(root / "scripts").replace("'", "''")
+        package = str(temporary).replace("'", "''")
+        subprocess.run([args.matlab, "-batch",
+                        f"addpath('{scripts}'); sync_mlapp_code('{package}');"],
+                       check=True)
         os.replace(temporary, target)
     finally:
         if temporary.exists():

@@ -10,6 +10,8 @@ function initialize()
 
     app = Program.GUIHandling.app;
     window = Program.GUIHandling.window_fig;
+    % Keep cleanup in user code so App Designer preserves it when saving.
+    window.DeleteFcn = @(~, ~) Program.Helpers.cleanup_ui_runtime(app);
 
     if ~isdeployed
         % If we're running in dev mode, add Data & External Dependencies to
