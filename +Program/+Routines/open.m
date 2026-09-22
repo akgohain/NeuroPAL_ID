@@ -7,6 +7,7 @@ function open(path)
     if app.is_opening_file
         return;
     end
+    if ~Program.ProcessingSession.prepareOpen(app), return; end
     app.is_opening_file = true;
     opening_guard = onCleanup(@() local_finish_open(app));
     
@@ -149,6 +150,7 @@ function open(path)
     % Setup the image.
     app.image_name = name; %strrep(name, '_', '\_');
     app.image_data = data;
+    Program.ProcessingSession.clear(app);
     if isappdata(app.CELL_ID, 'proc_runtime_dirty')
         rmappdata(app.CELL_ID, 'proc_runtime_dirty');
     end

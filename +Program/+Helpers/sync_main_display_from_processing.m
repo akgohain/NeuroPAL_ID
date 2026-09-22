@@ -9,7 +9,7 @@ if nargin < 2
 end
 
 synced = false;
-if isempty(app.image_data)
+if ~strcmp(app.VolumeDropDown.Value, 'Colormap')
     return
 end
 

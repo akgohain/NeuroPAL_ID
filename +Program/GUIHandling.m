@@ -4460,16 +4460,16 @@ classdef GUIHandling
             end
             if isprop(app, 'ProcCropImageButton') && isvalid(app.ProcCropImageButton)
                 app.ProcCropImageButton.ButtonPushedFcn = @(src, event) ...
-                    Program.Routines.Processing.crop();
+                    Program.ProcessingSession.run(app, 'crop');
             end
             Program.GUIHandling.ensure_processing_mirror_z_controls(app);
             if isprop(app, 'ProcSaveButton') && isvalid(app.ProcSaveButton)
                 app.ProcSaveButton.ButtonPushedFcn = @(src, event) ...
-                    Program.Routines.Processing.save();
+                    Program.ProcessingSession.run(app, 'save');
             end
             if isprop(app, 'ProcResetButton') && isvalid(app.ProcResetButton)
                 app.ProcResetButton.ButtonPushedFcn = @(src, event) ...
-                    Program.Routines.Processing.reset();
+                    Program.ProcessingSession.run(app, 'reset');
             end
             if isprop(app, 'ProcShowMIPCheckBox') && isvalid(app.ProcShowMIPCheckBox)
                 app.ProcShowMIPCheckBox.ValueChangedFcn = @(src, event) ...
@@ -4584,7 +4584,7 @@ classdef GUIHandling
             apply_button = uibutton(button_grid, 'push', ...
                 'Text', 'Apply', ...
                 'ButtonPushedFcn', @(src, event) ...
-                    Program.GUIHandling.commit_processing_normalize_colors(app));
+                    Program.ProcessingSession.run(app, 'normalize'));
             apply_button.Layout.Row = 1;
             apply_button.Layout.Column = 2;
 
@@ -4762,6 +4762,12 @@ classdef GUIHandling
         end
 
         function handle_processing_volume_changed(app, event)
+            requested = app.VolumeDropDown.Value;
+            if isprop(event, 'PreviousValue') || (isstruct(event) && isfield(event,'PreviousValue'))
+                app.VolumeDropDown.Value = event.PreviousValue;
+                if ~Program.ProcessingSession.prepareOpen(app), return; end
+                app.VolumeDropDown.Value = requested;
+            end
             Program.Handlers.loading.start('Swapping volumes...');
             cleanup = onCleanup(@() Program.Handlers.loading.done());
             Program.GUIHandling.hide_percentile_noise_editor(app);
@@ -4887,6 +4893,7 @@ classdef GUIHandling
             Program.GUIHandling.update_processing_threshold_target_options(app);
             setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
             Program.Helpers.sync_main_display_from_processing(app, false);
+            Program.ProcessingSession.refreshColors(app);
             if ~rendered_processing
                 Program.Routines.Processing.render();
             end
@@ -4903,80 +4910,23 @@ classdef GUIHandling
         function install_processing_commit_callbacks(app)
             if isprop(app, 'confirm_rotation') && isvalid(app.confirm_rotation)
                 app.confirm_rotation.ButtonPushedFcn = @(src, event) ...
-                    Program.GUIHandling.confirm_processing_rotation(app);
+                    Program.ProcessingSession.run(app, 'rotate');
             end
         end
 
         function confirm_processing_rotation(app)
             Program.HeavyJob.assertIdle();
-            rotate_actions = {};
-            should_rotate_neurons = false;
-
-            try
-                rotate_angle = Program.GUIHandling.canonical_rotation_angle(app.proc_rot_spinner.Value);
-            catch
-                rotate_angle = 0;
+            actions = {};
+            if app.flip_lr.Value, actions{end+1} = 'hori'; end
+            if app.flip_ud.Value, actions{end+1} = 'vert'; end
+            if app.proc_rot_spinner.Value ~= 0, actions{end+1} = 'rotate'; end
+            if ~isempty(actions)
+                if ~Program.Helpers.apply_processing_preview_action(app, actions), return; end
             end
-
-            if isprop(app, 'ProcRotateNeuronsCheckBox') && isvalid(app.ProcRotateNeuronsCheckBox)
-                should_rotate_neurons = logical(app.ProcRotateNeuronsCheckBox.Value);
-            end
-
-            if app.flip_lr.Value
-                rotate_actions{end+1} = 'hori';
-            end
-            if app.flip_ud.Value
-                rotate_actions{end+1} = 'vert';
-            end
-            if app.proc_rot_spinner.Value ~= 0
-                rotate_actions{end+1} = 'rotate';
-            end
-
-            if isempty(rotate_actions)
-                app.proc_xyAxes.XLim(2) = app.proc_xSlider.Limits(2);
-                app.proc_xyAxes.YLim(2) = app.proc_ySlider.Limits(2);
-                Program.Routines.GUI.set_manipulation_panel('closed');
-                return
-            end
-
-            if should_rotate_neurons && any(strcmpi(rotate_actions, 'rotate')) ...
-                    && ~ismember(rotate_angle, [90, 180, 270])
-                uialert(app.CELL_ID, ...
-                    'Neuron geometry rotation is limited to 90, 180, and 270 degrees in processing. Choose one of those angles, or disable Rotate Neurons before applying.', ...
-                    'Unsupported Neuron Rotation', 'Icon', 'warning');
-                return
-            end
-
-            context = Program.Helpers.processing_colormap_context(app);
-            if should_rotate_neurons
-                [neurons_rotatable, neurons_msg] = Program.Helpers.apply_processing_rotation_to_neurons( ...
-                    app, rotate_actions, rotate_angle, context.dims, true);
-                if ~neurons_rotatable
-                    if isempty(neurons_msg)
-                        neurons_msg = 'Neuron geometry could not be validated for the requested processing rotation.';
-                    end
-                    uialert(app.CELL_ID, neurons_msg, 'Neuron Rotation Not Possible', 'Icon', 'error');
-                    return
-                end
-            end
-            applied = Program.Helpers.apply_processing_preview_action(app, rotate_actions);
-            if ~applied
-                return
-            end
-
-            if should_rotate_neurons
-                neurons_rotated = Program.Helpers.apply_processing_rotation_to_neurons( ...
-                    app, rotate_actions, rotate_angle, context.dims);
-                if ~neurons_rotated
-                    uialert(app.CELL_ID, ...
-                        'Neuron geometry rotation did not complete correctly. Rotation was not applied.', ...
-                        'Neuron Rotation Failed', 'Icon', 'error');
-                    return
-                end
-            end
-
             Program.Routines.GUI.set_manipulation_panel('closed');
+            Program.Routines.Processing.render();
         end
+
 
         function controls = ensure_processing_mirror_z_controls(app)
             controls = Program.GUIHandling.processing_mirror_z_controls(app);
@@ -5021,13 +4971,13 @@ classdef GUIHandling
             panel.Layout.Column = [1 2];
 
             grid = uigridlayout(panel, ...
-                'ColumnWidth', {'1x', 80, 80}, ...
+                'ColumnWidth', {0, '1x', '1x'}, ...
                 'RowHeight', {'1x'}, ...
                 'ColumnSpacing', 6, ...
                 'Padding', [0 0 0 0]);
 
             include_neurons = uicheckbox(grid, ...
-                'Text', 'Include neurons', ...
+                'Text', 'Include neurons', 'Visible', 'off', 'Value', true, ...
                 'Tooltip', 'Mirror neuron Z coordinates along with the image volume.');
             include_neurons.Layout.Row = 1;
             include_neurons.Layout.Column = 1;
@@ -5042,7 +4992,7 @@ classdef GUIHandling
             apply_button = uibutton(grid, 'push', ...
                 'Text', 'Apply', ...
                 'ButtonPushedFcn', @(src, event) ...
-                    Program.GUIHandling.apply_processing_mirror_z(app));
+                    Program.ProcessingSession.run(app, 'mirrorz'));
             apply_button.Layout.Row = 1;
             apply_button.Layout.Column = 3;
 
@@ -5110,50 +5060,13 @@ classdef GUIHandling
 
         function apply_processing_mirror_z(app)
             Program.HeavyJob.assertIdle();
-            controls = Program.GUIHandling.processing_mirror_z_controls(app);
-            include_neurons = false;
-            if ~isempty(controls)
-                include_neurons = logical(controls.include_neurons.Value);
+            if ~strcmp(app.VolumeDropDown.Value, 'Colormap')
+                error('NeuroPAL:MirrorVideo', 'Open a NeuroPAL image to mirror its Z axis.');
             end
-
-            if ~strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap')
-                uialert(app.CELL_ID, ...
-                    'Mirror Z is currently available for NeuroPAL image volumes only.', ...
-                    'Mirror Z Not Available', 'Icon', 'warning');
-                return
-            end
-
-            context = Program.Helpers.processing_colormap_context(app);
-            if include_neurons && ~Program.GUIHandling.can_mirror_processing_neurons(app)
-                uialert(app.CELL_ID, ...
-                    'Neuron geometry is not available for Z mirroring.', ...
-                    'Mirror Z Not Possible', 'Icon', 'warning');
-                return
-            end
-
-            applied = Program.Helpers.apply_processing_preview_action(app, {'mirrorz'});
-            if ~applied
-                return
-            end
-
-            if include_neurons
-                dims = double(context.dims(:).');
-                if numel(dims) < 3
-                    dims(end+1:3) = 1;
-                end
-                mirror_proxy = zeros(round(dims(1)), round(dims(2)), round(dims(3)));
-                try
-                    app.image_neurons.mirror_neurons_Z(mirror_proxy);
-                    Program.Routines.ID.render();
-                catch
-                    uialert(app.CELL_ID, ...
-                        'The image was mirrored, but neuron Z mirroring failed.', ...
-                        'Neuron Mirror Failed', 'Icon', 'warning');
-                end
-            end
-
+            if ~Program.Helpers.apply_processing_preview_action(app, {'mirrorz'}), return; end
             Program.Routines.GUI.set_manipulation_panel('closed');
         end
+
 
         function tf = can_mirror_processing_neurons(app)
             tf = false;
@@ -5418,6 +5331,7 @@ classdef GUIHandling
             end
 
             app.ProcSideGrid.RowHeight = {95, 'fit', 'fit', spectral_height, 34, 116};
+            app.ProcRotateNeuronsCheckBox.Visible = 'off';
             Program.GUIHandling.update_processing_commit_state(app);
         end
 
@@ -5466,19 +5380,15 @@ classdef GUIHandling
 
             label = Program.GUIHandling.ensure_processing_commit_ui(app);
             is_ready = Program.GUIHandling.processing_tab_rendered(app);
-            is_dirty = isappdata(app.CELL_ID, 'proc_runtime_dirty') && ...
-                logical(getappdata(app.CELL_ID, 'proc_runtime_dirty'));
-
-            if ~is_ready
-                label.Text = 'Open data to begin';
-                label.FontColor = [0.45 0.47 0.50];
-            elseif is_dirty
-                label.Text = 'Preview has unsaved changes';
-                label.FontColor = [0.72 0.38 0.02];
+            is_dirty = Program.ProcessingSession.dirty(app);
+            label.FontColor = [0.45 0.45 0.45];
+            if is_ready && is_dirty
+                label.Text = 'Unsaved changes';
             else
-                label.Text = 'No pending changes';
-                label.FontColor = [0.30 0.48 0.34];
+                label.Text = '';
             end
+            app.ProcSaveButton.Enable = Program.GUIHandling.on_off(is_ready && is_dirty);
+            app.ProcResetButton.Enable = Program.GUIHandling.on_off(is_ready && is_dirty);
         end
 
         function install_processing_advanced_callback(app)

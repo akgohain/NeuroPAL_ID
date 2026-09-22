@@ -1,4 +1,5 @@
-function save()
+function saved = save()
+    saved = false;
     Program.HeavyJob.assertIdle();
     app = Program.app;
     actions = Program.GUIHandling.processing_file_actions(app);
@@ -12,7 +13,7 @@ function save()
             end
 
             Program.Helpers.sync_main_display_from_processing(app, false);
-            Program.Helpers.write_processing_colormap_to_file(app);
+            if ~Program.Helpers.write_processing_colormap_to_file(app), return; end
             Program.Routines.Processing.render();
             Program.Routines.ID.render();
 
@@ -20,13 +21,23 @@ function save()
             if ~isempty(actions)
                 Program.Handlers.dialogue.add_task('Updating file...');
             end
-            Methods.ChunkyMethods.apply_video(app, actions);
+            if ~Methods.ChunkyMethods.apply_video(app, actions), return; end
             if ~isempty(actions)
                 Program.Handlers.dialogue.resolve();
             end
+        otherwise
+            return
     end
 
+    saved = true;
     app.flags = struct();
+    Program.GUIHandling.set_thresholds(app, 255);
+    Program.GUIHandling.sanitize_processing_downsample_fields(app);
+    app.ProcXYFactorEditField.Value = 1;
+    dims = Program.GUIHandling.processing_source_dims(app);
+    app.ProcZSlicesEditField.Value = dims(3);
+    if strcmp(app.VolumeDropDown.Value, 'Colormap'), Program.ProcessingSession.capture(app); end
+    Program.GUIHandling.update_processing_commit_state(app);
     Methods.ChunkyMethods.clear_spectral_filtered_cache(app);
     if isappdata(app.CELL_ID, 'proc_mip_cache')
         rmappdata(app.CELL_ID, 'proc_mip_cache');

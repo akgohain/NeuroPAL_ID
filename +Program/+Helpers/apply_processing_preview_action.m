@@ -16,6 +16,12 @@ actions = actions(~cellfun('isempty', actions));
 if isempty(actions)
     return
 end
+pending = fieldnames(app.flags)';
+actions = [setdiff(pending, actions, 'stable'), actions];
+supported = {'zscore','histmatch','crop','hori','vert','mirrorz','rotate','cc','acc','ds','window','debleed'};
+if any(~ismember(actions, supported))
+    error('NeuroPAL:ProcessingAction', 'Unknown image-processing action.');
+end
 
 context = Program.Helpers.processing_colormap_context(app);
 current_volume = context.volume;
@@ -33,25 +39,32 @@ end
 
 job = Program.HeavyJob.acquire('Image processing');
 job_cleanup = onCleanup(@() delete(job));
+Program.ProcessingSession.checkpointPixels(app);
+neurons = Program.ProcessingSession.copyNeurons(app.image_neurons);
 for n = 1:numel(actions)
     action = actions{n};
+    dims = size(current_volume); dims(end+1:4) = 1;
     current_volume = Methods.ChunkyMethods.apply_vol(app, action, current_volume);
-    if isfield(app.flags, action)
-        app.flags = rmfield(app.flags, action);
-    end
+    output_dims = size(current_volume); output_dims(end+1:4) = 1;
+    neurons = Program.Helpers.transform_processing_neurons(app, neurons, action, dims, output_dims);
 end
 
 app.image_data = current_volume;
 Program.Helpers.update_processing_image_scale(app, actions, source_dims);
+app.image_neurons = neurons;
+app.selected_neuron = [];
+if ~isempty(neurons), neurons.scale = app.image_um_scale; end
+Program.ProcessingSession.stageIDs(app);
+for n = 1:numel(actions)
+    if isfield(app.flags, actions{n}), app.flags = rmfield(app.flags, actions{n}); end
+end
 app.image_data_zscored = [];
 setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
 
 Program.GUIHandling.clear_processing_preview_cache(app);
 
 render_dims = size(app.image_data);
-if ndims(app.image_data) == 3
-    render_dims = [render_dims 1];
-end
+render_dims(end+1:4) = 1;
 Program.GUIHandling.set_gui_limits(app, 'soft', [render_dims(1:4) 1]);
 
 current_z = min(max(round(app.proc_zSlider.Value), 1), render_dims(3));
@@ -66,9 +79,13 @@ if isgraphics(app.XY)
     app.XY.YLim = [0, render_dims(1)];
 end
 
-max_val = max(255, double(max(app.image_data, [], 'all')));
-Program.GUIHandling.set_thresholds(app, max_val);
+if any(strcmp(actions, 'window'))
+    Program.GUIHandling.set_thresholds(app, 255);
+end
 Program.Helpers.sync_main_display_from_processing(app, false);
+Program.ProcessingSession.refreshColors(app);
+app.refreshAutoIDList();
+Program.Routines.ID.hot_neuron_reset();
 Program.Routines.Processing.render();
 Program.Routines.ID.render();
 
@@ -114,9 +131,18 @@ if ~isfield(metadata, 'info') || ~isstruct(metadata.info)
 end
 metadata.info.scale = updated_scale;
 state = local_processing_state(app, actions, dims(4));
+neurons = Program.ProcessingSession.copyNeurons(app.image_neurons);
+current_dims = dims;
+for n = 1:numel(actions)
+    next_dims = Methods.ChunkyMethods.calc_pp_size(app, actions{n}, current_dims);
+    neurons = Program.Helpers.transform_processing_neurons(app, neurons, actions{n}, current_dims, next_dims);
+    current_dims = next_dims;
+end
+if ~isempty(neurons), neurons.scale = updated_scale; end
 
 job = Program.HeavyJob.acquire('Image processing');
 job_cleanup = onCleanup(@() delete(job));
+Program.ProcessingSession.checkpointPixels(app);
 d = uiprogressdlg(app.CELL_ID, ...
     'Title', 'NeuroPAL ID', ...
     'Message', 'Applying chunked colormap processing...', ...
@@ -146,6 +172,9 @@ app.image_file = target_path;
 app.proc_image = matfile(target_path);
 app.image_data = [];
 app.image_data_zscored = [];
+app.image_neurons = neurons;
+app.selected_neuron = [];
+Program.ProcessingSession.stageIDs(app);
 app.image_prefs = metadata.prefs;
 app.image_um_scale = updated_scale;
 if isstruct(app.image_info)
@@ -156,13 +185,13 @@ for n = 1:numel(actions)
         app.flags = rmfield(app.flags, actions{n});
     end
 end
-if isappdata(app.CELL_ID, 'proc_runtime_dirty')
-    rmappdata(app.CELL_ID, 'proc_runtime_dirty');
-end
+setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
 
 Program.GUIHandling.clear_processing_preview_cache(app);
 Program.GUIHandling.set_gui_limits(app, 'soft', [out_dims 1]);
 Program.GUIHandling.set_thresholds(app, Program.Helpers.processing_colormap_max(app));
+app.refreshAutoIDList();
+Program.Routines.ID.hot_neuron_reset();
 Program.Routines.Processing.render();
 applied = true;
 end
@@ -197,10 +226,15 @@ function path = local_processed_mat_path(source_path)
 [folder, name, ~] = fileparts(char(source_path));
 name = regexprep(name, '(_processed(?:_\d{3,})?)+$', '');
 path = fullfile(folder, [name '_processed.mat']);
+index = 1;
+while isfile(path)
+    path = fullfile(folder, sprintf('%s_processed_%03d.mat', name, index));
+    index = index + 1;
+end
 end
 
 function actions = local_non_slice_agnostic_actions(actions)
-safe_actions = {'zscore', 'histmatch', 'crop', 'hori', 'vert', 'mirrorz', 'rotate', 'cc', 'acc', 'window'};
+safe_actions = {'crop', 'hori', 'vert', 'mirrorz', 'rotate', 'cc', 'acc', 'window'};
 unsafe = setdiff(actions, safe_actions);
 unsafe = setdiff(unsafe, {'ds'});
 actions = sort(unique(unsafe));

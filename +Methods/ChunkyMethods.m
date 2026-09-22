@@ -162,55 +162,20 @@ classdef ChunkyMethods
         end
 
         function apply_colormap(app, actions)
-            % Apply set of operations to a colormap.
-
-            if nargin < 2 || isempty(actions)
-                return
+            % Share the preview path so image edits also transform neuron positions.
+            if nargin < 2 || isempty(actions), return; end
+            if Program.Helpers.apply_processing_preview_action(app, actions)
+                Program.Routines.Processing.save();
             end
-
-            actions = cellstr(lower(string(actions)));
-            actions = actions(~cellfun('isempty', actions));
-            if isempty(actions)
-                return
-            end
-
-            % Calculate new colormap dimensions
-            Program.Handlers.dialogue.step('Calculating new dimensions...');
-            context = Program.Helpers.processing_colormap_context(app);
-            if isempty(context.volume)
-                Program.Helpers.apply_processing_preview_action(app, actions);
-                return
-            end
-
-            source_dims = size(context.volume);
-            if numel(source_dims) < 4
-                source_dims(end+1:4) = 1;
-            end
-            new_dims = size(context.volume);
-            for a=1:length(actions)
-                new_dims = Methods.ChunkyMethods.calc_pp_size(app, actions{a}, new_dims);
-            end
-
-            current_vol = context.volume;
-            for a=1:length(actions)
-                Program.Handlers.dialogue.add_task(sprintf("Applying %s", actions{a}));
-                Program.Handlers.dialogue.set_value(a/length(actions));
-                processed_vol = Methods.ChunkyMethods.apply_vol(app, actions{a}, current_vol);
-                current_vol = processed_vol;
-            end
-
-            app.image_data = current_vol;
-            Program.Helpers.update_processing_image_scale(app, actions, source_dims);
-            app.image_data_zscored = [];
-            setappdata(app.CELL_ID, 'proc_runtime_dirty', true);
-            Program.Helpers.write_processing_colormap_to_file(app);
         end
 
-        function apply_video(app, actions, progress)
+        function applied = apply_video(app, actions, progress)
+            applied = false;
             % Apply set of operations to a video.
             %#ok<INUSD>
 
             if nargin < 2 || isempty(actions)
+                applied = true;
                 return
             end
 
@@ -329,6 +294,7 @@ classdef ChunkyMethods
             movefile(temp_path, processed_path);
             app.video_info.nt = nt;
             Program.Routines.Videos.reload(processed_path);
+            applied = true;
         end
 
         function source_path = video_source_path(app)

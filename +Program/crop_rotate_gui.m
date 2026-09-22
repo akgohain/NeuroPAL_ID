@@ -599,7 +599,7 @@ classdef crop_rotate_gui
             right_edge = find(nonzero_columns, 1, 'last');
 
             rotated_img = imrotate(img, -app.rotation_stack.cache.(app.VolumeDropDown.Value).angle);
-            processed_img = rotated_img(top_edge:bottom_edge, left_edge:right_edge, :);
+            processed_img = rotated_img(top_edge:bottom_edge, left_edge:right_edge, :, :);
         end
         
         function preview_output(app)
