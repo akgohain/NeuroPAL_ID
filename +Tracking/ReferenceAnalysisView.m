@@ -180,6 +180,7 @@ classdef ReferenceAnalysisView < handle
                 'activity_current',c.activityCurrent(),'activity_options',obj.options(),'next_id',c.NextID, ...
                 'detection_channel',c.DetectionChannel.Value,'detection_mode',c.DetectionMode.Value,'rgbw_channels',c.RGBW.Value, ...
                 'detector',c.Detector.Value,'spacing_text',c.Spacing.Value,'calibration_confirmed',c.Calibration.Value);
+            value.detection_channels=Tracking.DetectionChannels.get(c);
         end
         function restoreTracking(obj,parameters)
             c=obj.Controller; c.First.Value=parameters.frame_range(1)+1; c.Last.Value=parameters.frame_range(2)+1;
@@ -196,7 +197,14 @@ classdef ReferenceAnalysisView < handle
             if isfield(value,'spacing_text'), c.Spacing.Value=value.spacing_text; end
             if isfield(value,'calibration_confirmed'), c.Calibration.Value=value.calibration_confirmed; end
             if isfield(value,'detection_channel'), c.DetectionChannel.Value=value.detection_channel; end
-            if isfield(value,'detection_mode'), c.DetectionMode.Value=value.detection_mode; end
+            if isfield(value,'detection_mode')
+                % Preserve the original joint RGBW path when opening older sessions.
+                if strcmp(value.detection_mode,'RGBW') && ~any(strcmp(c.DetectionMode.Items,'RGBW'))
+                    c.DetectionMode.Items=[c.DetectionMode.Items {'RGBW'}];
+                end
+                c.DetectionMode.Value=value.detection_mode;
+            end
+            if isfield(value,'detection_channels'), Tracking.DetectionChannels.restore(c,value.detection_channels); end
             if isfield(value,'rgbw_channels'), c.RGBW.Value=value.rgbw_channels; end
             c.View.detectionModeChanged();
             options=value.activity_options;

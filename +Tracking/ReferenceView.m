@@ -67,10 +67,7 @@ classdef ReferenceView < handle
             end
         end
         function detectionModeChanged(obj)
-            c=obj.Controller;
-            rgbw=strcmp(c.DetectionMode.Value,'RGBW');
-            c.RGBW.Visible=matlab.lang.OnOffSwitchState(rgbw);
-            c.DetectionChannel.Visible=matlab.lang.OnOffSwitchState(~rgbw);
+            Tracking.DetectionChannels.mode(obj.Controller);
         end
         function changeView(obj)
             obj.Playback.stop(); obj.Preview.cancel(); obj.FramePreview.cancel(); obj.redraw();
@@ -444,6 +441,7 @@ classdef ReferenceView < handle
         end
         function setBusy(obj,busy)
             obj.Controller.Buttons.cancel.Visible=matlab.lang.OnOffSwitchState(busy);
+            Tracking.DetectionChannels.setBusy(obj.Controller,busy);
             obj.Contrast.setBusy(busy); obj.Playback.setBusy(busy);
             if ~isempty(obj.Review) && ~isempty(obj.Review.Confirm)
                 obj.Review.Confirm.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(obj.Selection) && ~obj.Selection(1));

@@ -20,6 +20,17 @@ The label dropdown offers no labels, selected, sparse and all labels. **XYZ view
 
 Coordinates are one-based XYZ voxel centers in the supplied image. The crop offset is retained as metadata, not added to coordinates. The selected ROI outline uses the activity radii in pixels; its XY cross-section changes with Z.
 
+### Arbitrary multi-channel detection
+
+Choose **Multi-channel**, check any two or more source channels, and set the merge distance in micrometers (default 2 µm). Both MoE and Spotiflow run their existing single-channel inference separately on each selected channel, sequentially. Blank channels are skipped. This is a union of independent detections, not a newly trained joint multichannel model.
+
+Cross-channel matches within the merge distance retain the strongest proposal's center and score. At most one proposal from each channel joins a match, distances are measured against the retained center, and no transitive chain merging is used. Two proposals from the same channel are never combined. A zero merge distance combines only coincident centers. Larger distances can merge distinct nearby neurons, so review the candidates for the recording's calibration and density.
+
+Session settings retain selected channels and merge distance. Detection provenance records all per-channel runs, unmerged centers and scores, retained-source and supporting channels, merge policy, and skipped channels. Annotation `channel` records the channel of the retained proposal and is retained per neuron through tracking and export; support information remains in the detection provenance. Detection channels do not restrict the separately selected tracking or activity channel. Cancellation/failure leaves existing candidates and tracks unchanged; a zero-result run does not change the tracking reference or clear Undo. Saved legacy RGBW sessions retain their original joint RGBW execution path; ordinary new sessions offer Single channel and Multi-channel.
+
+The single-channel adaptation repeats one channel into the frozen RGBW experts. Arbitrary-channel detection inherits that adaptation; its biological accuracy on non-NeuroPAL recordings requires review and has not been established by these engineering checks.
+
+
 ## Track
 
 In **Track**, set the full range, reference frame, tracking channel, frames per window, and epochs. All seed IDs must be present at the reference frame. Detection and tracking channels can differ; using a weak or non-colocalized reference channel can still produce poor tracks.

@@ -85,12 +85,13 @@ classdef VideoWorkspace
             heading=uilabel(detection,'Text','Detect reference neurons','FontWeight','bold'); heading.Layout.Column=[1 2];
             uilabel(detection,'Text','Method'); c.Detector=uidropdown(detection,'Items',{'MoE','Spotiflow'});
             uilabel(detection,'Text','Input');
-            c.DetectionMode=uidropdown(detection,'Items',{'Single channel','RGBW'},'Value','Single channel','ValueChangedFcn',@(~,~) v.detectionModeChanged());
+            c.DetectionMode=uidropdown(detection,'Items',{'Single channel','Multi-channel'},'Value','Single channel','ValueChangedFcn',@(~,~) v.detectionModeChanged());
             uilabel(detection,'Text','Channels');
             c.DetectionChannel=uidropdown(detection,'Items',cellstr("C"+string(0:c.Source.nc-1)),'ItemsData',0:c.Source.nc-1,'Value',0);
             c.DetectionChannel.Layout.Row=4; c.DetectionChannel.Layout.Column=2;
             c.RGBW=uieditfield(detection,'text','Value','0 1 2 3','Tooltip','Channel indices in R G B W order','Visible','off');
             c.RGBW.Layout.Row=4; c.RGBW.Layout.Column=2;
+            Tracking.DetectionChannels.build(c,detection);
             v.DetectionSummary=uilabel(detection,'Text','Choose a reference frame with the time slider.','WordWrap','on','FontColor',[.4 .4 .4]);
             v.DetectionSummary.Layout.Row=5; v.DetectionSummary.Layout.Column=[1 2];
             c.Buttons.detect=uibutton(detection,'Text','Auto Detect','FontWeight','bold','ButtonPushedFcn',@(~,~) c.safe(@() c.detect()));

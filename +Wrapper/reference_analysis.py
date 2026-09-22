@@ -95,7 +95,7 @@ def track_sequence(request):
     seeds=canonical_rows(seeds)
     seeds.sort(key=lambda r:(r['t'],r['track_id']))
     root_rows=[r for r in seeds if r['t']==reference+1]
-    annotation_channel = int(root_rows[0].get('channel', channel))
+    annotation_channels = {r['track_id']: int(r.get('channel', channel)) for r in root_rows}
     parameters = dict(source_id=info['source_id'], frame_range=[first,last], reference_frame=reference,
                       channel=channel, window_size=size, epochs=epochs, observations=seeds)
     signature = hashlib.sha256(json.dumps(parameters,sort_keys=True).encode()).hexdigest()
@@ -141,7 +141,7 @@ def track_sequence(request):
             if {(r['track_id'],r['t']) for r in result} != expected:
                 raise ValueError('Tracking window returned incomplete or unexpected neuron IDs')
             for row in result:
-                row['channel'] = annotation_channel
+                row['channel'] = annotation_channels[row['track_id']]
                 by_key[(row['track_id'],row['t'])] = row
             # Keep explicit manual coordinates and the original reference exactly.
             by_key.update({(r['track_id'],r['t']):r for r in seeds if (r['track_id'],r['t']) in by_key})

@@ -9,7 +9,7 @@ import numpy as np
 import h5py
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'+Wrapper'))
 import reference_analysis as analysis
-from reference_video import source_info
+from reference_video import source_info, read_seeds
 
 
 class AnalysisTests(unittest.TestCase):
@@ -116,6 +116,25 @@ class AnalysisTests(unittest.TestCase):
             self.assertTrue(np.isfinite(f['dff'][:]).all())
             self.assertTrue(np.isnan(f['ratio_dff'][:]).all())
             self.assertTrue(np.all(f['quality_flags'][:]&analysis.FLAGS['invalid_ratio_baseline']))
+
+    def test_tracking_preserves_each_neurons_detection_channel(self):
+        seeds=[dict(self.rows[3]),
+               dict(self.rows[3],track_id=8,x=16.,channel=1)]
+        def worker(request,directory,number):
+            self.assertEqual(request['channel'],1)
+            stage=directory/f'zephir-{number}';stage.mkdir()
+            rows=[dict(seed,t=t+1,channel=1,provenance='zephir') for seed in seeds
+                  for t in range(request['frame_range'][0],request['frame_range'][1]+1)]
+            return dict(directory=str(stage),observations=rows)
+        request=dict(source=self.info,observations=seeds,frame_range=[0,6],reference_frame=3,channel=1,
+                     window_size=3,epochs=1,output_dir=str(self.root))
+        with patch.object(analysis,'run_window',worker):
+            result=analysis.track_sequence(request)
+        self.assertEqual(len(result['observations']),14)
+        self.assertTrue(all(r['channel']=={7:0,8:1}[r['track_id']] for r in result['observations']))
+        restored=read_seeds(Path(result['directory'])/'tracks',self.info)
+        self.assertEqual(len(restored),14)
+        self.assertTrue(all(r['channel']=={7:0,8:1}[r['track_id']] for r in restored))
 
     def test_tracking_resume_bidirectional_ids_and_settings(self):
         calls=[]

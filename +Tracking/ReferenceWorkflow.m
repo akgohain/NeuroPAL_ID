@@ -151,15 +151,15 @@ classdef ReferenceWorkflow < handle
             if obj.Busy, return; end
             obj.View.Playback.stop(); obj.View.FramePreview.cancel(); obj.View.Preview.cancel();
             obj.Busy = true; obj.Cancelled = false;
-            obj.View.setBusy(true);
-            obj.Frame.Enable = 'off'; obj.Channel.Enable = 'off'; obj.Slice.Enable = 'off';
-            obj.Table.Enable = 'off';
-            obj.DetectionChannel.Enable='off'; obj.DetectionMode.Enable='off'; obj.RGBW.Enable='off';
-            obj.Detector.Enable = 'off'; obj.Spacing.Enable = 'off'; obj.Calibration.Enable = 'off';
-            obj.First.Enable = 'off'; obj.Last.Enable = 'off';
-            obj.Analysis.setBusy(true);
             cleanup = onCleanup(@() obj.finish());
             try
+                obj.View.setBusy(true);
+                obj.Frame.Enable = 'off'; obj.Channel.Enable = 'off'; obj.Slice.Enable = 'off';
+                obj.Table.Enable = 'off';
+                obj.DetectionChannel.Enable='off'; obj.DetectionMode.Enable='off'; obj.RGBW.Enable='off';
+                obj.Detector.Enable = 'off'; obj.Spacing.Enable = 'off'; obj.Calibration.Enable = 'off';
+                obj.First.Enable = 'off'; obj.Last.Enable = 'off';
+                obj.Analysis.setBusy(true);
                 action();
             catch ME
                 obj.Status.Text = ME.message;
@@ -207,10 +207,6 @@ classdef ReferenceWorkflow < handle
             if ~obj.Calibration.Value, error('Tracking:Spacing','Confirm measured or assumed voxel spacing in Settings before detection.'); end
             scale = sscanf(obj.Spacing.Value,'%f')';
             if numel(scale)~=3 || any(~isfinite(scale) | scale<=0), error('Tracking:Spacing','Enter three positive XYZ spacings.'); end
-            actual = obj.bridge(struct('action','inspect','file',obj.Source.file));
-            if ~strcmp(actual.source_id,obj.Source.source_id)
-                error('Tracking:SourceChanged','Recording or metadata changed. Reopen the source before detection.');
-            end
             mode='single_channel'; channel=obj.DetectionChannel.Value; mapping=[];
             if strcmp(obj.DetectionMode.Value,'RGBW')
                 mode='rgbw'; mapping=sscanf(obj.RGBW.Value,'%f')';
@@ -219,13 +215,27 @@ classdef ReferenceWorkflow < handle
                 end
                 channel=mapping(1);
             end
+            selected=channel; merge_radius=0;
+            if strcmp(obj.DetectionMode.Value,'Multi-channel')
+                settings=Tracking.DetectionChannels.get(obj); selected=settings.channels; merge_radius=settings.merge_radius_um;
+                if numel(selected)<2, error('Tracking:Channels','Select at least two channels, or choose Single channel.'); end
+                mode='multi_channel'; channel=selected(1);
+            end
+            actual = obj.bridge(struct('action','inspect','file',obj.Source.file));
+            if ~strcmp(actual.source_id,obj.Source.source_id)
+                error('Tracking:SourceChanged','Recording or metadata changed. Reopen the source before detection.');
+            end
             obj.Channel.Value=channel; volume=obj.frameData(); frame=obj.Frame.Value;
-            if strcmp(mode,'rgbw'), volume=obj.Cache(:,:,:,mapping+1); end
+            if strcmp(mode,'rgbw'), volume=obj.Cache(:,:,:,mapping+1); selected=mapping; end
             measured = obj.Source.spacing_measured && isequal(scale,obj.Source.spacing_um_xyz(:)');
             snapshot = struct('source_id',obj.Source.source_id,'frame_index',frame-1,'channel_index',channel, ...
-                'spacing_measured',measured,'spacing_um_xyz',scale,'input_mode',mode,'rgbw_channels',mapping);
+                'spacing_measured',measured,'spacing_um_xyz',scale,'input_mode',mode,'rgbw_channels',mapping,'selected_channels',selected);
             obj.Status.Text = 'Detecting selected channel…'; drawnow;
-            if ~any(volume(:)>0)
+            if strcmp(mode,'multi_channel')
+                response=Wrapper.runMultiChannelCentroids(obj.Cache,selected,scale,'MergeRadiusUm',merge_radius, ...
+                    'SourceMetadata',snapshot,'Backend',lower(string(obj.Detector.Value)), ...
+                    'ProgressFcn',@(message) obj.progress(message),'CancelFcn',@() obj.Cancelled || ~isvalid(obj.App),'OutputDir',obj.OutputRoot);
+            elseif ~any(volume(:)>0)
                 response = struct('centroids_yxz',zeros(0,3),'scores',zeros(0,1),'num_centroids',0,'source_metadata',snapshot);
             else
                 response = Wrapper.runMoECentroids(volume,scale,'InputMode',string(mode),'SourceMetadata',snapshot, ...
@@ -238,9 +248,14 @@ classdef ReferenceWorkflow < handle
             if any(xyz<1,'all') || any(xyz>[obj.Source.nx obj.Source.ny obj.Source.nz],'all')
                 error('Tracking:Bounds','Detector returned a center outside pixel-center bounds.');
             end
-            obj.View.Review.clear();
             n = size(xyz,1);
-            obj.Candidates = [(obj.NextID:obj.NextID+n-1)',repmat(frame,n,1),xyz,response.scores(:),repmat(channel,n,1)];
+            if n==0
+                obj.render(); obj.Status.Text='No neurons detected. Existing candidates, tracks and reference frame were kept.'; return;
+            end
+            obj.View.Review.clear();
+            source_channels=repmat(channel,n,1);
+            if isfield(response,'source_channels'), source_channels=response.source_channels(:); end
+            obj.Candidates = [(obj.NextID:obj.NextID+n-1)',repmat(frame,n,1),xyz,response.scores(:),source_channels];
             obj.NextID = obj.NextID+n;
             obj.CandidateFrame = frame; obj.Provenance = response;
             obj.History{end+1} = response;
@@ -249,7 +264,11 @@ classdef ReferenceWorkflow < handle
         end
         function accept(obj)
             if isempty(obj.Candidates), return; end
-            if obj.Frame.Value~=obj.CandidateFrame || any(obj.Candidates(:,7)~=obj.Channel.Value)
+            channels=unique(obj.Candidates(:,7));
+            if isfield(obj.Provenance,'source_metadata') && isfield(obj.Provenance.source_metadata,'selected_channels')
+                channels=obj.Provenance.source_metadata.selected_channels;
+            end
+            if obj.Frame.Value~=obj.CandidateFrame || ~ismember(obj.Channel.Value,channels)
                 error('Tracking:CandidateView','Return to the candidate frame and channel before accepting.');
             end
             if any(ismember(obj.Candidates(:,[2 7]),obj.Rows(:,[2 7]),'rows'))
