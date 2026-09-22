@@ -1,5 +1,3 @@
----
-
 # NeuroPAL_ID
 
 ##### Research software to perform (semi-) automated detection and identification of neurons in images of NeuroPAL, extract ID’d neural activity traces from NeuroPAL;GCaMP animals, and upload these datasets to public repositories.
