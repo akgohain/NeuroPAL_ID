@@ -69,8 +69,13 @@ function [xz,yz] = local_cross_sections(info,t,x,y)
 layout = 'data';
 if isfield(info,'h5_layout'), layout = char(info.h5_layout); end
 if strcmp(layout,'data')
-    xz = h5read(char(info.file),'/data',[1 y 1 1 t],[info.ny 1 info.nz info.nc 1]);
-    yz = h5read(char(info.file),'/data',[x 1 1 1 t],[1 info.nx info.nz info.nc 1]);
+    if isfield(info, 'transpose_xy') && info.transpose_xy
+        xz = h5read(char(info.file), '/data', [y 1 1 1 t], [1 info.ny info.nz info.nc 1]);
+        yz = h5read(char(info.file), '/data', [1 x 1 1 t], [info.nx 1 info.nz info.nc 1]);
+    else
+        xz = h5read(char(info.file),'/data',[1 y 1 1 t],[info.ny 1 info.nz info.nc 1]);
+        yz = h5read(char(info.file),'/data',[x 1 1 1 t],[1 info.nx info.nz info.nc 1]);
+    end
     xz = reshape(xz,info.ny,info.nz,info.nc);
     yz = reshape(yz,info.nx,info.nz,info.nc);
 elseif strcmp(layout,'grouped-tc')

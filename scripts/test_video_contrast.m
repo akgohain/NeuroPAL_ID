@@ -20,7 +20,10 @@ contrast.Black.Value = 0; contrast.Black.ValueChangedFcn(contrast.Black,[]);
 contrast.White.Value = 100; contrast.White.ValueChangedFcn(contrast.White,[]);
 plane = w.frameData(); expected = Tracking.DisplayContrast.pixels(plane(:,:,z),[0 100]);
 assert(isequal(image.CData,expected));
+% Hidden projections are computed when their view is selected.
+v.DisplayMode.Value='MIP'; w.render();
 assert(isequal(projection.CData,Tracking.DisplayContrast.pixels(max(plane,[],3),[0 100])));
+v.DisplayMode.Value='Slice'; w.render();
 assert(isequal(raw,w.Cache) && isequal(rows,w.Rows) && isequal(excluded,w.Excluded));
 assert(isequal(options,w.Analysis.options()) && current==w.activityCurrent());
 assert(isvalid(image) && isvalid(projection) && all(isvalid(trace)));

@@ -8,7 +8,7 @@ if ~isempty(entry)
     signature.bytes = entry(1).bytes;
     signature.modified = entry(1).datenum;
 end
-fields = {'h5_layout','time_indices','channel_indices'};
+fields = {'h5_layout','time_indices','channel_indices','transpose_xy'};
 for i = 1:numel(fields)
     if isfield(info,fields{i}), signature.(fields{i}) = info.(fields{i}); end
 end
