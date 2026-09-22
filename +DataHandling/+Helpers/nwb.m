@@ -139,6 +139,11 @@ classdef nwb
                 preferred = 1;
             end
             metadata = candidates(preferred);
+            metadata.axes = '';
+            try
+                metadata.axes = char(h5readatt(file, metadata.data_path, 'axes'));
+            catch
+            end
         end
 
         function num_bytes = image_data_size_bytes(file)
@@ -230,10 +235,12 @@ classdef nwb
                 default_rgbw = 1:min(4, nc);
             end
 
+            image_info = DataHandling.Helpers.nwb.image_data_info(nwb_file);
+            zero_based = isfield(image_info, 'axes') && strcmp(image_info.axes, 'XYZC');
             rgbw = DataHandling.Helpers.nwb.h5_read_numeric( ...
-                nwb_file, [image_group '/RGBW_channels'], default_rgbw);
+                nwb_file, [image_group '/RGBW_channels'], default_rgbw - double(zero_based));
             rgbw = double(rgbw(:).');
-            if ~isempty(rgbw) && min(rgbw) <= 0
+            if ~isempty(rgbw) && (zero_based || min(rgbw) <= 0)
                 rgbw = rgbw + 1;
             end
             rgbw = rgbw(isfinite(rgbw));
@@ -245,7 +252,6 @@ classdef nwb
             end
             rgbw = rgbw(1:min(4, numel(rgbw)));
 
-            image_info = DataHandling.Helpers.nwb.image_data_info(nwb_file);
             volume_paths = unique(string({ ...
                 [image_group '/imaging_volume'], ...
                 image_info.imaging_volume_path}), 'stable');
@@ -292,6 +298,10 @@ classdef nwb
             if isempty(gamma)
                 gamma = DataHandling.Helpers.nwb.h5_read_numeric( ...
                     file, '/processing/NeuroPAL_IDSettings/gammas', []);
+            end
+            if isempty(gamma)
+                gamma = DataHandling.Helpers.nwb.h5_read_numeric( ...
+                    file, '/processing/ProgramSettings/NeuroPAL_IDSettings/gammas', []);
             end
             if isempty(gamma)
                 gamma = default_gamma;
@@ -353,7 +363,15 @@ classdef nwb
             % Preserve the orientation behavior of the established loader.
             % Normal NDX files are [Y X Z C]. Some older exports are
             % [C Z Y X] and require the historical [3 4 2 1] permutation.
-            if source_dims(4) == min(source_dims)
+            if isfield(image_info, 'axes') && strcmp(image_info.axes, 'CZXY')
+                layout.source_z_axis = 3;
+                layout.permutation = 1:4;
+                layout.output_dims = source_dims;
+            elseif isfield(image_info, 'axes') && strcmp(image_info.axes, 'XYZC')
+                layout.source_z_axis = 2;
+                layout.permutation = [3 4 2 1];
+                layout.output_dims = source_dims(layout.permutation);
+            elseif source_dims(4) == min(source_dims)
                 layout.source_z_axis = 3;
                 layout.permutation = 1:4;
                 layout.output_dims = source_dims;
@@ -373,6 +391,7 @@ classdef nwb
             % the completed MAT file only after validation.
 
             layout = DataHandling.Helpers.nwb.image_layout(image_info);
+            output_rank = max([2 find(layout.output_dims > 1, 1, 'last')]);
             sample = h5read(nwb_file, image_info.data_path, ...
                 ones(1, numel(layout.source_dims)), ...
                 ones(1, numel(layout.source_dims)));
@@ -468,7 +487,12 @@ classdef nwb
                 if ~isequal(layout.permutation, 1:4)
                     chunk = permute(chunk, layout.permutation);
                 end
-                target.data(:, :, z_start:z_end, :) = chunk;
+                % MAT variables omit trailing singleton dimensions.
+                indices = repmat({':'}, 1, output_rank);
+                if output_rank >= 3, indices{3} = z_start:z_end; end
+                chunk_dims = layout.output_dims;
+                chunk_dims(3) = z_end - z_start + 1;
+                target.data(indices{:}) = reshape(chunk, chunk_dims(1:output_rank));
 
                 state.completed_z = z_end;
                 state.chunk_count = state.chunk_count + 1;
@@ -486,7 +510,12 @@ classdef nwb
             end
 
             details = whos(target, 'data');
-            if isempty(details) || ~isequal(double(details.size), layout.output_dims) || ...
+            if isempty(details)
+                error('DataHandling:LargeFile:VerificationFailed', 'The streamed output has no image data.');
+            end
+            output_dims = double(details.size);
+            output_dims(end+1:4) = 1;
+            if isempty(details) || ~isequal(output_dims, layout.output_dims) || ...
                     ~strcmp(details.class, output_class)
                 error('DataHandling:LargeFile:VerificationFailed', ...
                     'The streamed output failed size or type verification.');
@@ -526,8 +555,11 @@ classdef nwb
                 end
                 reader = matfile(partial_file);
                 details = whos(reader, 'data');
+                if isempty(details), return; end
+                output_dims = double(details.size);
+                output_dims(end+1:4) = 1;
                 tf = ~isempty(details) && ...
-                    isequal(double(details.size), expected.output_dims) && ...
+                    isequal(output_dims, expected.output_dims) && ...
                     strcmp(details.class, expected.output_class) && ...
                     actual.completed_z >= 0 && ...
                     actual.completed_z <= expected.output_dims(3);

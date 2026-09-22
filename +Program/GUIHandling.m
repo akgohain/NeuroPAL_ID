@@ -3371,13 +3371,17 @@ classdef GUIHandling
             % loaded and checks their associated nodes in the passed uitree.
 
             files_to_check = fieldnames(app.data_flags);
-            loaded_files = [];
+            if nargin >= 2
+                loaded_files = gobjects(0, 1);
+            else
+                loaded_files = {};
+            end
 
-            if app.image_neurons.num_neurons > 1
+            if ~isempty(app.image_neurons) && app.image_neurons.num_neurons > 0
                 app.data_flags.('Neurons') = 1;
             end
 
-            if app.image_neurons.is_any_annotated
+            if ~isempty(app.image_neurons) && app.image_neurons.is_any_annotated
                 app.data_flags.('Neuronal_Identities') = 1;
             end
 
@@ -7380,8 +7384,9 @@ classdef GUIHandling
 
         %% Saving GUI
 
-        function nwb_init(app)          
-            Program.GUIHandling.loaded_file_check(app.parent_app, app.Tree)
+        function nwb_init(app)
+            allow_save = false;
+            Program.GUIHandling.loaded_file_check(app.parent_app, app.Tree);
             worm_properties = {
                 'AgeDropDown', ...
                 'BodyDropDown', ...
@@ -7395,7 +7400,7 @@ classdef GUIHandling
                 switch file
                     case 'NeuroPAL Volume'
                         allow_save = 1;
-                        for child=1:length(app.NPALVolumeGrid)
+                        for child=1:numel(app.NPALVolumeGrid.Children)
                             app.NPALVolumeGrid.Children(child).Enable = 'on';
                         end
 
@@ -7404,7 +7409,7 @@ classdef GUIHandling
 
                     case {'Video Volume', 'Tracking ROIs'}
                         allow_save = 1;
-                        for child=1:length(app.VideoVolumeGrid)
+                        for child=1:numel(app.VideoVolumeGrid.Children)
                             app.VideoVolumeGrid.Children(child).Enable = 'on';
                         end
 
@@ -7426,84 +7431,103 @@ classdef GUIHandling
                 for prop=1:length(worm_properties)
                     app.(worm_properties{prop}).Value = app.parent_app.(worm_properties{prop}).Value;
                 end
+                scale = app.parent_app.image_um_scale;
+                if numel(scale) == 3
+                    app.EditField.Value = scale(1);
+                    app.EditField_2.Value = scale(2);
+                    app.EditField_3.Value = scale(3);
+                end
 
             else
-                uiconfirm(app.parent_app.CELLID, "You need to load a volume before you can save to an NWB file.", "Error!");
+                uialert(app.parent_app.CELL_ID, 'Load a volume before exporting an NWB file.', 'NWB export');
                 delete(app);
             end
         end
         
         function device_handler(app, action, device)
-            device_table = app.DeviceUITable.Data;
-
+            data = app.DeviceUITable.Data;
+            if ~strcmp(action, 'add') && isempty(device), return; end
             switch action
                 case 'add'
-                    for comp=1:length(Program.GUIHandling.device_lists)
-                        app.(sprintf('%sHardwareDeviceDropDown', Program.GUIHandling.device_lists{comp})).Items{end+1} = device.name;
-                        app.(sprintf('%sHardwareDeviceDropDown', Program.GUIHandling.device_lists{comp})).ItemsData{end+1} = device.name;
+                    name = strtrim(device.name);
+                    if isempty(name) || contains(name, '/')
+                        uialert(app.SaveasNWBFileUIFigure, 'Enter a device name without slashes.', 'Microscope');
+                        return
                     end
-
+                    row = app.DeviceUITable.UserData;
+                    if isempty(row), row = size(data, 1)+1; end
+                    duplicate = find(strcmp(string(data(:, 1)), name));
+                    if any(duplicate ~= row)
+                        uialert(app.SaveasNWBFileUIFigure, 'This device name already exists.', 'Microscope');
+                        return
+                    end
+                    data(row, :) = {name, device.manu, device.desc};
+                    app.DeviceUITable.Data = data;
+                    app.DeviceUITable.UserData = [];
+                    app.AddHardwareDeviceButton.Text = 'Add Hardware Device';
                     app.NameEditField.Value = '';
                     app.ManufacturerEditField.Value = '';
                     app.HardwareDescriptionTextArea.Value = '';
-
-                    app.DeviceUITable.Data = [device_table; {device.name, device.manu, device.desc}];
-
                 case 'edit'
-                    logged_device = struct(...
-                        'name', char(device_table(device, 1)), ...
-                        'manu', char(device_table(device, 2)), ...
-                        'desc', char(device_table(device, 3)));
-
-                    app.NameEditField.Value = logged_device.name;
-                    app.ManufacturerEditField.Value = logged_device.manu;
-                    app.HardwareDescriptionTextArea.Value = logged_device.desc;
-                    
-                    Program.GUIHandling.device_handler(app, 'remove', device);
-
+                    row = device(1);
+                    app.NameEditField.Value = char(string(data{row, 1}));
+                    app.ManufacturerEditField.Value = char(string(data{row, 2}));
+                    app.HardwareDescriptionTextArea.Value = char(string(data{row, 3}));
+                    app.DeviceUITable.UserData = row;
+                    app.AddHardwareDeviceButton.Text = 'Update Hardware Device';
+                    return
                 case 'remove'
-                    app.DeviceUITable.Data(device, :) = [];
-
-                    for comp=1:length(Program.GUIHandling.device_lists)
-                        app.(sprintf('%sHardwareDeviceDropDown', Program.GUIHandling.device_lists{comp})).Items(device) = [];
-                        app.(sprintf('%sHardwareDeviceDropDown', Program.GUIHandling.device_lists{comp})).ItemsData(device) = [];
-                    end
-
+                    data(device, :) = [];
+                    app.DeviceUITable.Data = data;
+                    app.DeviceUITable.UserData = [];
+                    app.AddHardwareDeviceButton.Text = 'Add Hardware Device';
             end
-
+            for index = 1:numel(Program.GUIHandling.device_lists)
+                control = app.(sprintf('%sHardwareDeviceDropDown', Program.GUIHandling.device_lists{index}));
+                selected = control.Value;
+                control.ItemsData = {};
+                control.Items = cellstr(string(data(:, 1)));
+                control.ItemsData = control.Items;
+                if any(strcmp(control.Items, selected)), control.Value = selected; end
+            end
         end
-        
-        function channel_handler(app, action, channel)
-            channel_table = app.OpticalUITable.Data;
 
+        function channel_handler(app, action, channel)
+            data = app.OpticalUITable.Data;
+            if ~strcmp(action, 'add') && isempty(channel), return; end
             switch action
                 case 'add'
-                    columns = fieldnames(channel);
-
-                    new_row = cell(1, length(columns));
-                    for comp=1:length(columns)
-                        new_row{comp} = channel.(columns{comp});
+                    row = app.OpticalUITable.UserData;
+                    if isempty(row), row = size(data, 1)+1; end
+                    fields = fieldnames(channel);
+                    entry = cellfun(@(field) channel.(field), fields, 'UniformOutput', false)';
+                    if isempty(strtrim(entry{1})) || contains(entry{1}, '/')
+                        uialert(app.SaveasNWBFileUIFigure, 'Enter a channel name without slashes.', 'Optical channel');
+                        return
                     end
-
-                    app.OpticalUITable.Data = [channel_table; new_row];
-
-                    for comp=1:length(Program.GUIHandling.optical_fields)
-                        try
-                            app.(sprintf('%sEditField', Program.GUIHandling.optical_fields{comp})).Value = ''; 
-                        catch 
-                            app.(sprintf('%sEditField', Program.GUIHandling.optical_fields{comp})).Value = 0; 
-                        end
+                    data(row, :) = entry;
+                    app.OpticalUITable.Data = data;
+                    app.OpticalUITable.UserData = [];
+                    app.AddOpticalChannelButton.Text = 'Add Optical Channel';
+                    for index = 1:numel(Program.GUIHandling.optical_fields)
+                        control = app.([Program.GUIHandling.optical_fields{index} 'EditField']);
+                        if isnumeric(control.Value), control.Value = 0; else, control.Value = ''; end
                     end
                 case 'edit'
-                    for comp=1:length(Program.GUIHandling.optical_fields)
-                        app.(Program.GUIHandling.optical_fields{comp}).Value = channel_table(channel, comp); 
+                    row = channel(1);
+                    for index = 1:numel(Program.GUIHandling.optical_fields)
+                        control = app.([Program.GUIHandling.optical_fields{index} 'EditField']);
+                        value = data{row, index};
+                        if isnumeric(control.Value), value = str2double(string(value)); end
+                        control.Value = value;
                     end
-                    
-                    Program.GUIHandling.device_handler(app, 'remove', channel);
+                    app.OpticalUITable.UserData = row;
+                    app.AddOpticalChannelButton.Text = 'Update Optical Channel';
                 case 'remove'
                     app.OpticalUITable.Data(channel, :) = [];
+                    app.OpticalUITable.UserData = [];
+                    app.AddOpticalChannelButton.Text = 'Add Optical Channel';
             end
-
         end
 
 

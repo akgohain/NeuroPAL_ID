@@ -287,6 +287,8 @@ classdef NeuroPALImage
             % First, try to load from NWB file if it exists and companion ID file doesn't
             nwb_file = fullfile(image_dir, [image_stem, '.nwb']);
             if exist(nwb_file, 'file') && ~exist(id_file, 'file')
+                [neurons, nwb_mp] = DataHandling.Helpers.read_nwb_annotations(nwb_file, info.scale);
+                if ~isempty(nwb_mp), mp = nwb_mp; end
                 if DataHandling.Helpers.nwb.has_neuropal_segmentation(nwb_file)
                     Program.Helpers.debug_event('NWB', ...
                         ['NWB segmentation metadata found in "%s", but automatic ' ...
@@ -586,6 +588,15 @@ classdef NeuroPALImage
             prefs.z_center = ceil(layout.output_dims(3) / 2);
             prefs.is_Z_LR = true;
             prefs.is_Z_flip = true;
+            try
+                saved_prefs = jsondecode(h5readatt(nwb_file, image_info.data_path, 'neuropal_preferences'));
+                for field = fieldnames(saved_prefs)'
+                    prefs.(field{1}) = saved_prefs.(field{1});
+                end
+                prefs.RGBW = double(prefs.RGBW(:)');
+                prefs.gamma = double(prefs.gamma(:)');
+            catch
+            end
 
             [folder, name] = fileparts(nwb_file);
             np_file = fullfile(folder, [name '.mat']);

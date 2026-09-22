@@ -70,9 +70,9 @@ image_source = DataHandling.Helpers.nwb_stream_export.image_source(image);
 image_source.path = source.path;
 image_output = fullfile(root, 'image.nwb');
 DataHandling.Helpers.nwb_stream_export.write(make_nwb(image_source), image_output, {image_source});
-assert(isequal(h5read(image_output, source.path), uint16(image)));
+assert(isequal(permute(h5read(image_output, source.path), [3 4 2 1]), uint16(image)));
 info = h5info(image_output, source.path);
-assert(isequal(info.Dataspace.Size, [4 5 1 1]));
+assert(isequal(info.Dataspace.Size, [1 1 4 5]));
 
 % Integer overflow is an error, not a saturating conversion.
 bad_source.read_plane = @(t, z, c) repmat(uint32(70000), dims(1:2));
@@ -126,7 +126,7 @@ end
 function nwb = make_nwb(source)
 nwb = NwbFile('session_description', 'NWB streaming export fixture', ...
     'identifier', 'stream-test', 'session_start_time', datetime(2026, 1, 1, 'TimeZone', 'UTC'));
-pipe = DataHandling.Helpers.nwb_stream_export.make_pipe(source.dims);
+pipe = DataHandling.Helpers.nwb_stream_export.make_pipe(source);
 series = types.core.TimeSeries('data', pipe, 'data_unit', 'a.u.', ...
     'starting_time', 0, 'starting_time_rate', 1);
 nwb.acquisition.set('Fixture', series);

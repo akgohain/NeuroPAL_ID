@@ -6,9 +6,10 @@ classdef writeNWB
 
     methods (Static)
 
-        function code = write_order(app, path, progress)
+        function [code, output_path] = write_order(app, path, progress)
             % Full-shot NWB save routine
             path = char(path);
+            output_path = path;
             job = Program.HeavyJob.acquire('NWB export');
             job_cleanup = onCleanup(@() delete(job));
 
@@ -31,10 +32,30 @@ classdef writeNWB
             progress.Message = 'Parsing metadata...';
             [ctx, device_table, optical_table] = Program.GUIHandling.read_gui(app);
 
+            if all(strlength(string(ctx.colormap.description)) == 0)
+                ctx.colormap.description = 'NeuroPAL image volume';
+            end
+            if all(strlength(string(ctx.neurons.id_description)) == 0)
+                ctx.neurons.id_description = 'Neuron centers and user identities';
+            end
+
             % Grab data flags from visualize_light.mlapp so we know which
             % parts of the save routine to skip.
             progress.Message = 'Checking flags...';
-            ctx.flags = Program.GUIHandling.global_grab('NeuroPAL ID', 'data_flags');
+            ctx.flags = app.parent_app.data_flags;
+            for field = fieldnames(ctx.flags)'
+                node = [strrep(field{1}, '_', '') 'Node'];
+                ctx.flags.(field{1}) = isprop(app, node) && ...
+                    any(app.Tree.CheckedNodes == app.(node));
+            end
+            if ~ctx.flags.NeuroPAL_Volume && ~ctx.flags.Video_Volume
+                error('DataHandling:NWBExport:NoVolume', 'Select an image or video volume to export.');
+            end
+            if isempty(strtrim(ctx.worm.identifier)) || isnat(ctx.worm.session_date) || ...
+                    all(strlength(string(ctx.author.data_description)) == 0)
+                error('DataHandling:NWBExport:Metadata', ...
+                    'Enter a worm identifier, session date, and data description before saving.');
+            end
             
             % Debug: Print all flags
             Program.Helpers.debug_log('\n=== DEBUG: Data Flags ===\n');
@@ -61,8 +82,8 @@ classdef writeNWB
             Program.Helpers.debug_log('============================\n\n');
             
             % Determine what data types we have
-            has_colormap = ~isempty(colormap_data);
-            has_video = ~isempty(video_info);
+            has_colormap = ctx.flags.NeuroPAL_Volume && ~isempty(colormap_data);
+            has_video = ctx.flags.Video_Volume && ~isempty(video_info);
             
             if ~has_colormap && ~has_video
                 error('No image or video data available');
@@ -89,14 +110,17 @@ classdef writeNWB
                 end
                 
                 % Validate colormap data structure
-                if ~isnumeric(colormap_data) || ndims(colormap_data) < 3
+                if ~isnumeric(colormap_data) || ~ismatrix(colormap_data) && ndims(colormap_data) > 4
                     error('Invalid colormap data format');
                 end
             end
             
             if has_video
                 ctx.video.info = video_info;
-                ctx.neurons.video = Methods.ChunkyMethods.stream_neurons('annotations');
+                ctx.neurons.video = [];
+                if ctx.flags.Tracking_ROIs
+                    ctx.neurons.video = Methods.ChunkyMethods.stream_neurons('annotations');
+                end
                 ctx.neurons.activity_data = Program.GUIHandling.global_grab('NeuroPAL ID', 'activity_table');
                 
                 % Validate video info structure
@@ -120,8 +144,8 @@ classdef writeNWB
                 
                 % Get relevant name, description, & manufacturer, ensuring they are char arrays
                 name = char(device_table{eachDevice, 1});
-                desc = char(device_table{eachDevice, 2});
-                manu = char(device_table{eachDevice, 3});
+                manu = char(device_table{eachDevice, 2});
+                desc = char(device_table{eachDevice, 3});
 
                 % Create device object & add to device array.
                 new_device = DataHandling.writeNWB.create_device(name, desc, manu);
@@ -130,12 +154,22 @@ classdef writeNWB
                 % If current device was selected as colormap microscope,
                 % save the object for later (only if we have colormap data).
                 if has_colormap && strcmp(strtrim(char(name)), strtrim(char(ctx.colormap.device)))
-                    ctx.colormap.device = new_device;
+                    ctx.colormap.device = types.untyped.SoftLink(['/general/devices/' name]);
                 end
 
                 if has_video && strcmp(strtrim(char(name)), strtrim(char(ctx.video.device)))
-                    ctx.video.device = new_device;
+                    ctx.video.device = types.untyped.SoftLink(['/general/devices/' name]);
                 end
+            end
+
+            if has_colormap && ~isa(ctx.colormap.device, 'types.untyped.SoftLink') || ...
+                    has_video && ~isa(ctx.video.device, 'types.untyped.SoftLink')
+                error('DataHandling:NWBExport:Device', 'Add and select a microscope for each selected volume.');
+            end
+
+            if has_colormap
+                validateattributes(ctx.colormap.grid_spacing.values, {'numeric'}, ...
+                    {'numel', 3, 'finite', 'positive'}, '', 'XYZ voxel spacing');
             end
 
             % Create optical channel objects.
@@ -162,7 +196,9 @@ classdef writeNWB
                 ctx.build.modules.acquisition.NeuroPALImVol = ctx.colormap.imaging_volume;
 
                 export_source = DataHandling.Helpers.nwb_stream_export.image_source(ctx.colormap.data);
-                ctx.colormap.export_pipe = DataHandling.Helpers.nwb_stream_export.make_pipe(export_source.dims);
+                export_source.metadata = struct('axes', 'XYZC', ...
+                    'neuropal_preferences', jsonencode(ctx.colormap.prefs));
+                ctx.colormap.export_pipe = DataHandling.Helpers.nwb_stream_export.make_pipe(export_source);
                 export_sources{end+1} = export_source;
                 ctx.colormap.multichannel_volume = DataHandling.writeNWB.create_volume('colormap', 'multichannel', ctx);
                 ctx.build.modules.acquisition.NeuroPALImageRaw = ctx.colormap.multichannel_volume;
@@ -176,7 +212,7 @@ classdef writeNWB
                     'description', 'NeuroPAL_ID Settings', ...
                     'colnames', {'gammas'}, ...
                     'gammas', gammas, ...
-                    'id', types.hdmf_common.ElementIdentifiers('data', 0:length(gammas)-1));
+                    'id', types.hdmf_common.ElementIdentifiers('data', 0:numel(ctx.colormap.prefs.gamma)-1));
 
                 % Initialize processing module if it doesn't exist
                 if ~isfield(ctx.build.modules, 'processing')
@@ -185,8 +221,9 @@ classdef writeNWB
                 ctx.build.modules.processing.NeuroPAL_IDSettings = ctx.colormap.settings;
             end
 
-            % Always save neuron data if it exists, regardless of flags
-            if has_colormap && ~isempty(ctx.neurons.image_neurons) && ~isempty(ctx.neurons.image_neurons.neurons)
+            % Export only the data selected in the dialog.
+            if has_colormap && (ctx.flags.Neurons || ctx.flags.Neuronal_Identities) && ...
+                    ~isempty(ctx.neurons.image_neurons) && ~isempty(ctx.neurons.image_neurons.neurons)
                 progress.Message = 'Populating neuronal identities...';
                 Program.Helpers.debug_log('=== DEBUG: NEURON DATA PROCESSING ===\n');
                 Program.Helpers.debug_log('Number of neurons found: %d\n', length(ctx.neurons.image_neurons.neurons));
@@ -301,7 +338,7 @@ classdef writeNWB
                 source_app = Program.GUIHandling.get_parent_app( ...
                     Program.GUIHandling.global_grab('NeuroPAL ID', 'CELL_ID'));
                 export_source = DataHandling.Helpers.nwb_stream_export.video_source(source_app);
-                ctx.video.export_pipe = DataHandling.Helpers.nwb_stream_export.make_pipe(export_source.dims);
+                ctx.video.export_pipe = DataHandling.Helpers.nwb_stream_export.make_pipe(export_source);
                 export_sources{end+1} = export_source;
                 ctx.video.multichannel_volume = DataHandling.writeNWB.create_volume('video', 'multichannel', ctx);
                 ctx.build.modules.acquisition.CalciumImageSeries = ctx.video.multichannel_volume;
@@ -485,6 +522,7 @@ classdef writeNWB
                     
                     [output_dir, output_name, output_ext] = fileparts(path);
                     new_path = fullfile(output_dir, [output_name '-new' output_ext]);
+                    output_path = new_path;
                     source_file = dir(path);
                     DataHandling.Helpers.nwb_stream_export.write(existing_nwb, new_path, ...
                         export_sources, progress, 'AdditionalDiskBytes', source_file.bytes);
@@ -502,7 +540,8 @@ classdef writeNWB
         end
 
         function nwb_file = create_file(ctx)
-            session_date = datetime(posixtime(ctx.worm.session_date),'ConvertFrom','posixtime', 'Format', 'yyyy-MM-dd HH:mm:ss');
+            session_date = ctx.worm.session_date;
+            session_date.TimeZone = 'local';
 
             nwb_file = NwbFile( ...
                 'session_description', ctx.author.data_description, ...
@@ -527,7 +566,6 @@ classdef writeNWB
 
         function device = create_device(name, description, manufacturer)
             device = types.core.Device(...
-                'name', name, ...
                 'description', description, ...
                 'manufacturer', manufacturer ...
                 );
@@ -547,87 +585,57 @@ classdef writeNWB
         end
 
         function optical_metadata = create_channels(optical_table)
-            % Populate channel data
-            OptChannels = [];
-            OptChanRefData = [];
-            
-            % Populate device data
-            for eachChannel = 1:size(optical_table, 1)
-                name = optical_table(eachChannel, 1);
-                desc = optical_table(eachChannel, 2);
-
-                ex_lambda = optical_table(eachChannel, 3);
-                ex_low = optical_table(eachChannel, 4);
-                ex_high = optical_table(eachChannel, 5);
-                
-                % Use str2double instead of deprecated str2num
-                try
-                    ex_range = [str2double(ex_low{1}), str2double(ex_high{1})];
-                catch
-                    warning('Could not parse excitation range for channel %d, using defaults', eachChannel);
-                    ex_range = [400, 500]; % Default range
+            % Validate optical metadata before constructing schema objects.
+            if isempty(optical_table)
+                error('DataHandling:NWBExport:Channels', 'Add the optical channels used for this recording.');
+            end
+            channels = types.untyped.Set();
+            names = cell(size(optical_table, 1), 1);
+            for index = 1:size(optical_table, 1)
+                names{index} = char(string(optical_table{index, 1}));
+                values = str2double(string(optical_table(index, 3:8)));
+                if isempty(strtrim(names{index})) || any(~isfinite(values) | values <= 0) || ...
+                        values(2) > values(3) || values(5) > values(6)
+                    error('DataHandling:NWBExport:Channels', ...
+                        'Each optical channel needs a name and positive, ordered wavelength ranges.');
                 end
-
-                em_lambda = optical_table(eachChannel, 6);
-                em_low = optical_table(eachChannel, 7);
-                em_high = optical_table(eachChannel, 8);
-                
-                try
-                    em_range = [str2double(em_low{1}), str2double(em_high{1})];
-                catch
-                    warning('Could not parse emission range for channel %d, using defaults', eachChannel);
-                    em_range = [500, 600]; % Default range
-                end
-            
-                OptChan = types.ndx_multichannel_volume.OpticalChannelPlus( ...
-                    'name', name, ...
-                    'description', desc, ...
-                    'excitation_lambda', ex_lambda, ...
-                    'excitation_range', ex_range, ...
-                    'emission_lambda', em_lambda, ...
-                    'emission_range', em_range ...
-                    );
-                
-                OptChannels = [OptChannels, OptChan];
-                
-                % Create reference string with proper error handling
-                try
-                    bandwidth = str2double(em_high{1}) - str2double(em_low{1});
-                    new_line = sprintf('%s-%s-%dnm', ex_lambda{1}, em_lambda{1}, round(bandwidth));
-                catch
-                    new_line = sprintf('%s-%s-default', ex_lambda{1}, em_lambda{1});
-                end
-                OptChanRefData = [OptChanRefData, new_line];
-            end           
-            
-            orderOpticalChannels = types.ndx_multichannel_volume.OpticalChannelReferences( ...
-                'channels', OptChanRefData);
-
-            optical_metadata = struct( ...
-                'channels', OptChannels, ...
-                'reference_data', OptChanRefData, ...
-                'order', orderOpticalChannels);
+                channel = types.ndx_multichannel_volume.OpticalChannelPlus( ...
+                    'description', char(string(optical_table{index, 2})), ...
+                    'excitation_lambda', values(1), 'excitation_range', values(2:3), ...
+                    'emission_lambda', values(4), 'emission_range', values(5:6));
+                channels.set(names{index}, channel);
+            end
+            if numel(unique(names)) ~= numel(names)
+                error('DataHandling:NWBExport:Channels', 'Optical channel names must be unique.');
+            end
+            order = types.ndx_multichannel_volume.OpticalChannelReferences('channels', names);
+            optical_metadata = struct('channels', channels, ...
+                'reference_data', {names}, 'order', order);
         end
 
         function nwb_volume = create_volume(preset, module, ctx)
             switch module
                 case 'imaging'
                     nwb_volume = types.ndx_multichannel_volume.ImagingVolume( ...
-                        'opticalchannelplus', ctx.optical_metadata.channels, ...
                         'order_optical_channels', ctx.optical_metadata.order, ...
                         'description', ctx.(preset).description, ...
                         'device', ctx.(preset).device, ...
                         'location', ctx.worm.body_part, ...
+                        'excitation_lambda', 0, ...
+                        'indicator', strjoin(ctx.optical_metadata.reference_data, ', '), ...
                         'grid_spacing', ctx.(preset).grid_spacing.values, ...
                         'grid_spacing_unit', ctx.(preset).grid_spacing.unit, ...
                         'origin_coords', [0, 0, 0], ...
                         'origin_coords_unit', ctx.(preset).grid_spacing.unit, ...
                         'reference_frame', ['Worm ', ctx.worm.body_part]);
+                    nwb_volume.opticalchannelplus = ctx.optical_metadata.channels;
                 case 'multichannel'
                     if strcmp(preset, 'colormap')
+                        rgbw = ctx.(preset).prefs.RGBW - 1;
+                        rgbw(~isfinite(rgbw)) = -1;
                         nwb_volume = types.ndx_multichannel_volume.MultiChannelVolume( ...
                             'description', ctx.(preset).description, ...
-                            'RGBW_channels', ctx.(preset).prefs.RGBW, ...
+                            'RGBW_channels', rgbw, ...
                             'data', ctx.(preset).export_pipe, ...
                             'imaging_volume', types.untyped.SoftLink('/general/optophysiology/NeuroPALImVol'));
                     elseif strcmp(preset, 'video')
@@ -644,16 +652,19 @@ classdef writeNWB
             switch preset
                 case 'colormap'        
                     positions = ctx.neurons.image_neurons.get_positions;
+                    mask = table(uint32(max(0, round(positions(:, 2))-1)), ...
+                        uint32(max(0, round(positions(:, 1))-1)), ...
+                        uint32(max(0, round(positions(:, 3))-1)), ones(size(positions, 1), 1), ...
+                        'VariableNames', {'x', 'y', 'z', 'weight'});
                     
                     % Create proper SoftLink references
                     imaging_volume_link = types.untyped.SoftLink('/general/optophysiology/NeuroPALImVol');
                     
-                    obj = types.ndx_multichannel_volume.VolumeSegmentation( ...
+                    obj = types.core.PlaneSegmentation( ...
                         'colnames', {'voxel_mask'}, ...
                         'description', ctx.neurons.id_description, ...
-                        'voxel_mask', types.hdmf_common.VectorData('description', 'Neuron ROIs', 'data', positions'), ...
-                        'id', types.hdmf_common.ElementIdentifiers('data', 0:length(positions')-1), ...
-                        'imaging_volume', imaging_volume_link, ...
+                        'voxel_mask', types.hdmf_common.VectorData('description', 'Neuron ROIs', 'data', mask), ...
+                        'id', types.hdmf_common.ElementIdentifiers('data', 0:size(positions, 1)-1), ...
                         'imaging_plane', imaging_volume_link);
 
                     labels = {};
@@ -675,7 +686,7 @@ classdef writeNWB
                         'description', ctx.video.tracking_notes, ...
                         'voxel_mask', types.hdmf_common.VectorData('description', 'Neuron ROIs', 'data', positions'), ...
                         'labels', types.hdmf_common.VectorData('description', 'Neuron IDs', 'data', ctx.neurons.(preset).labels), ...
-                        'id', types.hdmf_common.ElementIdentifiers('data', 0:length(positions')-1), ...
+                        'id', types.hdmf_common.ElementIdentifiers('data', 0:size(positions, 1)-1), ...
                         'imaging_plane', video_imaging_volume_link);
             end
         end
@@ -812,7 +823,8 @@ classdef writeNWB
             is_emphasized = false(num_neurons, 1);
             deterministic_ids = cell(num_neurons, 1);
             probabilistic_ids_str = cell(num_neurons, 1); % Store as JSON-like strings
-            probabilistic_probs = zeros(num_neurons, 7);
+            probability_count = max([0 arrayfun(@(n) numel(n.probabilistic_probs), neurons.neurons)]);
+            probabilistic_probs = nan(num_neurons, max(1, probability_count));
             ranks = zeros(num_neurons, 1);
             positions = zeros(num_neurons, 3);
             colors = zeros(num_neurons, 4);
@@ -837,15 +849,10 @@ classdef writeNWB
                     annotation_confidences(i) = n.annotation_confidence;
                 end
                 
-                % Force neurons to be ON if they have annotations
-                % Only set to OFF if explicitly intended to be hidden
-                if ~isempty(n.annotation) && ~strcmp(n.annotation, '')
-                    % If neuron has an annotation, it should be ON
-                    is_annotation_on(i) = 1;
-                elseif ~isempty(n.is_annotation_on) && ~isnan(n.is_annotation_on)
-                    is_annotation_on(i) = double(n.is_annotation_on); % Convert to double
+                if ~isempty(n.is_annotation_on)
+                    is_annotation_on(i) = double(n.is_annotation_on);
                 else
-                    is_annotation_on(i) = 1; % Default to ON instead of OFF
+                    is_annotation_on(i) = NaN;
                 end
                 
                 if isempty(n.is_emphasized)
@@ -872,7 +879,7 @@ classdef writeNWB
                     probabilistic_ids_str{i} = '';
                 end
                 if ~isempty(n.probabilistic_probs)
-                    num_prob_probs = min(length(n.probabilistic_probs), 7);
+                    num_prob_probs = length(n.probabilistic_probs);
                     probabilistic_probs(i, 1:num_prob_probs) = n.probabilistic_probs(1:num_prob_probs);
                 end
                 % Handle rank - ensure it's a scalar
@@ -911,8 +918,8 @@ classdef writeNWB
                     baselines(i, :) = [0, 0, 0, 0]; % Default baseline
                 end
                 
-                if ~isempty(n.covariance) && size(n.covariance, 1) == 3 && size(n.covariance, 2) == 3
-                    covariances(:, :, i) = n.covariance;
+                if numel(n.covariance) == 9
+                    covariances(:, :, i) = reshape(n.covariance, 3, 3);
                 else
                     % Create default identity matrix if covariance is empty or wrong size
                     covariances(:, :, i) = eye(3);
@@ -963,6 +970,10 @@ classdef writeNWB
             covariances_for_storage = reshape(permute(covariances, [3, 1, 2]), [num_neurons, 9]);
             Program.Helpers.debug_log('DEBUG: Covariances after reshaping for storage: %s\n', mat2str(size(covariances_for_storage)));
             
+            % Keep the row dimension for tables containing a single neuron.
+            matrix_column = @(value) types.untyped.DataPipe('data', value', ...
+                'maxSize', [size(value, 2) size(value, 1)], 'axis', 2);
+
             annotations_table = types.hdmf_common.DynamicTable( ...
                 'description', 'Neuron annotation data including user IDs and auto IDs', ...
                 'colnames', {'user_annotation', 'annotation_confidence', 'is_annotation_on', 'is_emphasized', ...
@@ -973,20 +984,20 @@ classdef writeNWB
                 'is_emphasized', types.hdmf_common.VectorData('description', 'Whether neuron is emphasized (e.g., for mutations)', 'data', is_emphasized), ...
                 'deterministic_id', types.hdmf_common.VectorData('description', 'Deterministic neuron IDs from auto-ID', 'data', deterministic_ids), ...
                 'probabilistic_ids', types.hdmf_common.VectorData('description', 'Probabilistic neuron IDs from auto-ID (pipe-separated)', 'data', probabilistic_ids_str), ...
-                'probabilistic_probs', types.hdmf_common.VectorData('description', 'Probabilities for probabilistic IDs', 'data', probabilistic_probs), ...
+                'probabilistic_probs', types.hdmf_common.VectorData('description', 'Probabilities for probabilistic IDs', 'data', matrix_column(probabilistic_probs)), ...
                 'rank', types.hdmf_common.VectorData('description', 'Neuron ranking based on auto-ID confidence', 'data', ranks), ...
                 'id', types.hdmf_common.ElementIdentifiers('data', 0:num_neurons-1));
             
             % Create neuron properties table
             properties_table = types.hdmf_common.DynamicTable( ...
-                'description', 'Neuron physical properties and measurements', ...
+                'description', 'Neuron physical properties and measurements (format 2)', ...
                 'colnames', {'positions', 'colors', 'color_readouts', 'baselines', 'covariances', 'aligned_xyzRGB'}, ...
-                'positions', types.hdmf_common.VectorData('description', 'Neuron 3D positions (x,y,z)', 'data', positions), ...
-                'colors', types.hdmf_common.VectorData('description', 'Neuron RGBW colors', 'data', colors), ...
-                'color_readouts', types.hdmf_common.VectorData('description', 'Neuron color readouts', 'data', color_readouts), ...
-                'baselines', types.hdmf_common.VectorData('description', 'Neuron baseline values', 'data', baselines), ...
-                'covariances', types.hdmf_common.VectorData('description', 'Neuron covariance matrices (Nx9 format: each row is a flattened 3x3 matrix)', 'data', covariances_for_storage), ...
-                'aligned_xyzRGB', types.hdmf_common.VectorData('description', 'Aligned neuron positions and colors', 'data', aligned_xyzRGBs), ...
+                'positions', types.hdmf_common.VectorData('description', 'Neuron centers in one-based MATLAB YXZ coordinates', 'data', matrix_column(positions)), ...
+                'colors', types.hdmf_common.VectorData('description', 'Neuron RGBW colors', 'data', matrix_column(colors)), ...
+                'color_readouts', types.hdmf_common.VectorData('description', 'Neuron color readouts', 'data', matrix_column(color_readouts)), ...
+                'baselines', types.hdmf_common.VectorData('description', 'Neuron baseline values', 'data', matrix_column(baselines)), ...
+                'covariances', types.hdmf_common.VectorData('description', 'Neuron covariance matrices (Nx9 format: each row is a flattened 3x3 matrix)', 'data', matrix_column(covariances_for_storage)), ...
+                'aligned_xyzRGB', types.hdmf_common.VectorData('description', 'Aligned neuron positions and colors', 'data', matrix_column(aligned_xyzRGBs)), ...
                 'id', types.hdmf_common.ElementIdentifiers('data', 0:num_neurons-1));
             
             % Create processing module to hold both tables
@@ -996,11 +1007,15 @@ classdef writeNWB
             annotations_module.dynamictable.set('NeuronProperties', properties_table);
             
             % Add atlas version if available
-            if isfield(neurons, 'atlas_version') && ~isempty(neurons.atlas_version)
+            if isprop(neurons, 'atlas_version') && ~isempty(neurons.atlas_version)
                 atlas_info = types.hdmf_common.VectorData( ...
                     'description', 'Atlas version information', ...
                     'data', neurons.atlas_version);
-                annotations_module.nwbdatainterface.set('AtlasVersion', atlas_info);
+                atlas_table = types.hdmf_common.DynamicTable( ...
+                    'description', 'Atlas version', 'colnames', {'version'}, ...
+                    'id', types.hdmf_common.ElementIdentifiers('data', int64(0)), ...
+                    'version', atlas_info);
+                annotations_module.dynamictable.set('AtlasVersion', atlas_table);
             end
         end
         
@@ -1014,7 +1029,7 @@ classdef writeNWB
             app = Program.app;
             
             % Get mp_params (matching pursuit parameters)
-            if isfield(app, 'mp_params') && ~isempty(app.mp_params)
+            if isprop(app, 'mp_params') && ~isempty(app.mp_params)
                 mp_params = app.mp_params;
             else
                 % Create default mp_params if not available
@@ -1056,7 +1071,7 @@ classdef writeNWB
                         param_data{i} = char(num2str(param_value));
                     end
                 else
-                    param_data{i} = char(string(param_value));
+                    param_data{i} = jsonencode(param_value);
                 end
                 
                 if param_descriptions.isKey(param_name)
