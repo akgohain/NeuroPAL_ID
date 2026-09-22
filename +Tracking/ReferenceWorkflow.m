@@ -222,9 +222,12 @@ classdef ReferenceWorkflow < handle
         end
         function spacingChanged(obj)
             obj.Calibration.Text = 'Use assumed spacing'; obj.Calibration.Value = false;
+            Tracking.ImageUnits.refresh(obj);
         end
         function detect(obj)
-            if ~obj.Calibration.Value, error('Tracking:Spacing','Confirm measured or assumed voxel spacing in Settings before detection.'); end
+            if ~obj.Calibration.Value
+                obj.View.openSettings(); obj.Status.Text='Confirm voxel spacing in Image settings, then run detection.'; return;
+            end
             scale = sscanf(obj.Spacing.Value,'%f')';
             if numel(scale)~=3 || any(~isfinite(scale) | scale<=0), error('Tracking:Spacing','Enter three positive XYZ spacings.'); end
             mode='single_channel'; channel=obj.DetectionChannel.Value; mapping=[];
@@ -301,6 +304,45 @@ classdef ReferenceWorkflow < handle
         function discard(obj)
             obj.View.Review.checkpoint();
             obj.Candidates = zeros(0,7); obj.render();
+        end
+        function continueTracking(obj)
+            if obj.Busy, return; end
+            try
+                obj.View.Playback.stop(); obj.View.FramePreview.cancel(); obj.View.Preview.cancel();
+                obj.checkTrackingSeeds(false);
+                obj.View.setStage(3);
+            catch ME
+                obj.Status.Text=ME.message;
+                uialert(obj.App.CELL_ID,ME.message,'Continue to tracking');
+            end
+        end
+        function checkTrackingSeeds(obj,check_reference)
+            if ~isempty(obj.Candidates)
+                error('Tracking:PendingCandidates','Accept the detected candidates before continuing to tracking.');
+            end
+            if isempty(obj.Rows)
+                error('Tracking:NoSeeds','Run Auto Detect and accept the candidates first, or add neurons in Review.');
+            end
+            % Reference and range settings are edited in the Track panel.
+            if ~check_reference, return; end
+            first=obj.First.Value; last=obj.Last.Value; reference=obj.Reference.Value;
+            frames=[first reference last];
+            if any(~isfinite(frames) | frames~=round(frames)) || first<1 || first>reference || reference>last || last>obj.Source.nt
+                error('Tracking:ReferenceRange','Use whole frame numbers, with First frame <= Reference frame <= Last frame.');
+            end
+            root=obj.Rows(obj.Rows(:,2)==reference,1);
+            if isempty(root)
+                error('Tracking:ReferenceSeeds','Frame %d has no accepted neurons. Set Reference frame to a frame containing your accepted neurons.',reference);
+            end
+            selected=obj.Rows(:,2)>=first & obj.Rows(:,2)<=last & ~ismember(obj.Rows(:,1),root);
+            rows=obj.Rows(selected,:);
+            for i=1:size(rows,1)
+                key=sprintf('%d:%d',rows(i,1),rows(i,2));
+                if ~isKey(obj.Origins,key) || ~strcmp(obj.Origins(key),'zephir')
+                    error('Tracking:IncompleteReference', ...
+                        'Neuron %d has an accepted observation in the tracking range but is missing from reference frame %d. Choose a reference containing all seed neurons, or correct the seed set in Review.',rows(i,1),reference);
+                end
+            end
         end
         function captureCursor(obj)
             if obj.Busy, return; end
@@ -393,8 +435,8 @@ classdef ReferenceWorkflow < handle
             obj.Rows = rows; obj.NextID = max(obj.NextID,max([0;rows(:,1);obj.Candidates(:,1)])+1);
         end
         function track(obj,resume)
-            obj.View.Review.clear();
             if nargin<2, resume=false; end
+            obj.checkTrackingSeeds(true);
             request = struct('action','track_sequence','source',obj.Source,'observations',obj.observations(), ...
                 'frame_range',[obj.First.Value-1 obj.Last.Value-1],'reference_frame',obj.Reference.Value-1, ...
                 'channel',obj.TrackingChannel.Value,'window_size',obj.WindowSize.Value,'epochs',obj.Epochs.Value, ...
@@ -403,6 +445,7 @@ classdef ReferenceWorkflow < handle
                 if isempty(obj.TrackDirectory), error('Tracking:Resume','There is no tracking run to resume.'); end
                 request.resume_dir=obj.TrackDirectory;
             end
+            obj.View.Review.clear();
             response = obj.bridge(request,@() obj.Cancelled || ~isvalid(obj.App),@(message) obj.progress(message));
             obj.TrackDirectory=response.directory;
             obj.mergeTracks(response.observations);

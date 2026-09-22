@@ -31,7 +31,7 @@ classdef ReferenceView < handle
         Review
         Panels = cell(1,5)
         Stages = cell(1,5)
-        Stage = 1
+        Stage = 2
         Body
         DisplayMode
         DetectionSummary
@@ -56,8 +56,9 @@ classdef ReferenceView < handle
         function setStage(obj,index)
             if obj.Controller.Busy, return; end
             if ~isempty(obj.Playback), obj.Playback.stop(); end
+            if index==1, index=2; elseif index==5, index=4; end
             obj.Stage=index;
-            for i=1:5
+            for i=2:4
                 obj.Panels{i}.Visible=matlab.lang.OnOffSwitchState(i==index);
                 if i==index
                     obj.Stages{i}.BackgroundColor=[.24 .24 .24]; obj.Stages{i}.FontColor=[1 1 1]; obj.Stages{i}.FontWeight='bold';
@@ -65,6 +66,9 @@ classdef ReferenceView < handle
                     obj.Stages{i}.BackgroundColor=[.94 .94 .94]; obj.Stages{i}.FontColor=[.25 .25 .25]; obj.Stages{i}.FontWeight='normal';
                 end
             end
+        end
+        function openSettings(obj)
+            obj.Playback.stop(); window=getappdata(obj.Controller.Grid,'image_settings_window'); window.Visible='on'; figure(window);
         end
         function detectionModeChanged(obj)
             Tracking.DetectionChannels.mode(obj.Controller);
@@ -169,6 +173,14 @@ classdef ReferenceView < handle
             if isvalid(grid)
                 reference=getappdata(grid,'paired_reference_controller');
                 if ~isempty(reference) && isvalid(reference), delete(reference); end
+                window=getappdata(grid,'image_settings_window');
+                if ~isempty(window) && isvalid(window), delete(window); end
+                menus=getappdata(grid,'tracking_session_menus');
+                for i=1:numel(menus), if isvalid(menus{i}), delete(menus{i}); end, end
+                for key={'activity_settings_window','neuron_actions_menu','tracking_run_menu'}
+                    control=getappdata(grid,key{1});
+                    if ~isempty(control) && isvalid(control), delete(control); end
+                end
             end
             if isprop(obj,'Playback') && ~isempty(obj.Playback) && isvalid(obj.Playback), delete(obj.Playback); end
             if isprop(obj,'TableWindow') && ~isempty(obj.TableWindow) && isvalid(obj.TableWindow), delete(obj.TableWindow); end
@@ -206,7 +218,11 @@ classdef ReferenceView < handle
                 else
                     Program.Helpers.fill_axes_parent(ax); ax.OuterPosition=[0 0 1 1];
                 end
-                daspect(ax,[1 1 1]);
+                if isequal(ax,obj.Controller.Axes) || isequal(ax,obj.Projection)
+                    Tracking.ImageUnits.axis(obj.Controller,ax);
+                else
+                    daspect(ax,[1 1 1]);
+                end
             end
         end
         function redraw(obj)
@@ -244,7 +260,7 @@ classdef ReferenceView < handle
             if ~mip, obj.drawImage(c.Axes,obj.displayPixels(plane)); end
             obj.SlicePanel.Visible=matlab.lang.OnOffSwitchState(~mip);
             obj.ProjectionPanel.Visible=matlab.lang.OnOffSwitchState(mip);
-            title(c.Axes,sprintf('Frame %d · C%d · Z %d',c.Frame.Value,c.Channel.Value,z),'Interpreter','none','FontWeight','normal');
+            title(c.Axes,'');
             obj.updateList();
             if ~mip
                 setappdata(c.Axes,'reference_label_boxes',zeros(0,4));
@@ -257,7 +273,7 @@ classdef ReferenceView < handle
                 setappdata(obj.Projection,'reference_label_boxes',zeros(0,4));
                 obj.drawMarkers(obj.Projection,obj.ListRows(obj.ListRows(:,8)==0,1:7),false,[]); obj.drawMarkers(obj.Projection,c.Candidates,true,[]);
                 obj.drawROI(obj.Projection,[]);
-                title(obj.Projection,sprintf('Frame %d · C%d · MIP',c.Frame.Value,c.Channel.Value),'FontWeight','normal');
+                title(obj.Projection,'');
                 obj.ProjectionKey = projection_key;
             end
             if ~isequaln(obj.TableRows,c.Rows)
@@ -266,12 +282,11 @@ classdef ReferenceView < handle
                     table=findobj(obj.TableWindow,'Type','uitable'); table.Data=c.Rows;
                 end
             end
-            c.Status.Text = sprintf('Frame %d / %d · C%d · %d neurons · %d candidates', ...
-                c.Frame.Value,c.Source.nt,c.Channel.Value,numel(unique(c.Rows(:,1))),size(c.Candidates,1));
+            c.Status.Text = '';
             if mip, obj.drawTrail(obj.Projection); end
             obj.drawOrthogonal(volume);
             obj.Playback.sync(); c.Analysis.render(); obj.Review.render();
-            obj.DetectionSummary.Text=sprintf('Frame %d · %d candidates',c.Frame.Value,size(c.Candidates,1));
+            Tracking.ImageUnits.refresh(c);
 
         end
         function finishRender(obj)
@@ -286,26 +301,17 @@ classdef ReferenceView < handle
         end
         function drawImage(obj,ax,pixels)
             c = obj.Controller;
-            scale = [1 1];
-            if c.Source.spacing_measured, scale = c.Source.spacing_um_xyz(1:2); end
             image=getappdata(ax,'main_slice_image');
             if isgraphics(image,'image')
                 image.CData=pixels; configure=false;
                 delete(findobj(ax,'Tag','reference_label'));
             else
-                [image,configure] = Program.Helpers.main_slice_image(ax,pixels,scale,false);
+                [image,configure] = Program.Helpers.main_slice_image(ax,pixels,[1 1],false);
             end
             if configure
                 obj.fitAxes(ax); ax.YDir = 'reverse';
-                Program.Helpers.configure_image_axes_ticks(ax,size(pixels),scale,'XLim',[.5 c.Source.nx+.5],'YLim',[.5 c.Source.ny+.5]);
-                if ~c.Source.spacing_measured
-                    x_step = max(1,round(c.Source.nx/5,-1));
-                    y_step = max(1,round(c.Source.ny/5,-1));
-                    ax.XTick = unique([1 x_step:x_step:c.Source.nx]);
-                    ax.YTick = unique([1 y_step:y_step:c.Source.ny]);
-                    ax.XTickLabel = string(ax.XTick); ax.YTickLabel = string(ax.YTick);
-                    xlabel(ax,'X (pixels)'); ylabel(ax,'Y (pixels)');
-                end
+                ax.XLim=[.5 c.Source.nx+.5]; ax.YLim=[.5 c.Source.ny+.5];
+                Tracking.ImageUnits.axis(c,ax);
             end
             hold(ax,'on');
             image.HitTest = 'on'; image.ButtonDownFcn = @(~,~) obj.imageClick(ax);
@@ -449,17 +455,21 @@ classdef ReferenceView < handle
             obj.setBusy(c.Busy);
         end
         function setBusy(obj,busy)
+            Tracking.VideoWorkspace.refreshActions(obj.Controller,busy);
             obj.Controller.Buttons.cancel.Visible=matlab.lang.OnOffSwitchState(busy);
-            Tracking.DetectionChannels.setBusy(obj.Controller,busy);
+            if isfield(obj.Controller.Buttons,'reset'), obj.Controller.Buttons.reset.Enable=matlab.lang.OnOffSwitchState(~busy); end
+            obj.Controller.Buttons.continueTracking.Enable=matlab.lang.OnOffSwitchState(~busy);
+            units=getappdata(obj.Controller.Grid,'image_units_control'); units.Enable=matlab.lang.OnOffSwitchState(~busy);
             reference=getappdata(obj.Controller.Grid,'paired_reference_controller');
             if ~isempty(reference) && isvalid(reference), reference.setBusy(busy); end
+            Tracking.DetectionChannels.setBusy(obj.Controller,busy);
             obj.Contrast.setBusy(busy); obj.Playback.setBusy(busy);
             if ~isempty(obj.Review) && ~isempty(obj.Review.Confirm)
                 obj.Review.Confirm.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(obj.Selection) && ~obj.Selection(1));
                 obj.Review.Undo.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(obj.Review.Snapshots));
             end
-            for i=1:5, obj.Stages{i}.Enable=matlab.lang.OnOffSwitchState(~busy); end
-            handles={obj.DisplayMode,obj.Follow,obj.Trails,obj.XYZ};
+            for i=2:4, obj.Stages{i}.Enable=matlab.lang.OnOffSwitchState(~busy); end
+            handles={obj.DisplayMode,obj.Follow,obj.Trails,obj.XYZ,getappdata(obj.Controller.Grid,'image_settings_button')};
             for i=1:numel(handles), handles{i}.Enable=matlab.lang.OnOffSwitchState(~busy); end
             state = matlab.lang.OnOffSwitchState(~busy);
             obj.Labels.Enable = state; obj.LabelMode.Enable=state; obj.ShowROI.Enable=state; obj.NeuronList.Enable = state;
@@ -502,8 +512,13 @@ classdef ReferenceView < handle
             if obj.Controller.Busy, return; end
             obj.Playback.stop(); obj.CorrectMode=false; obj.DisplayMode.Value='Slice'; obj.redraw();
             obj.AddMode = ~obj.AddMode;
-            if obj.AddMode, obj.Controller.Buttons.add.Text = 'Click image…';
-            else, obj.Controller.Buttons.add.Text = 'Add neuron'; end
+            if obj.AddMode
+                obj.Controller.Buttons.add.Text='Cancel adding neuron';
+                obj.Controller.Status.Text='Click the image to add a neuron at this Z slice.';
+            else
+                obj.Controller.Buttons.add.Text='Add neuron'; obj.Controller.Status.Text='';
+            end
+            Tracking.VideoWorkspace.refreshActions(obj.Controller,false);
         end
         function imageClick(obj,ax)
             c = obj.Controller; if c.Busy, return; end
@@ -514,7 +529,7 @@ classdef ReferenceView < handle
                 return;
             end
             if obj.AddMode
-                obj.AddMode = false; c.Buttons.add.Text = 'Add neuron';
+                obj.AddMode = false; c.Buttons.add.Text = 'Add neuron'; c.Status.Text='';
                 c.safe(@() c.add());
             end
         end

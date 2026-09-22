@@ -36,7 +36,7 @@ points = findobj(w.Axes,'-regexp','Tag','^reference_neurons_');
 assert(any(all(points.CData==Neurons.Neuron.marker_palette().selected,2)));
 v.Position{1}.Value=candidates(2,3)+.125; v.Position{1}.ValueChangedFcn([],[]);
 assert(w.Candidates(2,3)==candidates(2,3)+.125);
-w.Buttons.remove.ButtonPushedFcn([],[]);
+w.Buttons.remove.MenuSelectedFcn([],[]);
 assert(size(w.Candidates,1)==size(candidates,1)-1 && ~w.Busy);
 assert(~any(w.Candidates(:,1)==candidates(2,1)));
 w.Buttons.accept.ButtonPushedFcn([],[]);
@@ -50,7 +50,7 @@ loaded=Tracking.ReferenceWorkflow.bridge(struct('action','import','source',w.Sou
 w.setRows(loaded.observations); assert(isequal(w.Rows,rows));
 w.Cursor=[10 10 0;10 10 0]; w.add();
 assert(w.Rows(end,1)==next_id && w.Rows(end,3)==10 && w.Rows(end,4)==10);
-v.select(w.Rows(end,:),false); w.Buttons.remove.ButtonPushedFcn([],[]);
+v.select(w.Rows(end,:),false); w.Buttons.remove.MenuSelectedFcn([],[]);
 assert(isequal(w.Rows,rows));
 v.Labels.Value=false; v.Labels.ValueChangedFcn([],[]);
 assert(isempty(findobj(v.Projection,'Tag','reference_label')));

@@ -11,10 +11,10 @@ identity=view.PreferredID;
 assert(contains(analysis.Axes.Title.String,sprintf('Neuron %d',identity)));
 w.Frame.Value=min(w.Source.nt,frame+1); w.render();
 assert(view.PreferredID==identity);
-analysis.Mode.Value='Population ΔF/F'; analysis.render();
+analysis.population();
 heatmap=findobj(analysis.Axes,'Type','image');
 assert(isequal(size(heatmap.CData),[numel(analysis.IDs) numel(analysis.Frames)]));
-analysis.Mode.Value='ΔF/F'; analysis.render();
+analysis.population(); analysis.Mode.Value='ΔF/F'; analysis.render();
 view.Exclude.Value=true; view.exclude();
 assert(~w.activityCurrent()); assert(contains(analysis.Axes.Title.String,'out of date'));
 view.Exclude.Value=false; view.exclude();
@@ -33,8 +33,8 @@ session.activity_current=true; analysis.restoreSession(session); assert(w.activi
 assert(session.next_id==w.NextID);
 file=fullfile(w.ActivityDirectory,'activity.h5');
 index=find(analysis.IDs==identity,1); nt=numel(analysis.Frames);
-modes={'Raw fluorescence','Background','Reference fluorescence'};
-datasets={'/raw/channel_0','/background/channel_0','/raw/channel_1'};
+modes={'Raw fluorescence','Reference fluorescence'};
+datasets={'/raw/channel_0','/raw/channel_1'};
 original_signal=analysis.Controls.signal.Value;
 analysis.Controls.signal.Value=2;
 for i=1:numel(modes)

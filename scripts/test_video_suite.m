@@ -11,10 +11,10 @@ p.resize();
 assert(p.Compact && p.Play.Layout.Column==2 && p.Play.Layout.Row==1 && p.Controls{1}==p.Previous);
 v.Body.ColumnWidth=saved.columns; drawnow; p.resize();
 assert(p.Play.Layout.Column==2 && p.Play.Layout.Row==1);
-for i=1:5
+for i=2:4
     v.Stages{i}.ButtonPushedFcn([],[]);
     assert(v.Stage==i && strcmp(v.Panels{i}.Visible,'on'));
-    assert(all(cellfun(@(panel) strcmp(panel.Visible,'off'),v.Panels(setdiff(1:5,i)))));
+    assert(all(cellfun(@(panel) strcmp(panel.Visible,'off'),v.Panels(setdiff(2:4,i)))));
 end
 v.setStage(4); v.DisplayMode.Value='Slice'; w.render();
 image=getappdata(w.Axes,'main_slice_image');
@@ -63,12 +63,6 @@ v.Exclude.Value=true; v.Exclude.ValueChangedFcn([],[]); assert(ismember(w.Rows(r
 v.Review.undo(); assert(isequal(w.Excluded,saved.excluded));
 
 
-v.Review.Filter.Value='All quality flags'; v.redraw();
-if ~isempty(v.Review.Issues)
-    v.Review.List.Value=1; v.Review.choose(); assert(w.Frame.Value==v.Review.Issues(1,1));
-end
-v.Review.Filter.Value='Tracking cues';
-
 % A missing observation keeps the selected identity and its trace.
 v.navigate(660); key=w.Rows(:,1)==saved.preferred & w.Rows(:,2)==660; w.Rows(key,:)=[]; w.render();
 assert(v.PreferredID==saved.preferred && isempty(v.Selection));
@@ -89,5 +83,5 @@ v=w.View; v.Playback.stop(); v.FramePreview.cancel(); v.Preview.cancel();
 v.Body.ColumnWidth=saved.columns; drawnow; v.Playback.resize();
 w.Rows=saved.rows; w.Excluded=saved.excluded; w.Frame.Value=saved.frame; w.Channel.Value=saved.channel; w.Slice.Value=saved.z;
 v.DisplayMode.Value=saved.mode; v.Selection=saved.selection; v.PreferredID=saved.preferred;
-v.XYZ.Value=saved.xyz; v.Review.Filter.Value='Tracking cues'; v.Review.clear(); v.setStage(saved.stage); w.render();
+v.XYZ.Value=saved.xyz; v.Review.clear(); v.setStage(saved.stage); w.render();
 end

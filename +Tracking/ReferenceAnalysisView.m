@@ -19,23 +19,43 @@ classdef ReferenceAnalysisView < handle
     methods
         function obj = ReferenceAnalysisView(c,tracking,activity,activity_display)
             obj.Controller=c;
-            grid=uigridlayout(tracking,[11 2]); grid.RowHeight={28,28,28,28,28,28,32,28,28,55,'1x'};
-            grid.Padding=[12 10 12 10]; grid.ColumnWidth={'1x',105}; grid.Scrollable='on';
-            uilabel(grid,'Text','First frame'); c.First=uispinner(grid,'Limits',[1 max(2,c.Source.nt)],'Value',1);
-            uilabel(grid,'Text','Last frame'); c.Last=uispinner(grid,'Limits',[1 max(2,c.Source.nt)],'Value',c.Source.nt);
-            uilabel(grid,'Text','Reference frame'); c.Reference=uispinner(grid,'Limits',[1 max(2,c.Source.nt)],'Value',1);
+            grid=uigridlayout(tracking,[11 2]); grid.RowHeight={24,20,30,30,30,26,0,4,34,28,'1x'};
+            grid.Padding=[12 10 12 10]; grid.ColumnWidth={105,'1x'}; grid.RowSpacing=8; grid.Scrollable='on';
+            heading=uilabel(grid,'Text','Tracking','FontWeight','bold'); heading.Layout.Row=1; heading.Layout.Column=[1 2];
+            label=uilabel(grid,'Text','Frame range'); label.Layout.Row=2; label.Layout.Column=[1 2];
+            range=uigridlayout(grid,[1 3]); range.Layout.Row=3; range.Layout.Column=[1 2];
+            range.Padding=[0 0 0 0]; range.ColumnWidth={'1x',20,'1x'}; range.ColumnSpacing=6;
+            c.First=uispinner(range,'Limits',[1 max(2,c.Source.nt)],'Value',1,'Tooltip','First frame to track and measure.');
+            uilabel(range,'Text','to','HorizontalAlignment','center');
+            c.Last=uispinner(range,'Limits',[1 max(2,c.Source.nt)],'Value',c.Source.nt,'Tooltip','Last frame to track and measure.');
+            label=uilabel(grid,'Text','Reference frame'); label.Layout.Row=4;
+            c.Reference=uispinner(grid,'Limits',[1 max(2,c.Source.nt)],'Value',1,'Tooltip','A frame containing accepted reference neurons.');
+            c.Reference.Layout.Row=4; c.Reference.Layout.Column=2;
             items=cellstr("C"+string(0:c.Source.nc-1));
-            uilabel(grid,'Text','Tracking channel'); c.TrackingChannel=uidropdown(grid,'Items',items,'ItemsData',0:c.Source.nc-1,'Value',0);
-            uilabel(grid,'Text','Frames per window'); c.WindowSize=uispinner(grid,'Limits',[2 100],'Value',50);
-            uilabel(grid,'Text','Epochs per frame'); c.Epochs=uispinner(grid,'Limits',[1 1000],'Value',40);
-            c.Buttons.track=uibutton(grid,'Text','Run ZephIR','FontWeight','bold','ButtonPushedFcn',@(~,~) c.safe(@() c.track())); c.Buttons.track.Layout.Column=[1 2];
-            c.Buttons.resume=uibutton(grid,'Text','Resume tracking','ButtonPushedFcn',@(~,~) c.safe(@() c.track(true)));
-            c.Buttons.progress=uibutton(grid,'Text','Load progress','ButtonPushedFcn',@(~,~) c.safe(@() c.loadProgress()));
-            c.Buttons.openrun=uibutton(grid,'Text','Open tracking run…','ButtonPushedFcn',@(~,~) c.safe(@() c.openTracking())); c.Buttons.openrun.Layout.Column=[1 2];
-            note=uilabel(grid,'Text','Completed windows are saved. Cancel and resume without restarting the recording.','WordWrap','on'); note.Layout.Column=[1 2];
+            label=uilabel(grid,'Text','Channel'); label.Layout.Row=5;
+            c.TrackingChannel=uidropdown(grid,'Items',items,'ItemsData',0:c.Source.nc-1,'Value',0);
+            c.TrackingChannel.Layout.Row=5; c.TrackingChannel.Layout.Column=2;
+            advanced=uigridlayout(grid,[2 2]); advanced.Layout.Row=7; advanced.Layout.Column=[1 2];
+            advanced.Padding=[0 0 0 0]; advanced.RowHeight={30,30}; advanced.RowSpacing=8; advanced.ColumnWidth={'1x',90}; advanced.Visible='off';
+            uilabel(advanced,'Text','Frames per window'); c.WindowSize=uispinner(advanced,'Limits',[2 100],'Value',50);
+            uilabel(advanced,'Text','Epochs per frame'); c.Epochs=uispinner(advanced,'Limits',[1 1000],'Value',40);
+            c.Buttons.advanced=uibutton(grid,'Text','Advanced ▸','HorizontalAlignment','left', ...
+                'ButtonPushedFcn',@(src,~) Tracking.VideoWorkspace.toggleAdvanced(c,src,advanced));
+            c.Buttons.advanced.Layout.Row=6; c.Buttons.advanced.Layout.Column=[1 2];
+            c.Buttons.track=uibutton(grid,'Text','Run ZephIR','ButtonPushedFcn',@(~,~) c.safe(@() c.track()));
+            c.Buttons.track.Layout.Row=9; c.Buttons.track.Layout.Column=[1 2]; Tracking.VideoWorkspace.primary(c.Buttons.track,true);
+            menu=uicontextmenu(c.App.CELL_ID);
+            c.Buttons.resume=uimenu(menu,'Text','Resume tracking','MenuSelectedFcn',@(~,~) c.safe(@() c.track(true)));
+            c.Buttons.progress=uimenu(menu,'Text','Load completed frames','MenuSelectedFcn',@(~,~) c.safe(@() c.loadProgress()));
+            c.Buttons.openrun=uimenu(menu,'Text','Open tracking run…','Separator','on','MenuSelectedFcn',@(~,~) c.safe(@() c.openTracking()));
+            c.Buttons.runOptions=uibutton(grid,'Text','Saved run ▾', ...
+                'Tooltip','Open a saved run, resume tracking, or load completed windows.', ...
+                'ButtonPushedFcn',@(src,~) Tracking.VideoWorkspace.openMenu(c,src,menu));
+            c.Buttons.runOptions.Layout.Row=10; c.Buttons.runOptions.Layout.Column=[1 2];
+            setappdata(c.Grid,'tracking_run_menu',menu);
 
-            grid=uigridlayout(activity,[11 2]); grid.RowHeight={28,28,28,28,28,28,32,28,60,50,'1x'};
-            grid.Padding=[12 10 12 10]; grid.ColumnWidth={'1x',105}; grid.Scrollable='on';
+            grid=uigridlayout(activity,[9 2]); grid.RowHeight={30,30,30,30,30,30,32,28,0};
+            grid.Padding=[14 12 14 12]; grid.ColumnWidth={'1x',110}; grid.RowSpacing=8; grid.Scrollable='on';
             uilabel(grid,'Text','Signal channel'); obj.Controls.signal=uidropdown(grid,'Items',items,'ItemsData',0:c.Source.nc-1,'Value',0);
             uilabel(grid,'Text','Reference channel'); obj.Controls.reference=uidropdown(grid,'Items',[{'None'};items(:)],'ItemsData',[-1 0:c.Source.nc-1],'Value',-1);
             uilabel(grid,'Text','ROI radii X Y Z (px)'); obj.Controls.radius=uieditfield(grid,'text','Value','3 3 1');
@@ -44,8 +64,10 @@ classdef ReferenceAnalysisView < handle
             uilabel(grid,'Text','Motion warning (px)'); obj.Controls.motion=uispinner(grid,'Limits',[.1 1000],'Value',10);
             c.Buttons.activity=uibutton(grid,'Text','Extract activity','FontWeight','bold','ButtonPushedFcn',@(~,~) c.safe(@() c.extractActivity())); c.Buttons.activity.Layout.Column=[1 2];
             c.Buttons.export=uibutton(grid,'Text','Export activity + tracks…','ButtonPushedFcn',@(~,~) c.safe(@() c.exportActivity())); c.Buttons.export.Layout.Column=[1 2];
-            note=uilabel(grid,'Text','Uses the Tracking frame range. ROI sizes are in pixels. Missing or excluded observations remain gaps.','WordWrap','on'); note.Layout.Column=[1 2];
-            obj.Coverage=uilabel(grid,'Text','','WordWrap','on'); obj.Coverage.Layout.Column=[1 2];
+            obj.Controls.radius.Tooltip='Ellipsoidal sampling radii in X, Y and Z pixels. Uses the Tracking frame range.';
+            obj.Controls.baseline.Tooltip='Percentile used for the fluorescence baseline over the Tracking frame range.';
+            obj.Controls.motion.Tooltip='Per-frame displacement threshold recorded in exported quality flags.';
+            obj.Coverage=uilabel(grid,'Text','','WordWrap','on','Visible','off'); obj.Coverage.Layout.Row=9; obj.Coverage.Layout.Column=[1 2];
             names=fieldnames(obj.Controls);
             for i=1:numel(names), obj.Controls.(names{i}).ValueChangedFcn=@(~,~) obj.refresh(); end
             c.First.ValueChangedFcn=@(~,~) obj.refresh(); c.Last.ValueChangedFcn=@(~,~) obj.refresh();
@@ -54,17 +76,20 @@ classdef ReferenceAnalysisView < handle
             display=uigridlayout(activity_display,[2 1]); display.RowHeight={25,'1x'}; display.Padding=[6 6 6 3];
             header=uigridlayout(display,[1 5]); header.Padding=[0 0 0 0]; header.ColumnWidth={60,165,'1x',95,105};
             uilabel(header,'Text','Activity','FontWeight','bold');
-            obj.Mode=uidropdown(header,'Tooltip','Click the trace to seek to a frame. Review quality flags in the Review panel.','Items',{'ΔF/F','Raw fluorescence','Background','Fluorescence','Reference fluorescence','Ratio ΔF/F','Population ΔF/F'},'ValueChangedFcn',@(~,~) obj.render());
+            obj.Mode=uidropdown(header,'Tooltip','Click the trace to seek to a frame.','Items',{'ΔF/F','Raw fluorescence','Fluorescence','Reference fluorescence'},'UserData',false,'ValueChangedFcn',@(~,~) obj.render());
             uilabel(header,'Text','');
-            uibutton(header,'Text','Population','ButtonPushedFcn',@(~,~) obj.population());
+            uibutton(header,'Text','Population','Tag','activity_population_toggle','ButtonPushedFcn',@(~,~) obj.population());
             uibutton(header,'Text','Expand trace','ButtonPushedFcn',@(src,~) obj.expand(src));
             panel=uipanel(display,'AutoResizeChildren','off','BorderType','none');
             obj.Axes=uiaxes(panel); obj.Axes.Toolbar.Visible='off';
             panel.SizeChangedFcn=@(~,~) obj.fitAxes(); obj.fitAxes();
         end
         function population(obj)
-            if strcmp(obj.Mode.Value,'Population ΔF/F'), obj.Mode.Value='ΔF/F';
-            else, obj.Mode.Value='Population ΔF/F'; end
+            if obj.Controller.Busy, return; end
+            obj.Mode.UserData=~logical(obj.Mode.UserData);
+            obj.Mode.Enable=matlab.lang.OnOffSwitchState(~obj.Mode.UserData);
+            button=findobj(obj.Mode.Parent,'Tag','activity_population_toggle');
+            if obj.Mode.UserData, button.Text='Single neuron'; else, button.Text='Population'; end
             obj.render();
         end
         function expand(obj,src)
@@ -85,6 +110,7 @@ classdef ReferenceAnalysisView < handle
             state=matlab.lang.OnOffSwitchState(~busy); c=obj.Controller;
             handles=[{c.Reference;c.TrackingChannel;c.WindowSize;c.Epochs;obj.Mode};struct2cell(obj.Controls)];
             for i=1:numel(handles), handles{i}.Enable=state; end
+            obj.Mode.Enable=matlab.lang.OnOffSwitchState(~busy && ~obj.Mode.UserData);
             if c.Source.nt==1, c.Reference.Enable='off'; c.First.Enable='off'; c.Last.Enable='off'; end
         end
         function refresh(obj)
@@ -95,6 +121,7 @@ classdef ReferenceAnalysisView < handle
         end
         function render(obj)
             c=obj.Controller; file=fullfile(c.ActivityDirectory,'activity.h5');
+            cleanup=onCleanup(@() Tracking.ImageSettings.axis(c));
             count=numel(unique(c.Rows(:,1))); total=max(1,c.Last.Value-c.First.Value+1)*max(1,count);
             present=nnz(c.Rows(:,2)>=c.First.Value & c.Rows(:,2)<=c.Last.Value);
             obj.Coverage.Text=sprintf('%d neurons · %.1f%% coordinate coverage in the selected range',count,100*present/total);
@@ -112,18 +139,20 @@ classdef ReferenceAnalysisView < handle
                 record=jsondecode(fileread(fullfile(c.ActivityDirectory,'analysis.json'))); obj.ResultOptions=record.options;
                 obj.ResultKey=file; obj.PlotKey={};
             end
+            mode=obj.Mode.Value;
+            if obj.Mode.UserData, mode='Population ΔF/F'; end
             identity=c.View.PreferredID;
             index=find(obj.IDs==identity,1);
             if isempty(index), index=1; identity=obj.IDs(1); end
-            key={file,identity,obj.Mode.Value,c.activityCurrent()};
-            if strcmp(obj.Mode.Value,'Population ΔF/F'), key{2}=[]; end
+            key={file,identity,mode,c.activityCurrent()};
+            if strcmp(mode,'Population ΔF/F'), key{2}=[]; end
             if isequaln(obj.PlotKey,key) && isgraphics(obj.FrameCursor)
                 obj.FrameCursor.Value=c.Frame.Value; return
             end
             if ~isempty(obj.Colorbar) && isvalid(obj.Colorbar), delete(obj.Colorbar); obj.Colorbar=[]; end
             cla(obj.Axes); hold(obj.Axes,'on');
-            nt=numel(obj.Frames); population=strcmp(obj.Mode.Value,'Population ΔF/F');
-            switch obj.Mode.Value
+            nt=numel(obj.Frames); population=strcmp(mode,'Population ΔF/F');
+            switch mode
                 case 'Population ΔF/F'
                     data=h5read(file,'/dff');
                     pixels=imagesc(obj.Axes,obj.Frames,[1 numel(obj.IDs)],data);
@@ -134,13 +163,12 @@ classdef ReferenceAnalysisView < handle
                     title(obj.Axes,'Population ΔF/F'); obj.Colorbar=colorbar(obj.Axes); obj.Colorbar.Label.String='ΔF/F';
                 otherwise
                     dataset='/dff'; ylabel_text='ΔF/F';
-                    if strcmp(obj.Mode.Value,'Fluorescence'), dataset='/signal'; ylabel_text='Fluorescence (background corrected)'; end
-                    if strcmp(obj.Mode.Value,'Ratio ΔF/F'), dataset='/ratio_dff'; ylabel_text='Ratio ΔF/F'; end
-                    if strcmp(obj.Mode.Value,'Raw fluorescence')
+                    if strcmp(mode,'Fluorescence'), dataset='/signal'; ylabel_text='Fluorescence (background corrected)'; end
+                    if strcmp(mode,'Raw fluorescence')
                         dataset=sprintf('/raw/channel_%d',obj.ResultOptions.signal_channel); ylabel_text='Raw fluorescence';
-                    elseif strcmp(obj.Mode.Value,'Background')
+                    elseif strcmp(mode,'Background')
                         dataset=sprintf('/background/channel_%d',obj.ResultOptions.signal_channel); ylabel_text='Background fluorescence';
-                    elseif strcmp(obj.Mode.Value,'Reference fluorescence')
+                    elseif strcmp(mode,'Reference fluorescence')
                         dataset=''; ylabel_text='Reference fluorescence (raw)';
                         if obj.ResultOptions.reference_channel>=0, dataset=sprintf('/raw/channel_%d',obj.ResultOptions.reference_channel); end
                     end
@@ -180,9 +208,10 @@ classdef ReferenceAnalysisView < handle
                 'activity_current',c.activityCurrent(),'activity_options',obj.options(),'next_id',c.NextID, ...
                 'detection_channel',c.DetectionChannel.Value,'detection_mode',c.DetectionMode.Value,'rgbw_channels',c.RGBW.Value, ...
                 'detector',c.Detector.Value,'spacing_text',c.Spacing.Value,'calibration_confirmed',c.Calibration.Value);
-            value.detection_channels=Tracking.DetectionChannels.get(c);
             value.neuron_names=Tracking.NeuronNames.get(c);
             value.paired_reference=getappdata(c.Grid,'paired_reference_provenance');
+            value.image_settings=Tracking.ImageSettings.get(c);
+            value.detection_channels=Tracking.DetectionChannels.get(c);
         end
         function restoreTracking(obj,parameters)
             c=obj.Controller; c.First.Value=parameters.frame_range(1)+1; c.Last.Value=parameters.frame_range(2)+1;
@@ -211,6 +240,7 @@ classdef ReferenceAnalysisView < handle
             c.View.detectionModeChanged();
             if isfield(value,'neuron_names'), Tracking.NeuronNames.set(c,value.neuron_names); end
             if isfield(value,'paired_reference'), setappdata(c.Grid,'paired_reference_provenance',value.paired_reference); end
+            if isfield(value,'image_settings'), Tracking.ImageSettings.restore(c,value.image_settings); end
             options=value.activity_options;
             obj.Controls.signal.Value=options.signal_channel; obj.Controls.reference.Value=options.reference_channel;
             obj.Controls.radius.Value=num2str(options.radius_xyz(:)'); obj.Controls.background.Value=options.background;

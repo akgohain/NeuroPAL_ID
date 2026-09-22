@@ -18,11 +18,11 @@ classdef DisplayContrast < handle
         function obj = DisplayContrast(view,toolbar)
             obj.View = view; c = view.Controller;
             obj.Ranges = nan(c.Source.nc,2); obj.Bounds = obj.Ranges;
-            obj.Button = uibutton(toolbar,'Text','Contrast…','ButtonPushedFcn',@(~,~) obj.toggle());
+            obj.Button = uibutton(toolbar,'Text','Contrast ▸','ButtonPushedFcn',@(~,~) obj.toggle());
             obj.Panel = uigridlayout(c.Grid,[3 5]);
             obj.Panel.Layout.Row = 4; obj.Panel.Layout.Column = 1;
             obj.Panel.ColumnWidth = {'1x',80,'1x',80,90};
-            obj.Panel.RowHeight = {24,24,18}; obj.Panel.Padding = [6 4 6 4];
+            obj.Panel.RowHeight = {24,24,0}; obj.Panel.Padding = [6 4 6 4];
             obj.Panel.RowSpacing = 2; obj.Panel.Visible = 'off';
             uilabel(obj.Panel,'Text','Black level');
             obj.Black = uieditfield(obj.Panel,'numeric','ValueChangedFcn',@(src,~) obj.setLevel(1,src.Value));
@@ -33,7 +33,7 @@ classdef DisplayContrast < handle
             obj.BlackSlider.Layout.Row = 2; obj.BlackSlider.Layout.Column = [1 2];
             obj.WhiteSlider = uislider(obj.Panel,'Limits',[0 1000],'MajorTicks',[],'MinorTicks',[],'Value',1000);
             obj.WhiteSlider.Layout.Row = 2; obj.WhiteSlider.Layout.Column = [3 4];
-            obj.Note = uilabel(obj.Panel,'Text','Display only · fixed across frames','FontSize',11);
+            obj.Note = uilabel(obj.Panel,'Text','','Visible','off');
             obj.Note.Layout.Row = 3; obj.Note.Layout.Column = [1 5];
             sliders = {obj.BlackSlider,obj.WhiteSlider}; obj.Preview = cell(1,2);
             for i=1:2
@@ -52,9 +52,9 @@ classdef DisplayContrast < handle
         function toggle(obj)
             c = obj.View.Controller;
             if strcmp(obj.Panel.Visible,'on')
-                obj.Panel.Visible = 'off'; c.Grid.RowHeight{4} = 0;
+                obj.Panel.Visible = 'off'; c.Grid.RowHeight{4} = 0; obj.Button.Text = 'Contrast ▸';
             else
-                c.Grid.RowHeight{4} = 78; obj.Panel.Visible = 'on';
+                c.Grid.RowHeight{4} = 58; obj.Panel.Visible = 'on'; obj.Button.Text = 'Contrast ▾';
             end
         end
         function range = getRange(obj,volume)
@@ -78,7 +78,6 @@ classdef DisplayContrast < handle
             obj.Black.Value = range(1); obj.White.Value = range(2);
             obj.BlackSlider.Value = max(0,min(1000,1000*(range(1)-bounds(1))/diff(bounds)));
             obj.WhiteSlider.Value = max(0,min(1000,1000*(range(2)-bounds(1))/diff(bounds)));
-            obj.Note.Text = sprintf('C%d · Display only · fixed across frames',channel-1);
         end
         function slide(obj,index,value)
             channel = obj.View.Controller.Channel.Value+1; bounds = obj.Bounds(channel,:);

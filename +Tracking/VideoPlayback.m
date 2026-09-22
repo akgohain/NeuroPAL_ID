@@ -15,7 +15,6 @@ classdef VideoPlayback < handle
         Loop
         First
         Last
-        Events
         Status
         Clock
         Times = []
@@ -28,8 +27,8 @@ classdef VideoPlayback < handle
     methods
         function obj = VideoPlayback(view,parent)
             obj.View=view; c=view.Controller;
-            obj.Panel=uigridlayout(parent,[4 1]); obj.Panel.Padding=[8 2 8 2];
-            obj.Panel.RowHeight={30,0,42,12}; obj.Panel.RowSpacing=2;
+            obj.Panel=uigridlayout(parent,[3 1]); obj.Panel.Padding=[8 2 8 2];
+            obj.Panel.RowHeight={30,0,42}; obj.Panel.RowSpacing=2;
             bar=uigridlayout(obj.Panel,[1 13]); bar.Padding=[0 0 0 0]; bar.ColumnSpacing=5;
             bar.ColumnWidth={0,64,0,42,70,52,85,30,55,0,'1x'};
             obj.Previous=uibutton(bar,'Text','‹','Visible','off','Tooltip','Previous frame','ButtonPushedFcn',@(~,~) obj.step(-1));
@@ -69,12 +68,6 @@ classdef VideoPlayback < handle
             obj.Slider.Layout.Row=3;
             ticks=unique(round(linspace(1,c.Source.nt,min(5,c.Source.nt))));
             obj.Slider.MajorTicks=ticks; obj.Slider.MajorTickLabels=string(ticks);
-            events_panel=uipanel(obj.Panel,'BorderType','none','AutoResizeChildren','off');
-            events_panel.Layout.Row=4;
-            obj.Events=uiaxes(events_panel); obj.Events.Toolbar.Visible='off';
-            events_panel.SizeChangedFcn=@(~,~) Program.Helpers.fill_axes_parent(obj.Events);
-            obj.Events.XLim=[.5 c.Source.nt+.5]; obj.Events.YLim=[0 1]; obj.Events.Visible='off';
-            obj.Events.PositionConstraint='outerposition'; obj.Events.LooseInset=[0 0 0 0];
             % Leave time for navigation callbacks between movie frames.
             obj.Worker=timer('Name','NeuroPAL video playback','ExecutionMode','fixedSpacing', ...
                 'Period',.01,'BusyMode','drop','TimerFcn',@(~,~) obj.tick());
