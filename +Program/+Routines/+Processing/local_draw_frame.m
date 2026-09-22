@@ -125,36 +125,19 @@ if reset_view
 else
     Program.Helpers.configure_image_axes_ticks(ax, frame_size, scale_xy);
 end
-end
-
-function local_configure_frame_title(app, ax)
-try
-    if ~isvalid(app.proc_xyAxes) || ax ~= app.proc_xyAxes
-        return
-    end
-catch
-    return
-end
-
-title_text = "";
-try
-    title_text = string(app.image_name);
-catch
-end
-if strlength(title_text) == 0
-    try
-        title_text = string(app.image_file);
-        [~, title_text, ext] = fileparts(title_text);
-        title_text = title_text + ext;
-    catch
-        title_text = "";
+if isappdata(app.CELL_ID, 'proc_units_control')
+    units = getappdata(app.CELL_ID, 'proc_units_control');
+    if strcmp(units.Value, 'pixels')
+        ax.XTickMode = 'auto'; ax.YTickMode = 'auto';
+        ax.XTickLabelMode = 'auto'; ax.YTickLabelMode = 'auto';
+        ax.XLabel.String = 'X (pixels)'; ax.YLabel.String = 'Y (pixels)';
     end
 end
 
-ax.Title.Interpreter = 'none';
-ax.Title.String = char(title_text);
-ax.TitleFontSizeMultiplier = 2;
-ax.TitleFontWeight = 'bold';
+end
+
+function local_configure_frame_title(~, ax)
+ax.Title.String = '';
 end
 
 function scale_xy = local_frame_scale(app, ax)

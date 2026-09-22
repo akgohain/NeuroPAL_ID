@@ -3702,6 +3702,7 @@ classdef GUIHandling
             end
 
             Program.Routines.GUI.set_manipulation_panel('closed');
+            Program.GUIHandling.configure_processing_sidebar_layout(app);
         end
 
         function histogram_handler(~, mode, ~)
@@ -5324,14 +5325,39 @@ classdef GUIHandling
             advanced_button.Enable = Program.GUIHandling.on_off(is_image_mode);
             if is_expanded
                 spectral_height = 212;
-                advanced_button.Text = 'Hide Spectral Unmixing';
+                advanced_button.Text = 'Spectral unmixing ▾';
             else
                 spectral_height = 0;
-                advanced_button.Text = 'Show Spectral Unmixing';
+                advanced_button.Text = 'Spectral unmixing ▸';
             end
 
-            app.ProcSideGrid.RowHeight = {95, 'fit', 'fit', spectral_height, 34, 116};
-            app.ProcRotateNeuronsCheckBox.Visible = 'off';
+            geometry_height = 100;
+            if strcmp(app.proc_crop_panel.Visible,'on'), geometry_height = 150; end
+            if strcmp(app.proc_rot_panel.Visible,'on'), geometry_height = 270; end
+            if strcmp(app.proc_ds_panel.Visible,'on'), geometry_height = 225; end
+            mirror = Program.GUIHandling.processing_mirror_z_controls(app);
+            if ~isempty(mirror) && strcmp(mirror.panel.Visible,'on'), geometry_height = 150; end
+            app.ProcSideGrid.RowHeight = {128, 190, geometry_height, spectral_height, 30, 112, '1x'};
+            panels = {app.ProcToggleVolumePanel, app.VolumeChannelsPanel, ...
+                app.ImageManipulationPanel, app.ProcSavePanel, app.SpectralUnmixingPanel};
+            for k = 1:numel(panels)
+                panels{k}.BorderType = 'none';
+                panels{k}.TitlePosition = 'lefttop';
+                panels{k}.FontSize = 12;
+            end
+            if isprop(app,'ProcRotateNeuronsCheckBox')
+                app.ProcRotateNeuronsCheckBox.Visible = 'off';
+            end
+            Program.GUIHandling.install_processing_units(app);
+            app.OKButton.Text = 'Apply crop';
+            app.OKButton.FontSize = 12;
+            app.OKButton.BackgroundColor = [0.24 0.24 0.24];
+            app.OKButton.FontColor = [1 1 1];
+            app.OKButton.ButtonPushedFcn = @(~,~) Program.ProcessingSession.run(app, 'applycrop');
+            app.CancelButton_3.BackgroundColor = [0.94 0.94 0.94];
+            app.CancelButton_3.FontSize = 12;
+            app.CancelButton_3.FontColor = [0.12 0.12 0.12];
+            app.CancelButton_3.ButtonPushedFcn = @(~,~) Program.crop_rotate_gui.close(app);
             Program.GUIHandling.update_processing_commit_state(app);
         end
 
@@ -5358,17 +5384,17 @@ classdef GUIHandling
             app.ProcResetButton.Text = 'Discard Preview';
             app.ProcResetButton.FontSize = 12;
             app.ProcResetButton.FontWeight = 'normal';
-            app.ProcResetButton.BackgroundColor = [0.86 0.87 0.88];
+            app.ProcResetButton.BackgroundColor = [0.94 0.94 0.94];
             app.ProcResetButton.FontColor = [0.12 0.14 0.16];
-            app.ProcResetButton.Tooltip = 'Discard preview changes and restore the loaded data settings.';
+            app.ProcResetButton.Tooltip = 'Restore the image, neuron positions, and settings from before processing.';
 
             app.ProcSaveButton.Layout.Row = 3;
             app.ProcSaveButton.Text = 'Save Changes';
             app.ProcSaveButton.FontSize = 13;
             app.ProcSaveButton.FontWeight = 'bold';
-            app.ProcSaveButton.BackgroundColor = [0.10 0.43 0.66];
+            app.ProcSaveButton.BackgroundColor = [0.24 0.24 0.24];
             app.ProcSaveButton.FontColor = [1 1 1];
-            app.ProcSaveButton.Tooltip = 'Commit the current processing preview to the active dataset.';
+            app.ProcSaveButton.Tooltip = 'Save the processed image and its matching neuron IDs together.';
         end
 
         function update_processing_commit_state(app)
@@ -5982,12 +6008,25 @@ classdef GUIHandling
             end
         end
 
+        function install_processing_units(app)
+            key = 'proc_units_control';
+            app.ProcToggleVolumeGrid.RowHeight = {24, 26, 26};
+            if ~isappdata(app.CELL_ID, key)
+                units = uidropdown(app.ProcToggleVolumeGrid, ...
+                    'Items', {'Pixels', 'µm'}, 'ItemsData', {'pixels','physical'}, ...
+                    'Value', 'physical', 'Tooltip', 'Viewer coordinate units', ...
+                    'ValueChangedFcn', @(src,event) Program.Routines.Processing.render());
+                units.Layout.Row = 3; units.Layout.Column = [1 2];
+                setappdata(app.CELL_ID, key, units);
+            end
+        end
+
         function configure_processing_color_panel(app)
-            app.Panel_57.Title = 'Color Preview';
+            app.Panel_57.Title = 'Channel contrast';
             app.Panel_57.BorderType = 'line';
             app.Panel_57.FontWeight = 'bold';
             if isprop(app.Panel_57, 'TitlePosition')
-                app.Panel_57.TitlePosition = 'centertop';
+                app.Panel_57.TitlePosition = 'lefttop';
             end
 
             app.ProcHistogramManipulationLabel.Visible = 'off';
@@ -6027,7 +6066,7 @@ classdef GUIHandling
                 app.ProcMeasure90pthNoiseButton.ButtonPushedFcn = @(src, event) ...
                     Program.GUIHandling.measure_threshold_from_percentile(app);
             end
-            app.ProcNormalizeColorsButton.Text = 'Normalize channel ranges...';
+            app.ProcNormalizeColorsButton.Text = 'Normalize channels ▸';
             app.HidezerointensitypixelsCheckBox.Text = 'Ignore zero pixels';
             app.HidezerointensitypixelsCheckBox.Tooltip = ...
                 'Exclude zero-valued pixels when drawing channel histograms.';

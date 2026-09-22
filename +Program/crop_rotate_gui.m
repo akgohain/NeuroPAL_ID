@@ -1,14 +1,12 @@
 classdef crop_rotate_gui
-    %CROP_ROTATE_GUI Manipulation overlay for crop/rotate preprocessing.
-    %   This class owns the in-axes crop/rotate controls used by the
-    %   processing tab.
+    %CROP_ROTATE_GUI Crop selection for the processing tab.
+    %   Native rectangle handles select the region. Apply and Cancel stay
+    %   in the sidebar alongside the other geometry controls.
     %
     %   Note that it relies on the rotation stack property of the
     %   visualize_light app instance, which keeps track of relevant
     %   handles as well as caching of values between volumes.
     %
-    %   This class is very outdated and needs to be reworked once time
-    %   permits.
 
     properties (Constant)
         % The symbols featured in the crop/rotate overlay.
@@ -27,182 +25,22 @@ classdef crop_rotate_gui
     methods (Static)
 
         function draw(app, roi)
-            %DRAW Creates the in-axes crop/rotate overlay.
-            %
-            %   Inputs:
-            %   - app: Running app instance.
-            %   - roi: An freehand ROI object.
-
-            % We first call the close function to avoid double drawing.
+            % Use native rectangle handles; commit and cancel stay in the sidebar.
             Program.crop_rotate_gui.close(app);
-
-            % Prompt the image manipulation panel to load its cropping
-            % configuration (i.e. resizing the panel & toggling component
-            % visibilities).
-            gui_sidebar = Program.GUI.preprocessing_gui().sidebar;
-            parent_panel = gui_sidebar.panel_instances.image_manipulation;
-            parent_panel.set_display_configuration('crop');
-            
-            if ~isa(roi, 'images.roi.Freehand') || strcmp(roi.Tag, 'redraw') 
-                % If the passed roi is not a freehand ROI or has been tagged
-                % for redrawing, convert the input into a freehand ROI.
-                app.rotation_stack.roi = Program.GUIHandling.rect_to_freehand(roi);
-                
-                % Then initialize the rotation cache for this volume type.
-                app.rotation_stack.cache.(app.VolumeDropDown.Value) = ...
-                    struct('angle', {0});
-            else
-                app.rotation_stack.roi = roi;
+            if isempty(roi) || ~isvalid(roi) || isempty(roi.Position)
+                return
             end
-
-            Program.crop_rotate_gui.configure_roi_constraints(app);
-            
-            % Get the axes to which the roi was drawn.
-            axes = app.rotation_stack.roi.Parent;
-
-            % Get the symbols we'll be using to draw the overlay.
-            symbols = Program.crop_rotate_gui.symbols.in_gui;
-
-            % Get the number of symbols.
-            sym_count = sum(cellfun(@length, symbols));
-
-            % Get the default settings for the overlay.
-            font_size = Program.crop_rotate_gui.settings.font_size;                % Font size of the symbols drawn. 
-            stroke_size = Program.crop_rotate_gui.settings.stroke_size;            % The size of the stroke drawn around each symbol.
-            vertical_offset = Program.crop_rotate_gui.settings.vertical_offset;    % An optional vertical offset.
-            box_padding = Program.crop_rotate_gui.settings.box_padding;            % The size of the padding around the background box on which the symbols will be drawn.
-
-            % Get the corners of the roi.
-            corners = Program.crop_rotate_gui.get_edges(app, ...
-                app.rotation_stack.roi.Position);
-
-            % From these, get the top right corner (which is where we'll be
-            % be drawing the crop/rotate overlay.
-            top_right_corner = corners(3:-1:2);
-            
-            % Calculate the dimensions of the background box on which the
-            % symbols will be drawn.
-            bg_width = font_size*sym_count + stroke_size*length(symbols) + box_padding(1)/2;
-            bg_height = font_size + stroke_size + box_padding(2);
-            bg_xmin = top_right_corner(1) - bg_width;
-            bg_ymin = min(app.rotation_stack.roi.Position(:, 2)) - font_size - vertical_offset;
-
-            bg_pos = [
-                [bg_xmin+bg_width, bg_ymin];
-                [bg_xmin, bg_ymin];
-                [bg_xmin, bg_ymin+bg_height];
-                [bg_xmin+bg_width, bg_ymin+bg_height]];
-
-            % Draw the background box as a freehand roi.
-            app.rotation_stack.gui{end+1} = images.roi.Freehand( ...
-                app.rotation_stack.roi.Parent, 'Position', bg_pos, ...
-                'Color', [0.1 0.1 0.1], 'FaceAlpha', 0.7, ...
-                'InteractionsAllowed', 'none', 'MarkerSize', 1e-99, ...
-                'LineWidth', 1e-99);
-
-            % Initialize a variable that will help us account for
-            % multi-character symbols.
-            multi_string = 0;
-
-            % For each symbol in the top right box...
-            for n = 1:length(symbols)
-                % Get the symbol string.
-                symbol = symbols{n};
-
-                % Calculate the symbol's x position.
-                symbol_x = bg_xmin + (((font_size)*(n-1))/n + stroke_size)*n + ...
-                    box_padding(1) / 2 + multi_string/2;
-
-                % Calculate the symbol's y position.
-                symbol_y = bg_ymin + bg_height/2;
-
-                % Calculate any addition horizontal padding that may be
-                % required due to the number of characters contained within
-                % the symbol.
-                multi_string = multi_string + font_size * (length(symbol)-1);
-
-                % Define the symbol's color based on which symbol we're
-                % dealing with.
-                switch symbol
-                    case 'OK'
-                        color = 'green';
-                    case 'X'
-                        color = 'red';
-                    otherwise
-                        color = 'white';
-                end
-
-                % Draw the symbol and add it to the rotation stack.
-                app.rotation_stack.gui{end+1} = text(axes, ...
-                    symbol_x, symbol_y, symbol, ...
-                    'Color', color, ...
-                    'FontName', 'MonoSpace', 'FontSize', font_size, ...
-                    'FontWeight', 'bold', ...
-                    'ButtonDownFcn', @(src, event) Program.crop_rotate_gui.trigger(app, event), ...
-                    'Tag', 'rot_symbol');
-            end
-
-            % For each scaling symbol...
-            for n = 1:length(Program.crop_rotate_gui.symbols.out_gui)
-                % Get the symbol string.
-                scale = Program.crop_rotate_gui.symbols.out_gui{n};
-
-                % Get the edges of the roi.
-                pos = Program.crop_rotate_gui.get_edges(app);
-                
-                % Check which type of scaling symbol we're dealing with and
-                % calculate its coordinates. Note that we calculate two
-                % sets of coordinates because each scaling symbol is drawn
-                % twice, once on each end of its appropriate edge.
-                if strcmp(scale, '↔')
-                    x1 = pos(1) - font_size;
-                    y1 = (pos(2) + pos(4)) / 2;
-                    
-                    x2 = pos(3) - font_size;
-                    y2 = (pos(2) + pos(4)) / 2;
-                    
-                elseif strcmp(scale, '↕')
-                    x1 = (pos(1) + pos(3)) / 2 - font_size;
-                    y1 = pos(2);
-                    
-                    x2 = (pos(1) + pos(3)) / 2 - font_size;
-                    y2 = pos(4);
-                end
-                
-                % Draw the scaling symbols and add them to the rotation
-                % stack.
-                app.rotation_stack.gui{end+1} = text(axes, x1, y1, scale, ...
-                    'Color', 'white', ...
-                    'FontName', 'MonoSpace', 'FontSize', font_size*2, ...
-                    'ButtonDownFcn', @(src, event) Program.crop_rotate_gui.trigger(app, event), ...
-                    'Tag', num2str(n));
-            
-                app.rotation_stack.gui{end+1} = text(axes, x2, y2, scale, ...
-                    'Color', 'white', ...
-                    'FontName', 'MonoSpace', 'FontSize', font_size*2, ...
-                    'ButtonDownFcn', @(src, event) Program.crop_rotate_gui.trigger(app, event), ...
-                    'Tag', num2str(n+2));
-            end
-
-            % Assign the update() function to the roi's MovingROI listener. 
-            app.rotation_stack.listeners{end+1} = addlistener( ...
-                app.rotation_stack.roi, 'MovingROI', @(src, event) ...
-                Program.crop_rotate_gui.update(app, event, 'move'));
-
-            % Assign the mouse_poll() function to mouse press & release
-            % listeners in order to track click & drag actions.
-            app.rotation_stack.listeners{end+1} = addlistener( ...
-                app.CELL_ID, 'WindowMousePress', @(~,~) ...
-                Program.GUIHandling.mouse_poll(app, 1));
-
-            app.rotation_stack.listeners{end+1} = addlistener( ...
-                app.CELL_ID, 'WindowMouseRelease', @(~,~) ...
-                Program.GUIHandling.mouse_poll(app, 0));
-
-            set(app.CELL_ID, 'WindowButtonMotionFcn', @(~,~) ...
-                Program.GUIHandling.mouse_poll(app));
-
-            Program.crop_rotate_gui.layout_controls(app);
+            app.rotation_stack.roi = roi;
+            app.rotation_stack.cache.(app.VolumeDropDown.Value) = struct('angle', 0);
+            roi.Rotatable = false;
+            roi.Color = [0.85 0.85 0.85];
+            roi.StripeColor = [0.2 0.2 0.2];
+            roi.DrawingArea = Program.crop_rotate_gui.get_drawing_area(app);
+            Program.GUIHandling.processing_roi_lock(app, 'lock');
+            mirror = Program.GUIHandling.processing_mirror_z_controls(app);
+            if ~isempty(mirror), mirror.button.Enable = 'off'; end
+            sidebar = Program.GUI.preprocessing_gui().sidebar;
+            sidebar.panel_instances.image_manipulation.set_display_configuration('crop');
         end
 
         function update(app, event, mode)
@@ -345,6 +183,7 @@ classdef crop_rotate_gui
                 return
             end
 
+            if isa(app.rotation_stack.roi, 'images.roi.Rectangle'), return; end
             drawing_area = Program.crop_rotate_gui.get_drawing_area(app);
             old_position = app.rotation_stack.roi.Position;
             new_position = Program.crop_rotate_gui.constrain_position_to_viewport( ...
@@ -603,33 +442,15 @@ classdef crop_rotate_gui
         end
         
         function preview_output(app)
-            target_axes = app.rotation_stack.roi.Parent;
-            app.rotation_stack.cache.(app.VolumeDropDown.Value).mask = createMask(app.rotation_stack.roi);
-            preview_img = Program.crop_rotate_gui.apply_mask(app, getimage(target_axes));
-            
-            image(target_axes, preview_img);
-            Program.Helpers.configure_image_axes_ticks( ...
-                target_axes, size(preview_img), ...
-                Program.Helpers.processing_axis_scale(app, "xy"), ...
-                'XLim', [1, size(preview_img, 2)], ...
-                'YLim', [1, size(preview_img, 1)]);
-            
-            user_choice = uiconfirm(app.CELL_ID, "Apply this crop?", "NeuroPAL_ID", "Options", ...
-                                    ["Yes", "Return to cropping", "Cancel cropping"]);
-
-            Program.crop_rotate_gui.close(app);
-            switch user_choice
-                case "Yes"
-                    Program.GUIHandling.proc_save_prompt(app, 'crop');
-                    
-                case "Return to cropping"
-                    Program.GUIHandling.crop_routine(app);
-                    return;
-                    
-                case "Cancel cropping"
-                    Program.Routines.Processing.reset();
-                    return;
+            roi = app.rotation_stack.roi;
+            if isempty(roi) || ~isvalid(roi), return; end
+            mask = createMask(roi);
+            if ~any(mask, 'all')
+                error('NeuroPAL:ProcessingCrop', 'Draw a crop inside the image first.');
             end
+            app.rotation_stack.cache.(app.VolumeDropDown.Value).mask = mask;
+            Program.crop_rotate_gui.close(app);
+            Program.GUIHandling.proc_save_prompt(app, 'crop');
         end
 
         function close(app)
@@ -641,6 +462,10 @@ classdef crop_rotate_gui
 
             % Delete the roi.
             delete(app.rotation_stack.roi);
+            app.rotation_stack.roi = [];
+            Program.GUIHandling.processing_roi_lock(app, 'unlock');
+            mirror = Program.GUIHandling.processing_mirror_z_controls(app);
+            if ~isempty(mirror), mirror.button.Enable = 'on'; end
 
             % Call delete() on every element of the crop/rotate overlay.
             cellfun(@delete, app.rotation_stack.gui);
