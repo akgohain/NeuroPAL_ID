@@ -1,5 +1,10 @@
 function test_processing_geometry(app)
 % Compare transformed centers with transformed image landmarks.
+state = struct('rotation', app.rotation_stack, 'angle', app.proc_rot_spinner.Value, ...
+    'xy', app.ProcXYFactorEditField.Value, 'z', app.ProcZSlicesEditField.Value, ...
+    'scale', app.image_um_scale);
+cleanup = onCleanup(@() restore(app, state));
+app.rotation_stack = struct('cache', struct());
 data=zeros(9,13,5,4,'uint8');
 point=[3,9,3]; data(point(1),point(2),point(3),1)=255;
 neurons=Neurons.Image([]); n=Neurons.Neuron; n.position=point; n.annotation='AVAL';
@@ -31,4 +36,12 @@ scale=Program.Helpers.update_processing_image_scale(app,{'rotate'},size(data),fa
 assert(max(abs(scale-[0.3 0.3 1.5]))<1e-12);
 app.image_um_scale=original_scale;
 fprintf('PROCESSING_GEOMETRY=PASS\n');
+end
+
+function restore(app, state)
+app.rotation_stack = state.rotation;
+app.proc_rot_spinner.Value = state.angle;
+app.ProcXYFactorEditField.Value = state.xy;
+app.ProcZSlicesEditField.Value = state.z;
+app.image_um_scale = state.scale;
 end

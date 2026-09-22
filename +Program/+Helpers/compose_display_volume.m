@@ -1,7 +1,13 @@
-function [render_volume, rgb_channels] = compose_display_volume(raw_volume, channels)
+function [render_volume, rgb_channels] = compose_display_volume(raw_volume, channels, range)
 % Compose the display RGB volume from a canonical channel-state struct.
 
-display_volume = single(Program.Helpers.to_user_uint8(raw_volume));
+if nargin < 3, range=[]; end
+preserve_precision = ~isempty(range);
+if preserve_precision
+    display_volume = 255 * min(max((single(raw_volume)-range(1))/diff(range),0),1);
+else
+    display_volume = single(Program.Helpers.to_user_uint8(raw_volume));
+end
 rgb_channels = {channels.r, channels.g, channels.b};
 rgb_names = {'red', 'green', 'blue'};
 n_channels = size(display_volume, 4);
@@ -24,13 +30,13 @@ for c = 1:3
         render_volume(:, :, :, c) = local_adjust_channel( ...
             render_volume(:, :, :, c), ...
             channel.settings, ...
-            false);
+            false, preserve_precision);
     end
 end
 
-render_volume = local_add_channel(display_volume, render_volume, channels.white);
-render_volume = local_add_channel(display_volume, render_volume, channels.dic);
-render_volume = local_add_gfp_channel(display_volume, render_volume, channels.gfp);
+render_volume = local_add_channel(display_volume, render_volume, channels.white, preserve_precision);
+render_volume = local_add_channel(display_volume, render_volume, channels.dic, preserve_precision);
+render_volume = local_add_gfp_channel(display_volume, render_volume, channels.gfp, preserve_precision);
 
 for c = 1:length(channels.other)
     other = channels.other{c};
@@ -48,25 +54,25 @@ for c = 1:length(channels.other)
 end
 end
 
-function render_volume = local_add_channel(raw_volume, render_volume, channel)
+function render_volume = local_add_channel(raw_volume, render_volume, channel, preserve_precision)
 if ~channel.bool
     return
 end
 
 n_channels = size(raw_volume, 4);
 idx = local_safe_index(channel.idx, n_channels);
-channel_volume = local_adjust_channel(raw_volume(:, :, :, idx), channel.settings, true);
+channel_volume = local_adjust_channel(raw_volume(:, :, :, idx), channel.settings, true, preserve_precision);
 render_volume = render_volume + repmat(squeeze(channel_volume), [1, 1, 1, 3]);
 end
 
-function render_volume = local_add_gfp_channel(raw_volume, render_volume, channel)
+function render_volume = local_add_gfp_channel(raw_volume, render_volume, channel, preserve_precision)
 if ~channel.bool
     return
 end
 
 n_channels = size(raw_volume, 4);
 idx = local_safe_index(channel.idx, n_channels);
-channel_volume = local_adjust_channel(raw_volume(:, :, :, idx), channel.settings, true);
+channel_volume = local_adjust_channel(raw_volume(:, :, :, idx), channel.settings, true, preserve_precision);
 
 gfp_color = Program.GUIPreferences.instance().GFP_color;
 channel_volume = repmat(squeeze(channel_volume), [1, 1, 1, 3]);
@@ -82,7 +88,7 @@ elseif idx > n_channels
 end
 end
 
-function channel_volume = local_adjust_channel(channel_volume, settings, apply_gamma)
+function channel_volume = local_adjust_channel(channel_volume, settings, apply_gamma, preserve_precision)
 if nargin < 3
     apply_gamma = true;
 end
@@ -93,6 +99,13 @@ if gamma_value < 0.01
 end
 if ~apply_gamma
     gamma_value = 1;
+end
+
+if preserve_precision
+    % Apply contrast before reducing floating-point and 16-bit sources to the display depth.
+    channel_volume = 255 * imadjustn(channel_volume/255, ...
+        settings.low_high_in, settings.low_high_out, gamma_value);
+    return
 end
 
 channel_volume = uint8(min(max(round(channel_volume), 0), 255));

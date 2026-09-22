@@ -53,13 +53,23 @@ function load_file(mode, path)
             switch mode
                 case "image"
                     Program.Routines.GUI.add_volume('Colormap')
-                    mat_file = DataHandling.NeuroPALImage.prepare(path);
+                    mat_file = DataHandling.NeuroPALImage.prepare(path, job.Token);
                     path = mat_file;
                     source = DataHandling.Helpers.npal_mat.open_source(mat_file);
                     Program.HeavyJob.assertIdle(job.Token);
                     app.proc_image = source.reader;
                     prefs = source.metadata.prefs;
+                    % Old imports can refer to channels that are no longer present.
+                    for field = {'RGBW', 'DIC', 'GFP'}
+                        name = field{1};
+                        if ~isfield(prefs, name), prefs.(name) = NaN; end
+                        indices = double(prefs.(name));
+                        indices(~isfinite(indices) | indices < 1 | ...
+                            indices > source.dims(4) | indices ~= round(indices)) = NaN;
+                        prefs.(name) = indices;
+                    end
                     current_path = string(app.image_file);
+                    had_main_image = had_main_image && current_path == string(mat_file);
                     if isempty(app.image_data) || current_path ~= string(mat_file)
                         Program.ProcessingSession.clear(app);
                         [id_folder, id_name] = fileparts(mat_file);
@@ -81,7 +91,7 @@ function load_file(mode, path)
                         try
                             app.image_info = app.proc_image.info;
                             if isfield(app.image_info, 'scale')
-                                app.image_um_scale = app.image_info.scale;
+                                app.image_um_scale = double(app.image_info.scale(:).');
                             end
                         catch
                         end

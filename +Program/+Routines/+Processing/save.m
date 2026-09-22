@@ -31,12 +31,18 @@ function saved = save()
 
     saved = true;
     app.flags = struct();
+    if isappdata(app.CELL_ID, 'proc_runtime_dirty')
+        rmappdata(app.CELL_ID, 'proc_runtime_dirty');
+    end
     Program.GUIHandling.set_thresholds(app, 255);
     Program.GUIHandling.sanitize_processing_downsample_fields(app);
     app.ProcXYFactorEditField.Value = 1;
     dims = Program.GUIHandling.processing_source_dims(app);
     app.ProcZSlicesEditField.Value = dims(3);
     if strcmp(app.VolumeDropDown.Value, 'Colormap'), Program.ProcessingSession.capture(app); end
+    if strcmp(app.VolumeDropDown.Value, 'Video')
+        Program.GUIHandling.capture_processing_defaults(app, 'video', true);
+    end
     Program.GUIHandling.update_processing_commit_state(app);
     Methods.ChunkyMethods.clear_spectral_filtered_cache(app);
     if isappdata(app.CELL_ID, 'proc_mip_cache')

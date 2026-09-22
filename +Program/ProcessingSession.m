@@ -3,6 +3,9 @@ classdef ProcessingSession
     methods (Static)
         function capture(app)
             Program.ProcessingSession.clear(app);
+            if isappdata(app.CELL_ID,'processing_intensity_range')
+                rmappdata(app.CELL_ID,'processing_intensity_range');
+            end
             if ~strcmp(app.VolumeDropDown.Value, 'Colormap'), return; end
             folder = tempname; mkdir(folder);
             snapshot = struct('path', app.image_file, 'id_file', app.id_file, ...

@@ -1,5 +1,14 @@
-function volume = to_user_uint8(volume)
+function volume = to_user_uint8(volume, range)
 % Convert source-native image data to the canonical user-facing uint8 scale.
+
+if nargin > 1 && numel(range)==2
+    if isequal(double(range(:).'), [0 255])
+        volume = uint8(volume);
+        return
+    end
+    volume = uint8(255 * min(max((double(volume)-range(1))/diff(range),0),1));
+    return
+end
 
 if isa(volume, 'uint8')
     return

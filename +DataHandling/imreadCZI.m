@@ -1,4 +1,4 @@
-function [image, metadata] = imreadCZI(filename)
+function [image, metadata] = imreadCZI(filename, parent_token)
 %IMREADCZI Read in a Zeiss CZI image.
 %
 %   [IMAGE, METADATA] = IMREADCZI(FILENAME)
@@ -21,6 +21,8 @@ function [image, metadata] = imreadCZI(filename)
 %       values    = the meta data values (the values for the meta data)
 %       hashtable = a Java Hashtable of keys and their values
 
+if nargin < 2, parent_token = ''; end
+
 % Open the CZI file.
 try
     [reader, reader_cleanup, hashtable] = ...
@@ -29,7 +31,7 @@ catch ME
     if startsWith(ME.identifier, 'DataHandling:')
         rethrow(ME);
     end
-    [image, metadata] = fallbackToPython(filename, ME);
+    [image, metadata] = fallbackToPython(filename, ME, parent_token);
     return
 end
 
@@ -220,7 +222,7 @@ image.pixels = double([reader.getSizeX(); reader.getSizeY(); reader.getSizeZ()])
 image.data = DataHandling.Helpers.bioformats_image.read(reader, filename);
 end
 
-function [image, metadata] = fallbackToPython(filename, originalError)
+function [image, metadata] = fallbackToPython(filename, originalError, parent_token)
 root_dir = fileparts(fileparts(mfilename('fullpath')));
 script_path = fullfile(root_dir, '+Wrapper', 'read_czi.py');
 
@@ -238,7 +240,7 @@ output_json = [tempname, '.json'];
 
 cleanup = onCleanup(@() cleanupTempFiles(output_h5, output_json, [output_h5 '.pixels']));
 [status, cmdout] = Wrapper.runPythonProcess( ...
-    {python_bin, script_path, filename, output_h5, output_json});
+    {python_bin, script_path, filename, output_h5, output_json}, 'JobToken', string(parent_token));
 
 if status ~= 0 || ~isfile(output_h5) || ~isfile(output_json)
     error(['Cannot read "%s"!\nBio-Formats failed with:\n%s\n\n' ...

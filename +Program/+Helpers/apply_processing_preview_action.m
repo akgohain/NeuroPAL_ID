@@ -8,6 +8,9 @@ end
 
 applied = false;
 if ~strcmpi(char(string(app.VolumeDropDown.Value)), 'Colormap')
+    uialert(app.CELL_ID, ...
+        'This operation requires an image volume. Video processing currently supports channel contrast only.', ...
+        'Video processing');
     return
 end
 
@@ -40,6 +43,7 @@ end
 job = Program.HeavyJob.acquire('Image processing');
 job_cleanup = onCleanup(@() delete(job));
 Program.ProcessingSession.checkpointPixels(app);
+source_range = Program.Helpers.processing_intensity_range(app);
 neurons = Program.ProcessingSession.copyNeurons(app.image_neurons);
 for n = 1:numel(actions)
     action = actions{n};
@@ -50,6 +54,14 @@ for n = 1:numel(actions)
 end
 
 app.image_data = current_volume;
+if any(strcmp(actions,'zscore'))
+    app.image_info.display_range = Program.Helpers.native_intensity_range(current_volume);
+else
+    app.image_info.display_range = source_range;
+end
+if isappdata(app.CELL_ID,'processing_intensity_range')
+    rmappdata(app.CELL_ID,'processing_intensity_range');
+end
 Program.Helpers.update_processing_image_scale(app, actions, source_dims);
 app.image_neurons = neurons;
 app.selected_neuron = [];
@@ -130,6 +142,7 @@ if ~isfield(metadata, 'info') || ~isstruct(metadata.info)
     metadata.info = struct();
 end
 metadata.info.scale = updated_scale;
+metadata.info.display_range = Program.Helpers.processing_intensity_range(app);
 state = local_processing_state(app, actions, dims(4));
 neurons = Program.ProcessingSession.copyNeurons(app.image_neurons);
 current_dims = dims;
@@ -179,6 +192,7 @@ app.image_prefs = metadata.prefs;
 app.image_um_scale = updated_scale;
 if isstruct(app.image_info)
     app.image_info.scale = updated_scale;
+    app.image_info.display_range = metadata.info.display_range;
 end
 for n = 1:numel(actions)
     if isfield(app.flags, actions{n})

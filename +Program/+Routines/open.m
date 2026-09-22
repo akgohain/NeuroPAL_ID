@@ -102,7 +102,7 @@ function open(path)
     job_cleanup = onCleanup(@() delete(job));
     try                
         [data, info, prefs, worm, mp, neurons, np_file, id_file] = ...
-            DataHandling.NeuroPALImage.open(filename);
+            DataHandling.NeuroPALImage.open(filename, job.Token);
     catch ME
         Program.Helpers.debug_event('OpenFile', ...
             'Cannot read "%s": %s', filename, getReport(ME, 'extended', 'hyperlinks', 'off'));
@@ -269,12 +269,6 @@ function open(path)
 
     % Restrict the slider to the z stack.
     num_z_slices = size(app.image_data, 3);
-    if num_z_slices <= 1
-        uialert(app.CELL_ID, 'The image is not a volume!', ...
-            'Image Not a Volume', 'Icon', 'error');
-        app.is_opening_file = false;
-        return;
-    end
     initial_z_slice = round(num_z_slices / 2);
     Program.Helpers.configure_main_zslider(app, num_z_slices, initial_z_slice);
 
