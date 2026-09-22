@@ -231,24 +231,26 @@ classdef ReferenceView < handle
             range = obj.Contrast.getRange(volume);
             obj.DisplayMinimum = range(1); obj.DisplayMaximum = range(2);
             key = [c.CacheFrame,c.Channel.Value,range];
-            if ~isequal(obj.DisplayKey,key)
+            mip=strcmp(obj.DisplayMode.Value,'MIP');
+            if mip && ~isequal(obj.DisplayKey,key)
                 obj.ProjectionPixels = obj.displayPixels(max(volume,[],3)); obj.DisplayKey = key;
             end
             plane=volume(:,:,z);
             if strcmp(obj.DisplayMode.Value,'Slab')
                 plane=max(volume(:,:,max(1,z-2):min(c.Source.nz,z+2)),[],3);
             end
-            obj.drawImage(c.Axes,obj.displayPixels(plane));
-            mip=strcmp(obj.DisplayMode.Value,'MIP');
+            if ~mip, obj.drawImage(c.Axes,obj.displayPixels(plane)); end
             obj.SlicePanel.Visible=matlab.lang.OnOffSwitchState(~mip);
             obj.ProjectionPanel.Visible=matlab.lang.OnOffSwitchState(mip);
             title(c.Axes,sprintf('Frame %d · C%d · Z %d',c.Frame.Value,c.Channel.Value,z),'Interpreter','none','FontWeight','normal');
             obj.updateList();
-            setappdata(c.Axes,'reference_label_boxes',zeros(0,4));
-            obj.drawMarkers(c.Axes,obj.ListRows(obj.ListRows(:,8)==0,1:7),false,z); obj.drawMarkers(c.Axes,c.Candidates,true,z);
-            obj.drawROI(c.Axes,z); obj.drawTrail(obj.Projection);
+            if ~mip
+                setappdata(c.Axes,'reference_label_boxes',zeros(0,4));
+                obj.drawMarkers(c.Axes,obj.ListRows(obj.ListRows(:,8)==0,1:7),false,z); obj.drawMarkers(c.Axes,c.Candidates,true,z);
+                obj.drawROI(c.Axes,z); obj.drawTrail(c.Axes);
+            end
             projection_key = {key,obj.ListRows,obj.Selection,obj.Labels.Value,obj.LabelMode.Value,c.Excluded,obj.ShowROI.Value,c.Analysis.options()};
-            if ~isequaln(obj.ProjectionKey,projection_key)
+            if mip && ~isequaln(obj.ProjectionKey,projection_key)
                 obj.drawImage(obj.Projection,obj.ProjectionPixels);
                 setappdata(obj.Projection,'reference_label_boxes',zeros(0,4));
                 obj.drawMarkers(obj.Projection,obj.ListRows(obj.ListRows(:,8)==0,1:7),false,[]); obj.drawMarkers(obj.Projection,c.Candidates,true,[]);
@@ -264,9 +266,11 @@ classdef ReferenceView < handle
             end
             c.Status.Text = sprintf('Frame %d / %d · C%d · %d neurons · %d candidates', ...
                 c.Frame.Value,c.Source.nt,c.Channel.Value,numel(unique(c.Rows(:,1))),size(c.Candidates,1));
-            obj.drawTrail(c.Axes); obj.drawTrail(obj.Projection); obj.drawOrthogonal(volume);
+            if mip, obj.drawTrail(obj.Projection); end
+            obj.drawOrthogonal(volume);
             obj.Playback.sync(); c.Analysis.render(); obj.Review.render();
             obj.DetectionSummary.Text=sprintf('Frame %d · %d candidates',c.Frame.Value,size(c.Candidates,1));
+
         end
         function finishRender(obj)
             obj.Rendering=false;

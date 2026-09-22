@@ -11,7 +11,7 @@ v.finishRender(); v.FramePreview.flush(); v.Preview.flush();
 assert(w.Frame.Value==frame+2 && w.CacheFrame==frame+2 && w.Slice.Value==7);
 assert(~v.Rendering && ~v.PendingRender);
 test_video_depth_playback(w);
-p.Rate.Value=20; p.rateChanged(); p.Loop.Value=false; p.toggle();
+p.Rate.Value='20'; p.rateChanged(); p.Loop.Value=false; p.toggle();
 for i=1:25
     v.previewRequest(mod(i,w.Source.nz)+1); pause(.04);
 end

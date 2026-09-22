@@ -31,33 +31,37 @@ classdef VideoPlayback < handle
             obj.Panel=uigridlayout(parent,[4 1]); obj.Panel.Padding=[8 2 8 2];
             obj.Panel.RowHeight={30,0,42,12}; obj.Panel.RowSpacing=2;
             bar=uigridlayout(obj.Panel,[1 13]); bar.Padding=[0 0 0 0]; bar.ColumnSpacing=5;
-            bar.ColumnWidth={28,64,28,42,70,52,100,55,'1x',88};
-            obj.Previous=uibutton(bar,'Text','‹','Tooltip','Previous frame','ButtonPushedFcn',@(~,~) obj.step(-1));
+            bar.ColumnWidth={0,64,0,42,70,52,85,30,55,0,'1x'};
+            obj.Previous=uibutton(bar,'Text','‹','Visible','off','Tooltip','Previous frame','ButtonPushedFcn',@(~,~) obj.step(-1));
             obj.Play=uibutton(bar,'Text','Play','ButtonPushedFcn',@(~,~) obj.toggle());
-            obj.Next=uibutton(bar,'Text','›','Tooltip','Next frame','ButtonPushedFcn',@(~,~) obj.step(1));
-            frame_label=uilabel(bar,'Text','Frame');
+            obj.Next=uibutton(bar,'Text','›','Visible','off','Tooltip','Next frame','ButtonPushedFcn',@(~,~) obj.step(1));
+            frame_label=uilabel(bar,'Text','Frame','HorizontalAlignment','right');
             c.Frame=uispinner(bar,'Limits',[1 max(2,c.Source.nt)],'Value',1,'Step',1);
             total_label=uilabel(bar,'Text',sprintf('/ %d',c.Source.nt));
-            obj.Rate=uidropdown(bar,'Items',{'2 frames/s','5 frames/s','10 frames/s','20 frames/s'}, ...
-                'ItemsData',[2 5 10 20],'Value',5,'ValueChangedFcn',@(~,~) obj.rateChanged());
+            obj.Rate=uidropdown(bar,'Items',{'1','2','5','10','15','20', ...
+                '30','60','90','120','144','240'},'Editable','on','Value','5','UserData',5, ...
+                'Tooltip','Choose a preset or type a rate (0.1–240 FPS). Playback follows this rate; display frames are skipped if rendering falls behind.', ...
+                'ValueChangedFcn',@(~,~) obj.rateChanged());
+            rate_label=uilabel(bar,'Text','FPS');
+            rate_label.Layout.Row=1; rate_label.Layout.Column=8;
             obj.Loop=uicheckbox(bar,'Text','Loop','ValueChangedFcn',@(~,~) obj.loopChanged());
             obj.First=uispinner(bar,'Limits',[1 max(2,c.Source.nt)],'Value',1,'ValueChangedFcn',@(~,~) obj.rangeChanged(1));
             to_label=uilabel(bar,'Text','to');
             obj.Last=uispinner(bar,'Limits',[1 max(2,c.Source.nt)],'Value',c.Source.nt,'ValueChangedFcn',@(~,~) obj.rangeChanged(2));
-            obj.Status=uilabel(bar,'Text','','FontSize',11,'Tooltip','Achieved playback rate');
-            around=uibutton(bar,'Text','Around current frame','ButtonPushedFcn',@(~,~) obj.around());
+            obj.Status=uilabel(bar,'Text','','FontSize',11,'HorizontalAlignment','right','Tooltip','Displayed frames per second. Playback skips display frames when needed to keep the requested speed.');
+            around=uibutton(bar,'Text','Around current frame','Tooltip','Set the loop to 20 frames before and after the current frame.','ButtonPushedFcn',@(~,~) obj.around());
             obj.Bar=bar;
             obj.Controls={obj.Previous,obj.Play,obj.Next,frame_label,c.Frame,total_label,obj.Rate, ...
                 obj.Loop,obj.First,to_label,obj.Last,obj.Status,around};
-            obj.RangeBar=uigridlayout(obj.Panel,[1 6]); obj.RangeBar.Layout.Row=2;
-            obj.RangeBar.Padding=[0 0 0 0]; obj.RangeBar.ColumnWidth={80,20,80,150,'1x',1};
+            obj.RangeBar=uigridlayout(bar,[1 4]); obj.RangeBar.Layout.Row=1; obj.RangeBar.Layout.Column=10;
+            obj.RangeBar.Padding=[0 0 0 0]; obj.RangeBar.ColumnSpacing=5; obj.RangeBar.ColumnWidth={80,20,80,150};
             obj.RangeBar.Visible='off';
             indices=[9 10 11 13];
             for i=1:numel(indices)
                 control=obj.Controls{indices(i)}; control.Parent=obj.RangeBar;
                 control.Layout.Row=1; control.Layout.Column=i;
             end
-            columns=[1 2 3 4 5 6 7 8 0 0 0 10 0];
+            columns=[1 2 3 4 5 6 7 9 0 0 0 11 0];
             for i=[1:8 12], obj.Controls{i}.Layout.Row=1; obj.Controls{i}.Layout.Column=columns(i); end
             bar.RowHeight={30};
             parent.AutoResizeChildren='off'; parent.SizeChangedFcn=@(~,~) obj.resize();
@@ -73,20 +77,28 @@ classdef VideoPlayback < handle
             obj.Events.PositionConstraint='outerposition'; obj.Events.LooseInset=[0 0 0 0];
             % Leave time for navigation callbacks between movie frames.
             obj.Worker=timer('Name','NeuroPAL video playback','ExecutionMode','fixedSpacing', ...
-                'Period',.2,'BusyMode','drop','TimerFcn',@(~,~) obj.tick());
+                'Period',.01,'BusyMode','drop','TimerFcn',@(~,~) obj.tick());
             obj.Lifetime=addlistener(parent,'ObjectBeingDestroyed',@(~,~) delete(obj));
             obj.PreviousKey=c.App.CELL_ID.WindowKeyPressFcn;
             obj.KeyCallback=@(src,event) obj.key(src,event); c.App.CELL_ID.WindowKeyPressFcn=obj.KeyCallback;
         end
         function resize(obj)
-            obj.Compact=obj.Panel.Parent.Position(3)<850;
+            width=obj.Panel.Parent.Position(3); obj.Compact=width<1000;
             expanded=logical(obj.Loop.Value);
-            height=double(expanded)*32;
-            if obj.Panel.RowHeight{2}~=height
-                obj.Panel.RowHeight{2}=height;
-                obj.View.Body.RowHeight{3}=100+height;
+            % Reveal loop bounds inline without moving the image or timeline.
+            if obj.Compact
+                columns={0,60,0,38,65,48,72,28,52,0,'1x'};
+                ranges={65,16,65,95}; label='Around here';
+            else
+                columns={0,64,0,42,70,52,85,30,55,0,'1x'};
+                ranges={80,20,80,150}; label='Around current frame';
             end
+            if expanded, columns{10}=sum([ranges{:}])+15; end
+            if ~isequal(obj.Bar.ColumnWidth,columns), obj.Bar.ColumnWidth=columns; end
+            if ~isequal(obj.RangeBar.ColumnWidth,ranges), obj.RangeBar.ColumnWidth=ranges; end
+            obj.Controls{13}.Text=label;
             obj.RangeBar.Visible=matlab.lang.OnOffSwitchState(expanded);
+            obj.Status.Visible=matlab.lang.OnOffSwitchState(~expanded || width>=950);
         end
         function loopChanged(obj)
             obj.stop(); obj.resize();
@@ -117,6 +129,7 @@ classdef VideoPlayback < handle
             elseif c.Frame.Value>=c.Source.nt
                 obj.View.navigate(1);
             end
+            obj.Worker.UserData=c.Frame.Value;
             obj.Playing=true; obj.Play.Text='Pause'; obj.Clock=tic; obj.Times=[]; start(obj.Worker);
         end
         function stop(obj)
@@ -130,23 +143,38 @@ classdef VideoPlayback < handle
             if ~obj.Playing || c.Busy || ~isvalid(c.App) || c.App.TabGroup.SelectedTab~=c.App.VideoTrackingTab
                 obj.stop(); return;
             end
-            last=c.Source.nt; if obj.Loop.Value, last=obj.Last.Value; end
-            frame=c.Frame.Value+1;
-            if frame>last
-                if obj.Loop.Value, frame=obj.First.Value;
-                else, obj.stop(); return; end
+            if obj.View.Rendering, return; end
+            clock=obj.Clock; last=c.Source.nt; if obj.Loop.Value, last=obj.Last.Value; end
+            % Follow elapsed time rather than accumulating frame render delays.
+            frame=obj.Worker.UserData+floor(toc(clock)*obj.Rate.UserData);
+            finished=~obj.Loop.Value && frame>=last;
+            if obj.Loop.Value
+                frame=obj.First.Value+mod(frame-obj.First.Value,last-obj.First.Value+1);
+            else
+                frame=min(frame,last);
+            end
+            if frame==c.Frame.Value
+                if finished, obj.stop(); end
+                return;
             end
             try
                 obj.View.navigate(frame,true); drawnow nocallbacks;
-                obj.Times(end+1)=toc(obj.Clock);
+                if ~obj.Playing || obj.Clock~=clock, return; end
+                obj.Times(end+1)=toc(clock);
                 if numel(obj.Times)>21, obj.Times(1)=[]; end
-                if numel(obj.Times)>1, obj.Status.Text=sprintf('%.1f fps',1/mean(diff(obj.Times))); end
+                if numel(obj.Times)>1, obj.Status.Text=sprintf('Display: %.1f fps',1/mean(diff(obj.Times))); end
+                if finished, obj.stop(); end
             catch ME
                 obj.stop(); c.Status.Text=ME.message;
             end
         end
         function rateChanged(obj)
-            playing=obj.Playing; obj.stop(); obj.Worker.Period=1/obj.Rate.Value;
+            rate=str2double(strtrim(obj.Rate.Value));
+            if ~isfinite(rate) || rate<.1 || rate>240
+                obj.Rate.Value=sprintf('%g',obj.Rate.UserData); return;
+            end
+            obj.Rate.UserData=rate; obj.Rate.Value=sprintf('%g',rate);
+            playing=obj.Playing; obj.stop(); obj.Worker.Period=.01;
             if playing, obj.toggle(); end
         end
         function rangeChanged(obj,index)

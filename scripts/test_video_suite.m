@@ -5,7 +5,9 @@ saved=struct('frame',w.Frame.Value,'channel',w.Channel.Value,'z',w.Slice.Value,'
     'selection',v.Selection,'preferred',v.PreferredID,'rows',w.Rows,'excluded',w.Excluded,'xyz',v.XYZ.Value,'stage',v.Stage, ...
     'columns',{v.Body.ColumnWidth});
 cleanup=onCleanup(@() restore(w,saved));
-v.Body.ColumnWidth={700,'1x'}; pause(.2); drawnow; p.resize();
+v.Body.ColumnWidth={700,'1x'}; layout_clock=tic;
+while abs(p.Panel.Parent.Position(3)-700)>1 && toc(layout_clock)<3, drawnow; pause(.05); end
+p.resize();
 assert(p.Compact && p.Play.Layout.Column==2 && p.Play.Layout.Row==1 && p.Controls{1}==p.Previous);
 v.Body.ColumnWidth=saved.columns; drawnow; p.resize();
 assert(p.Play.Layout.Column==2 && p.Play.Layout.Row==1);
@@ -15,7 +17,7 @@ for i=1:5
     assert(all(cellfun(@(panel) strcmp(panel.Visible,'off'),v.Panels(setdiff(1:5,i)))));
 end
 v.setStage(4); v.DisplayMode.Value='Slice'; w.render();
-image=getappdata(w.Axes,'main_slice_image'); projection=getappdata(v.Projection,'main_slice_image');
+image=getappdata(w.Axes,'main_slice_image');
 trace=findobj(w.Analysis.Axes,'Tag','activity_trace'); cursor=w.Analysis.FrameCursor;
 for frame=[610 611 620 615]
     p.Slider.Value=frame; p.Slider.ValueChangedFcn(p.Slider,[]); drawnow;
@@ -26,14 +28,14 @@ for frame=630:650, p.request(frame); end
 v.FramePreview.flush(); assert(w.CacheFrame==650);
 p.request(651); p.Slider.Value=655; p.Slider.ValueChangedFcn(p.Slider,struct('Value',655)); pause(.1);
 assert(w.CacheFrame==655 && w.Frame.Value==655 && p.Slider.Value==655);
-p.First.Value=655; p.Last.Value=657; p.Loop.Value=true; p.Rate.Value=20; p.rateChanged();
+p.First.Value=655; p.Last.Value=657; p.Loop.Value=true; p.Rate.Value='20'; p.rateChanged();
 p.toggle(); pause(1.5); p.stop();
 assert(w.Frame.Value>=655 && w.Frame.Value<=657 && ~p.Playing);
 assert(w.Analysis.FrameCursor.Value==w.Frame.Value && p.Slider.Value==w.Frame.Value);
 frame=w.Frame.Value; pause(.15); assert(w.Frame.Value==frame);
 p.toggle(); v.navigate(660); pause(.15); assert(~p.Playing && w.Frame.Value==660);
 p.toggle(); w.safe(@() w.render()); assert(~p.Playing);
-p.Loop.Value=false; v.navigate(w.Source.nt); p.Playing=true; p.tick(); assert(~p.Playing && w.Frame.Value==w.Source.nt);
+p.Loop.Value=false; v.navigate(w.Source.nt); p.Worker.UserData=w.Source.nt; p.Clock=tic; p.Playing=true; p.tick(); assert(~p.Playing && w.Frame.Value==w.Source.nt);
 v.navigate(660); p.toggle(); w.App.TabGroup.SelectedTab=w.App.NeuroPALIDTab; p.tick(); assert(~p.Playing);
 w.App.TabGroup.SelectedTab=w.App.VideoTrackingTab;
 
@@ -41,6 +43,7 @@ raw=w.Cache; v.DisplayMode.Value='Slab'; w.render();
 z=w.Slice.Value; volume=w.frameData(); expected=max(volume(:,:,max(1,z-2):min(w.Source.nz,z+2)),[],3);
 assert(isequal(image.CData,v.displayPixels(expected)));
 v.DisplayMode.Value='MIP'; w.render(); assert(strcmp(v.ProjectionPanel.Visible,'on') && strcmp(v.SlicePanel.Visible,'off'));
+projection=getappdata(v.Projection,'main_slice_image');
 assert(isequal(projection.CData,v.displayPixels(max(w.frameData(),[],3))));
 v.DisplayMode.Value='Slice'; v.XYZ.Value=true; w.render(); assert(strcmp(v.OrthogonalPanel.Visible,'on'));
 assert(all(cellfun(@(ax) ~isempty(findobj(ax,'Type','image')),v.Orthogonal)));
@@ -58,6 +61,8 @@ assert(abs(w.Rows(row,3)-original(row,3)-.1)<1e-9); assert(~w.activityCurrent())
 v.Review.undo(); assert(isequal(w.Rows,original) && w.activityCurrent());
 v.Exclude.Value=true; v.Exclude.ValueChangedFcn([],[]); assert(ismember(w.Rows(row,[1 2]),w.Excluded,'rows'));
 v.Review.undo(); assert(isequal(w.Excluded,saved.excluded));
+
+
 v.Review.Filter.Value='All quality flags'; v.redraw();
 if ~isempty(v.Review.Issues)
     v.Review.List.Value=1; v.Review.choose(); assert(w.Frame.Value==v.Review.Issues(1,1));

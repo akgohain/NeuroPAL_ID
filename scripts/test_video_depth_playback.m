@@ -5,12 +5,12 @@ saved=struct('frame',w.Frame.Value,'z',w.Slice.Value,'follow',v.Follow.Value, ..
     'loop',p.Loop.Value,'rate',p.Rate.Value,'tab',w.App.TabGroup.SelectedTab);
 cleanup=onCleanup(@() restore(w,saved));
 w.App.TabGroup.SelectedTab=w.App.VideoTrackingTab;
-p.stop(); p.Loop.Value=false; p.Rate.Value=5; p.rateChanged(); v.navigate(687);
+p.stop(); p.Loop.Value=false; p.Rate.Value='5'; p.rateChanged(); v.navigate(687);
 p.toggle();
 v.Follow.Value=true; v.previewRequest(8);
 assert(p.Playing && w.Slice.Value==8 && ~v.Follow.Value, ...
     sprintf('Playing=%d, Z=%g, Follow=%d, Status=%s',p.Playing,w.Slice.Value,v.Follow.Value,w.Status.Text));
-p.tick(); assert(p.Playing && w.Slice.Value==8 && v.SliceValue.Value==8);
+v.Preview.flush(); p.tick(); assert(p.Playing && w.Slice.Value==8 && v.SliceValue.Value==8);
 v.finishSlice(w.Slice,struct('Value',17));
 assert(p.Playing && w.Slice.Value==17 && v.SliceValue.Value==17);
 p.tick(); assert(p.Playing && w.Slice.Value==17 && v.SliceValue.Value==17);
