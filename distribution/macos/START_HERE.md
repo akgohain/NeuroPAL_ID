@@ -35,7 +35,10 @@ This is MATLAB source software, not a standalone MATLAB Runtime application.
    distinct RGBW assignments, including W even when its display is unchecked.
 4. Inspect and edit the centers. For automatic identities, choose **GAT** and
    **Run auto-ID**. Confirm or correct those suggestions manually.
-5. Use **Save: IDs** to save the companion annotation file beside the image.
+5. Detection and manual edits save automatically to the companion `_ID.mat`
+   file beside the image; keep both files together. **Save: IDs** exports a
+   separate CSV containing identities, positions and colors. To export the
+   current results, choose **No** when asked whether to rerun Auto-ID.
    Manual identification also works without running either model.
 
 The app includes the App Designer method repair and the keyboard/slider fix.

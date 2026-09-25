@@ -109,7 +109,7 @@ classdef TransformerAutoId
             [~, checkpoint_path] = Wrapper.resolveTransformerAssets();
         end
 
-        function applyPredictions(app, predictions)
+        function match_stats = applyPredictions(app, predictions)
             if isempty(app.image_neurons) || app.image_neurons.num_neurons() < 1
                 error('Methods:TransformerAutoId:NoNeurons', ...
                     'Run auto-detection before transformer auto-ID.');
@@ -193,6 +193,10 @@ classdef TransformerAutoId
                         app.image_neurons.neurons(matched_neuron_indices(order(rank_i))).rank = rank_i;
                     end
                 end
+                % Count assigned identities separately from matched input rows.
+                match_stats.assigned_neurons = numel(unique(matched_neuron_indices));
+                match_stats.unassigned_neurons = n - match_stats.assigned_neurons;
+                match_stats.failed_predictions = sum(strcmpi(string(predictions.predicted_class), 'FAILED'));
                 Methods.TransformerAutoId.storeMatchStats(app, match_stats);
             catch ME
                 Methods.TransformerAutoId.restoreModelIDs(app.image_neurons, snapshot);
