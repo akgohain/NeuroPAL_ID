@@ -19,10 +19,7 @@ end
 job = Program.HeavyJob.acquire('runSpotiflowCentroids', options.JobToken);
 job_cleanup = onCleanup(@() delete(job));
 
-readiness = Methods.MethodBundle.inspect('spotiflow_supervised', options.BundlePath);
-if ~readiness.ready
-    error('Wrapper:SpotiflowBundleUnavailable', '%s', readiness.summary);
-end
+readiness = Methods.ModelSetup.bundle('spotiflow_supervised', options.BundlePath);
 checkpoint_path = Methods.MethodBundle.artifact(readiness, 'checkpoint');
 model_manifest_path = Methods.MethodBundle.artifact(readiness, 'model_manifest');
 config = readiness.manifest.configuration;

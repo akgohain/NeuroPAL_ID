@@ -184,7 +184,7 @@ classdef ReferenceWorkflow < handle
             catch ME
                 obj.Status.Text = ME.message;
                 if ~contains(ME.identifier,'Cancelled')
-                    uialert(obj.App.CELL_ID,ME.message,'Reference workflow');
+                    uialert(obj.App.CELL_ID,Program.GUIHandling.method_error_message(ME),'Reference workflow');
                 end
             end
         end

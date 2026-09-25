@@ -1390,6 +1390,7 @@ classdef GUIHandling
                     return
                 end
 
+                Methods.ModelSetup.detection(backend);
                 Program.GUIHandling.invoke_gui_callback(callback, src, event);
             catch ME
                 Program.GUIHandling.log_gui_callback_error(app, 'Auto-detect', ME);
@@ -1407,6 +1408,8 @@ classdef GUIHandling
                 return
             end
 
+            params = Program.GUIHandling.main_method_params(app, 'detect');
+            Methods.ModelSetup.detection(backend, params);
             previous_neurons = app.image_neurons;
             previous_params = app.mp_params;
             body = app.BodyDropDown.Value;
@@ -1956,7 +1959,7 @@ classdef GUIHandling
             switch char(string(ME.identifier))
                 case 'Wrapper:MissingCellposeModel'
                     message = sprintf(['Cellpose model weights are not configured.\n\n%s\n\n' ...
-                        'For now, use YOLO for detection or set a local Cellpose model path in the method settings.'], ...
+                        'Open detection Settings and select a local Cellpose weights file.'], ...
                         ME.message);
                 case 'Wrapper:CellposeUnavailable'
                     message = sprintf(['Cellpose could not start cleanly.\n\n%s\n\n' ...
@@ -1964,20 +1967,36 @@ classdef GUIHandling
                         ME.message);
                 case 'Wrapper:MissingYoloWeights'
                     message = sprintf(['YOLO model weights are missing.\n\n%s\n\n' ...
-                        'Expected a local best.pt weights file.'], ME.message);
+                        'Open detection Settings and select the YOLO best.pt weights file.'], ME.message);
                 case 'Wrapper:YoloUnavailable'
                     message = sprintf(['YOLO could not start cleanly.\n\n%s\n\n' ...
                         'Check NEUROPAL_YOLO_PYTHON and the YOLO weights path.'], ME.message);
                 case {'Wrapper:MissingTransformerCheckpoint', 'Wrapper:MissingTransformerWeights'}
-                    message = sprintf(['Transformer checkpoint weights are missing.\n\n%s\n\n' ...
-                        'Choose a checkpoint directory containing best_model.pt before running Transformer auto-ID.'], ...
+                    message = sprintf(['GAT model weights are missing or unreadable.\n\n%s\n\n' ...
+                        'Open auto-ID Settings and select a checkpoint folder containing best_model.pt and train_config.json.'], ...
                         ME.message);
+                case {'Wrapper:MissingTransformerConfig', 'Wrapper:InvalidTransformerConfig'}
+                    message = sprintf(['GAT training configuration is missing or invalid.\n\n%s\n\n' ...
+                        'Select the complete checkpoint folder in auto-ID Settings. Use the train_config.json supplied with those weights.'], ME.message);
+                case {'Wrapper:MissingTransformerRepo', 'Wrapper:MissingTransformerVolumeScript'}
+                    message = sprintf(['GAT inference code is missing.\n\n%s\n\n' ...
+                        'Install GAT-NeuroPAL beside NeuroPAL_ID or set NEUROPAL_GAT_REPO to its folder.'], ME.message);
                 case 'Wrapper:TransformerUnavailable'
                     message = sprintf(['Transformer auto-ID could not start cleanly.\n\n%s\n\n' ...
                         'Check NEUROPAL_TRANSFORMER_PYTHON and the checkpoint path.'], ME.message);
                 case 'Wrapper:SpotiflowBundleUnavailable'
                     message = sprintf(['Spotiflow is wired but its model bundle is incomplete.\n\n%s\n\n' ...
                         'Open detection Settings and select a folder containing method_bundle.json and the checkpoint.'], ME.message);
+                case 'Wrapper:MoEBundleUnavailable'
+                    message = sprintf(['MoE model bundle is missing or incomplete.\n\n%s\n\n' ...
+                        'Set NEUROPAL_DETECTION_MOE_BUNDLE to the complete bundle folder containing method_bundle.json and all trained components. ' ...
+                        'For NeuroPAL ID, you can also select it in detection Settings.'], ME.message);
+                case 'Wrapper:MoEPythonUnavailable'
+                    message = sprintf(['MoE Python environment is not configured.\n\n%s\n\n' ...
+                        'Set NEUROPAL_MOE_PYTHON to the MoE Python interpreter, or select it in NeuroPAL ID detection Settings.'], ME.message);
+                case {'Methods:NNDetect:MissingModel', 'Methods:NNDetect:InvalidModel'}
+                    message = sprintf(['Neural-network detection weights are missing or invalid.\n\n%s\n\n' ...
+                        'Restore NN_model.mat from the NeuroPAL software distribution and add its folder to the MATLAB path, or choose Matching Pursuit.'], ME.message);
                 case 'Wrapper:SpotiflowUnavailable'
                     message = sprintf(['Spotiflow could not start.\n\n%s\n\n' ...
                         'Set NEUROPAL_SPOTIFLOW_PYTHON to the packaged Spotiflow environment.'], ME.message);
@@ -1989,10 +2008,7 @@ classdef GUIHandling
                     message = sprintf(['CRF Cell-ID 2.0 is wired but its bundle is incomplete.\n\n%s\n\n' ...
                         'Open auto-ID Settings and select the completed CRF-ID 2.0 bundle.'], ME.message);
                 otherwise
-                    report = getReport(ME, 'basic', 'hyperlinks', 'off');
-                    if ~isempty(report)
-                        message = report;
-                    end
+                    message = char(string(ME.message));
             end
         end
 

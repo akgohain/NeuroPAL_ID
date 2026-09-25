@@ -20,7 +20,19 @@ classdef NNDetect < handle
             %       obj : an instance of this class
             
             % Load Neural Net Model.
-            NN = load(Methods.NNDetect.NN_model);
+            model_path = Methods.ModelSetup.neuralNetwork();
+            try
+                variables = whos('-file', model_path);
+                if ~all(ismember({'version', 'model'}, {variables.name}))
+                    error('Methods:NNDetect:InvalidModel', 'Expected version and model variables.');
+                end
+                NN = load(model_path, 'version', 'model');
+                if ~all(isfield(NN, {'version', 'model'})) || isempty(NN.model)
+                    error('Methods:NNDetect:InvalidModel', 'Expected version and model variables.');
+                end
+            catch ME
+                error('Methods:NNDetect:InvalidModel', 'Cannot load %s: %s', model_path, ME.message);
+            end
             obj.model_version = NN.version;
             obj.model = NN.model;
         end
@@ -74,8 +86,9 @@ classdef NNDetect < handle
             import Methods.NNDetect;
             
             % Detect the neurons.
+            detector = NNDetect.instance();
             data_p = NNDetect.pad_to_shape(data, NNDetect.pst_shape);
-            pred_p = NNDetect.instance().predict_nn(data_p,size(data), titlestr);
+            pred_p = detector.predict_nn(data_p,size(data), titlestr);
             
             % Do we have any neuron predictions?
             if isempty(pred_p)

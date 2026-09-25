@@ -22,10 +22,7 @@ job_cleanup = onCleanup(@() delete(job));
 if ~isfinite(options.TimeoutSeconds) || options.TimeoutSeconds <= 0
     error('Wrapper:MoEInvalidTimeout', 'TimeoutSeconds must be finite and positive.');
 end
-readiness = Methods.MethodBundle.inspect('detection_moe', options.BundlePath);
-if ~readiness.ready
-    error('Wrapper:MoEBundleUnavailable', '%s', readiness.summary);
-end
+readiness = Methods.ModelSetup.bundle('detection_moe', options.BundlePath);
 if ~any(options.InputMode == ["rgbw", "single_channel"])
     error('Wrapper:MoEInvalidMode', 'Choose rgbw or single_channel.');
 end

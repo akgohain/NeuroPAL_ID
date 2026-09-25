@@ -37,6 +37,13 @@ if isempty(positions_yxz)
     error('Wrapper:TransformerNoCentroids', 'Cannot run transformer auto-ID before neurons are detected.');
 end
 
+[repo_dir, checkpoint_path] = Methods.ModelSetup.transformer(options.RepoDir, options.CheckpointPath);
+script_path = fullfile(repo_dir, 'run_app_volume_inference.py');
+python_executable = local_pick_python(char(options.PythonExecutable));
+if isempty(python_executable)
+    error('Wrapper:NoPython', 'Could not resolve Python. Set NEUROPAL_TRANSFORMER_PYTHON or pass PythonExecutable.');
+end
+
 output_dir = char(options.OutputDir);
 if isempty(strtrim(output_dir))
     output_dir = tempname;
@@ -56,24 +63,6 @@ request.scale_um_xyz = scale_um_xyz(:)';
 request.labels = cellstr(string(options.Labels(:)));
 request.animal_id = 'neuropal_app_volume';
 save(request_path, '-struct', 'request', '-v7');
-
-python_executable = local_pick_python(char(options.PythonExecutable));
-if isempty(python_executable)
-    error('Wrapper:NoPython', 'Could not resolve Python. Set NEUROPAL_TRANSFORMER_PYTHON or pass PythonExecutable.');
-end
-
-[repo_dir, checkpoint_path] = Wrapper.resolveTransformerAssets( ...
-    options.RepoDir, options.CheckpointPath);
-script_path = fullfile(repo_dir, 'run_app_volume_inference.py');
-if exist(script_path, 'file') ~= 2
-    error('Wrapper:MissingTransformerVolumeScript', 'run_app_volume_inference.py not found: %s', script_path);
-end
-if exist(checkpoint_path, 'file') ~= 2 && exist(checkpoint_path, 'dir') ~= 7
-    error('Wrapper:MissingTransformerCheckpoint', ...
-        ['Transformer checkpoint path not found: %s\n\n' ...
-         'Set the transformer checkpoint path to a run directory containing best_model.pt, ' ...
-         'Set NEUROPAL_GAT_CHECKPOINT or choose the checkpoint in method settings.'], checkpoint_path);
-end
 
 command_parts = { ...
     python_executable, script_path, ...
@@ -189,8 +178,7 @@ end
 function message = local_transformer_failure_message(output, checkpoint_path)
 message = '';
 output_text = lower(char(string(output)));
-if contains(output_text, 'no module named') || contains(output_text, 'modulenotfounderror') || ...
-        contains(output_text, 'torch') || contains(output_text, 'pynwb')
+if contains(output_text, 'no module named') || contains(output_text, 'modulenotfounderror')
     message = ['Transformer dependencies are not available in the selected Python environment. ' ...
         'Set NEUROPAL_TRANSFORMER_PYTHON to the GAT environment or install its requirements.'];
     return

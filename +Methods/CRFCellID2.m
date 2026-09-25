@@ -9,6 +9,7 @@ classdef CRFCellID2
                 options.OutputDir (1,1) string = ""
                 options.KeepArtifacts (1,1) logical = false
             end
+            Methods.ModelSetup.bundle('crf_cellid_2', options.BundlePath);
             job = Program.HeavyJob.acquire('CRF auto-ID');
             job_cleanup = onCleanup(@() delete(job));
             input_context = Program.Helpers.main_job_context(app, true);

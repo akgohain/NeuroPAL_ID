@@ -51,27 +51,16 @@ end
 wrapper_dir = fileparts(mfilename('fullpath'));
 repo_root = fileparts(wrapper_dir);
 
+model_path = '';
+if ~strcmp(mode, "stub")
+    model_path = Methods.ModelSetup.cellpose(options.ModelPath);
+end
+
 python_executable = local_pick_python(repo_root, char(options.PythonExecutable));
 if isempty(python_executable)
     error('Wrapper:NoPython', ...
         ['Could not resolve a Python interpreter. Set NEUROPAL_CELLPOSE_PYTHON, ' ...
          'pass the PythonExecutable option, or install Cellpose into ./venv.']);
-end
-
-model_path = local_pick_model(repo_root, char(options.ModelPath));
-if ~strcmp(mode, "stub") && isempty(model_path)
-    error('Wrapper:MissingCellposeModel', ...
-        ['Cellpose model weights were not found. Set NEUROPAL_CELLPOSE_MODEL, ' ...
-         'enter a Cellpose model path in the method settings, or switch the mode to stub. ' ...
-         'Checked the built-in app model path and ~/Downloads/cellpose_000715.']);
-end
-if ~strcmp(mode, "stub") && local_is_builtin_cellpose_model(model_path) && ...
-        ~local_env_truthy('NEUROPAL_CELLPOSE_ALLOW_DOWNLOAD')
-    error('Wrapper:MissingCellposeModel', ...
-        ['Cellpose model "%s" is a download-backed model name, not a local weights file. ' ...
-         'Set NEUROPAL_CELLPOSE_MODEL or the GUI model path to a local model file. ' ...
-         'If you intentionally want Cellpose to download/use a built-in model, set ' ...
-         'NEUROPAL_CELLPOSE_ALLOW_DOWNLOAD=1 before launching MATLAB.'], model_path);
 end
 
 local_progress(progress_fcn, 'Writing Cellpose request volume...');
@@ -181,15 +170,6 @@ catch
 end
 end
 
-function tf = local_is_builtin_cellpose_model(model_path)
-tf = any(strcmpi(char(string(model_path)), {'cpsam', 'cyto', 'cyto2', 'nuclei'}));
-end
-
-function tf = local_env_truthy(name)
-value = lower(strtrim(getenv(name)));
-tf = any(strcmp(value, {'1', 'true', 'yes', 'on'}));
-end
-
 function local_emit_progress_lines(progress_fcn, output)
 if isempty(progress_fcn) || ~isa(progress_fcn, 'function_handle') || isempty(output)
     return
@@ -237,29 +217,6 @@ for i = 1:numel(candidate_paths)
     resolved = local_realpath_interpreter(candidate_paths{i});
     if ~isempty(resolved)
         path_value = resolved;
-        return;
-    end
-end
-end
-
-function model_path = local_pick_model(repo_root, model_candidate)
-model_path = strtrim(char(string(model_candidate)));
-if isempty(model_path)
-    model_path = strtrim(getenv('NEUROPAL_CELLPOSE_MODEL'));
-end
-if any(strcmpi(model_path, {'cpsam', 'cyto', 'cyto2', 'nuclei'}))
-    return
-end
-candidate_paths = {
-    model_path
-    fullfile(repo_root, '+CellPose', 'models', 'cellpose_000715')
-    fullfile(getenv('HOME'), 'Downloads', 'cellpose_000715')
-    };
-model_path = '';
-for i = 1:numel(candidate_paths)
-    candidate = local_realpath(candidate_paths{i});
-    if ~isempty(candidate) && exist(candidate, 'file') == 2
-        model_path = candidate;
         return;
     end
 end

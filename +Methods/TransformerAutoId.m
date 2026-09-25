@@ -19,14 +19,15 @@ classdef TransformerAutoId
                 options.CheckpointPath (1,1) string = ""
             end
 
+            script_name = 'run_app_volume_inference.py';
+            if strlength(options.NWBPath) > 0, script_name = 'run_inference.py'; end
+            [~, checkpoint_path] = Methods.ModelSetup.transformer("", options.CheckpointPath, script_name);
             job = Program.HeavyJob.acquire('Transformer auto-ID');
             job_cleanup = onCleanup(@() delete(job));
             input_context = Program.Helpers.main_job_context(app, true);
             progress = Methods.TransformerAutoId.openProgressDialog(app);
             if ~isempty(progress), progress.Cancelable = 'on'; end
             cleanup = onCleanup(@() Methods.TransformerAutoId.closeProgressDialog(progress));
-            [~, checkpoint_path] = Wrapper.resolveTransformerAssets("", options.CheckpointPath);
-
             nwb_path = Methods.TransformerAutoId.resolveNWBPath(app, options.NWBPath);
             if strlength(nwb_path) > 0
                 Methods.TransformerAutoId.updateProgress(progress, ...

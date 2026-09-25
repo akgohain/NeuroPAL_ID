@@ -29,19 +29,9 @@ if exist(nwb_path, 'file') ~= 2
     error('Wrapper:MissingNWB', 'NWB file not found: %s', nwb_path);
 end
 local_progress(options.ProgressFcn, 'Checking transformer files...');
-[repo_dir, checkpoint_path] = Wrapper.resolveTransformerAssets( ...
-    options.RepoDir, options.CheckpointPath);
+[repo_dir, checkpoint_path] = Methods.ModelSetup.transformer( ...
+    options.RepoDir, options.CheckpointPath, 'run_inference.py');
 script_path = fullfile(repo_dir, 'run_inference.py');
-if exist(script_path, 'file') ~= 2
-    error('Wrapper:MissingTransformerRepo', 'run_inference.py not found: %s', script_path);
-end
-if exist(checkpoint_path, 'file') ~= 2 && exist(checkpoint_path, 'dir') ~= 7
-    error('Wrapper:MissingTransformerCheckpoint', ...
-        ['Transformer checkpoint path not found: %s\n\n' ...
-         'Set the transformer checkpoint path to a run directory containing best_model.pt, ' ...
-         'Set NEUROPAL_GAT_CHECKPOINT or choose the checkpoint in method settings.'], checkpoint_path);
-end
-local_validate_checkpoint(checkpoint_path);
 
 python_executable = local_pick_python(char(options.PythonExecutable));
 if isempty(python_executable)
@@ -106,28 +96,10 @@ predictions = readtable(csv_path, 'TextType', 'string');
 local_progress(options.ProgressFcn, sprintf('Transformer auto-ID finished: %d predictions.', height(predictions)));
 end
 
-function local_validate_checkpoint(checkpoint_path)
-if exist(checkpoint_path, 'file') == 2
-    return
-end
-expected_model = fullfile(checkpoint_path, 'best_model.pt');
-if exist(expected_model, 'file') == 2
-    return
-end
-candidates = dir(fullfile(checkpoint_path, '*.pt'));
-if ~isempty(candidates)
-    return
-end
-error('Wrapper:MissingTransformerWeights', ...
-    ['Transformer checkpoint directory does not contain model weights: %s\n\n' ...
-     'Expected best_model.pt or another .pt checkpoint in that directory.'], checkpoint_path);
-end
-
 function message = local_transformer_failure_message(output, checkpoint_path)
 message = '';
 output_text = lower(char(string(output)));
-if contains(output_text, 'no module named') || contains(output_text, 'modulenotfounderror') || ...
-        contains(output_text, 'torch') || contains(output_text, 'pynwb')
+if contains(output_text, 'no module named') || contains(output_text, 'modulenotfounderror')
     message = ['Transformer dependencies are not available in the selected Python environment. ' ...
         'Set NEUROPAL_TRANSFORMER_PYTHON to the GAT environment or install its requirements.'];
     return

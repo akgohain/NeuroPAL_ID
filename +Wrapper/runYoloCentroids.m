@@ -45,14 +45,9 @@ end
 
 repo_root = fileparts(fileparts(mfilename('fullpath')));
 default_yolo_dir = fullfile(repo_root, 'External_Dependencies', 'yolo_inf2');
-default_weights_path = string(fullfile(default_yolo_dir, 'best.pt'));
 default_infer_script = string(fullfile(default_yolo_dir, 'infer_volume_slices_yolo.py'));
 default_fuse_script = string(fullfile(default_yolo_dir, 'mip_centroids_iou_color_fuse.py'));
 
-weights_option = options.WeightsPath;
-if strlength(weights_option) == 0
-    weights_option = default_weights_path;
-end
 infer_option = options.InferScript;
 if strlength(infer_option) == 0
     infer_option = default_infer_script;
@@ -62,14 +57,12 @@ if strlength(fuse_option) == 0
     fuse_option = default_fuse_script;
 end
 
+weights_path = Methods.ModelSetup.yolo(options.WeightsPath);
 python_executable = local_pick_python(char(options.PythonExecutable));
 if isempty(python_executable)
     error('Wrapper:NoPython', 'Could not resolve Python. Set NEUROPAL_YOLO_PYTHON or pass PythonExecutable.');
 end
 
-weights_path = local_existing_file(weights_option, 'YOLO weights', 'Wrapper:MissingYoloWeights', ...
-    ['YOLO weights were not found. Put best.pt at the configured path, ' ...
-     'set the YOLO weights path in method settings, or set the WeightsPath option.']);
 infer_script = local_existing_file(infer_option, 'YOLO inference script', 'Wrapper:MissingYoloScript', ...
     'YOLO inference script was not found. Check the neuroPAL-detection checkout path.');
 fuse_script = local_existing_file(fuse_option, 'YOLO fusion script', 'Wrapper:MissingYoloScript', ...

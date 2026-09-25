@@ -10,10 +10,7 @@ arguments
     options.KeepArtifacts (1,1) logical = false
 end
 
-readiness = Methods.MethodBundle.inspect('crf_cellid_2', options.BundlePath);
-if ~readiness.ready
-    error('Wrapper:CRFID2BundleUnavailable', '%s', readiness.summary);
-end
+readiness = Methods.ModelSetup.bundle('crf_cellid_2', options.BundlePath);
 scale = double(scale_um_xyz(:)');
 if size(positions_yxz, 2) < 3 || size(colors_rgbw, 1) ~= size(positions_yxz, 1) || ...
         size(colors_rgbw, 2) < 4 || any(~isfinite(positions_yxz(:, 1:3)), 'all') || ...
