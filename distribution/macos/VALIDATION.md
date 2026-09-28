@@ -14,3 +14,9 @@ the delivered archive. MATLAB toolbox availability remains a recipient requireme
 Missing Cellpose, standalone Spotiflow and CRF models have not been validated;
 no claim is made that those methods are installed. The root repository README
 is preserved.
+
+On the packaging machine, Atlas initialization passed, but the legacy neural
+network could not be instantiated because Deep Learning Toolbox is unavailable.
+Its checkpoint is shipped unchanged; its inference is not certified by this
+package build. Ultrack and Higher-Order Transformer remain backend contracts,
+not implemented tracking methods, and have no packaged runtime.

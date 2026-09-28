@@ -74,3 +74,7 @@ Once installed, detection and identification run locally.
 
 For a bug report, include `setup.log`, the installed `installation.json`,
 the app's error message, and the steps that triggered it.
+
+The legacy neural detector requires Deep Learning Toolbox; it was not available
+on the packaging machine, so that detector's inference was not revalidated.
+Ultrack and Higher-Order Transformer are unimplemented backend placeholders.

@@ -1,13 +1,60 @@
 {
-  "mp": {"status": "included", "assets": "MATLAB matching pursuit; no trained checkpoint"},
-  "nn": {"status": "included", "assets": "Data/Models/NN_model.mat", "requires": "MATLAB Deep Learning Toolbox"},
-  "yolo": {"status": "included", "assets": "External_Dependencies/yolo_inf2/best.pt", "runtime": "moe"},
-  "detection_moe": {"status": "included", "version": "fold00-v1", "runtime": "moe"},
-  "anshita_gat": {"status": "included", "version": "20260601-v1", "runtime": "gat"},
-  "legacy_atlas": {"status": "included", "assets": "Data/Models/atlas_*.mat"},
-  "zephir": {"status": "included", "version": "1.0.4", "runtime": "tracking", "note": "Fits the user's recording; no example tracking results shipped"},
-  "spotiflow_supervised": {"status": "missing_weights", "request": "MISSING_MODELS.md"},
-  "cellpose": {"status": "missing_weights", "request": "MISSING_MODELS.md"},
-  "crf_cellid_2": {"status": "missing_weights", "request": "MISSING_MODELS.md"},
-  "wormnd_atlas": {"status": "deferred", "note": "Not an enabled portable app method"}
+  "mp": {
+    "status": "included",
+    "assets": "MATLAB matching pursuit; no trained checkpoint"
+  },
+  "nn": {
+    "status": "included",
+    "assets": "Data/Models/NN_model.mat",
+    "requires": "MATLAB Deep Learning Toolbox"
+  },
+  "yolo": {
+    "status": "included",
+    "assets": "External_Dependencies/yolo_inf2/best.pt",
+    "runtime": "moe"
+  },
+  "detection_moe": {
+    "status": "included",
+    "version": "fold00-v1",
+    "runtime": "moe"
+  },
+  "anshita_gat": {
+    "status": "included",
+    "version": "20260601-v1",
+    "runtime": "gat"
+  },
+  "legacy_atlas": {
+    "status": "included",
+    "assets": "Data/Models/atlas_*.mat"
+  },
+  "zephir": {
+    "status": "included",
+    "version": "1.0.4",
+    "runtime": "tracking",
+    "note": "Fits the user's recording; no example tracking results shipped"
+  },
+  "spotiflow_supervised": {
+    "status": "missing_weights",
+    "request": "MISSING_MODELS.md"
+  },
+  "cellpose": {
+    "status": "missing_weights",
+    "request": "MISSING_MODELS.md"
+  },
+  "crf_cellid_2": {
+    "status": "missing_weights",
+    "request": "MISSING_MODELS.md"
+  },
+  "wormnd_atlas": {
+    "status": "deferred",
+    "note": "Not an enabled portable app method"
+  },
+  "ultrack": {
+    "status": "deferred",
+    "note": "Backend contract only; tracking worker and segmentation adapter are not implemented"
+  },
+  "hoct": {
+    "status": "deferred",
+    "note": "Backend contract only; worker, segmentation adapter and weights are not implemented"
+  }
 }
