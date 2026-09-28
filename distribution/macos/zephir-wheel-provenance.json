@@ -2,5 +2,5 @@
   "upstream_url": "https://files.pythonhosted.org/packages/0b/17/35f5b3d111119aec984c3be7b567c5b1b2e1c229571ed5c7b940ef35a0ee/zephir-1.0.4-py3-none-any.whl",
   "upstream_sha256": "1a46cebdecca53a8aa26f978cfd4c507834fca34beed2dc248bb0b94ebf40740",
   "packaged_sha256": "9bcf1d4c80fbc00d6973dbd3357f866c4ab6177e014642677c18bc397c4a1d98",
-  "change": "Fix two malformed Requires-Dist lines and remove the unnecessary dataclasses backport for Python 3.11. Source code, bundled models and license unchanged. Tracking dependencies installed separately; web annotator dependencies omitted."
+  "change": "Fix two malformed Requires-Dist lines and remove the unnecessary dataclasses backport for Python 3.11. Source code, bundled models and license unchanged. Tracking dependencies installed separately; declared web dependencies are included to keep dependency validation complete."
 }
