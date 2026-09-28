@@ -2,7 +2,7 @@
 """Build a shareable Ev kit from committed app source and verified model ZIPs."""
 import argparse
 import hashlib
-import io
+import tempfile
 import json
 from pathlib import Path
 import shutil
@@ -39,7 +39,7 @@ def main():
     parser.add_argument('--seal-only', action='store_true', help='Update the completed kit after adding validation evidence')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
-    name = 'NeuroPAL-Ev-macOS-20260925'
+    name = 'NeuroPAL-Methods-macOS-20260928'
     kit = args.output / name
     if not args.seal_only:
         if subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], cwd=REPO):
@@ -57,21 +57,32 @@ def main():
             shutil.copy2(source, kit / source.name)
         for filename in ['Setup-Mac.command', 'Setup-with-Auto-ID.command', 'Start_NeuroPAL.m',
                          'setup_models.py', 'check_models.py', 'START_HERE.md', 'VALIDATION.md',
-                         'lock-macos-arm64-moe.txt', 'lock-macos-arm64-gat.txt']:
+                         'lock-macos-arm64-moe.txt', 'lock-macos-arm64-gat.txt',
+                         'lock-macos-arm64-tracking.txt', 'zephir-1.0.4-py3-none-any.whl',
+                         'zephir-wheel-provenance.json', 'METHODS.json', 'MISSING_MODELS.md']:
             shutil.copy2(HERE / filename, kit / filename)
         for path in kit.glob('*.command'):
             path.chmod(0o755)
-        payload = subprocess.check_output(['git', 'archive', '--format=zip', '--prefix=NeuroPAL_ID/', revision], cwd=REPO)
+        payload = tempfile.TemporaryFile()
+        subprocess.run(['git', 'archive', '--format=zip', '--prefix=NeuroPAL_ID/', revision], cwd=REPO, stdout=payload, check=True)
+        payload.seek(0)
         app_archive = kit / ('NeuroPAL_ID-' + revision[:12] + '.zip')
-        with zipfile.ZipFile(io.BytesIO(payload)) as source, zipfile.ZipFile(
+        with zipfile.ZipFile(payload) as source, zipfile.ZipFile(
                 app_archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=3) as archive:
             sums = []
             for info in source.infolist():
-                data = source.read(info.filename)
-                archive.writestr(info, data)
-                if not info.is_dir():
-                    sums.append(hashlib.sha256(data).hexdigest() + '  ' + info.filename.removeprefix('NeuroPAL_ID/') + '\n')
+                if info.is_dir():
+                    archive.writestr(info, b'')
+                    continue
+                checksum = hashlib.sha256()
+                with source.open(info) as reader, archive.open(info, 'w') as writer:
+                    for block in iter(lambda: reader.read(8 * 1024 * 1024), b''):
+                        checksum.update(block)
+                        writer.write(block)
+                sums.append(checksum.hexdigest() + '  ' + info.filename.removeprefix('NeuroPAL_ID/') + '\n')
             archive.writestr('NeuroPAL_ID/SHA256SUMS', ''.join(sums))
+        payload.close()
+        catalog['methods'] = json.loads((HERE / 'METHODS.json').read_text())
         catalog['app_archive'] = dict(file=app_archive.name, bytes=app_archive.stat().st_size, sha256=digest(app_archive))
         (kit / 'catalog.json').write_text(json.dumps(catalog, indent=2) + '\n')
     seal(kit, args.output / (name + '.zip'))

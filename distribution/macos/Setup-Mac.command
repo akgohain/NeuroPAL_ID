@@ -21,7 +21,7 @@ if [ "$(uname -m)" != arm64 ] || [ "$(sw_vers -productVersion | cut -d. -f1)" -l
 fi
 
 # Keep the setup tool and Python separate from the user's other installations.
-setup_root="${NEUROPAL_SETUP_ROOT:-$HOME/Library/Application Support/NeuroPAL_ID/Ev-20260925}"
+setup_root="${NEUROPAL_SETUP_ROOT:-$HOME/Library/Application Support/NeuroPAL_ID/Methods-20260928}"
 tool_dir="$setup_root/tools/uv-0.12.19"
 if [ ! -x "$tool_dir/uv" ]; then
     mkdir -p "$setup_root/tools"

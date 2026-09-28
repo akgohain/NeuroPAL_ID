@@ -1,15 +1,15 @@
-# NeuroPAL ID for Ev
+# NeuroPAL ID — versioned methods package
 
 For an Apple silicon Mac (M1 or newer), macOS 14+, with MATLAB installed.
 Tested with MATLAB R2024a. Setup needs an internet connection and at least
-8 GB free. The model weights are included; Python and its libraries are
+12 GB free. The model weights are included; Python and its libraries are
 downloaded during setup. No NVIDIA GPU or training is needed.
 
 ## Install
 
 1. Unzip the package and keep its files together.
-2. Double-click **Setup-with-Auto-ID.command** to install MoE detection and
-   GAT Auto-ID. For detection alone, use **Setup-Mac.command** instead.
+2. Double-click **Setup-Mac.command** to install detection, GAT Auto-ID and
+   the ZephIR tracking runtime. Setup-with-Auto-ID.command is an equivalent alias.
 3. Wait for **SETUP COMPLETE**. Then start a fresh MATLAB session, open
    **Start_NeuroPAL.m** from the extracted folder, and click **Run**.
 
@@ -23,7 +23,7 @@ If setup fails, keep `setup.log` from the extracted folder for your bug report.
 Running setup again resumes by reusing verified installed components.
 
 The app needs its usual MATLAB toolboxes: Image Processing, Statistics and
-Machine Learning, and Optimization. Parallel Computing is optional.
+Machine Learning, and Optimization. Deep Learning Toolbox is required for the legacy neural detector. Parallel Computing is optional.
 This is MATLAB source software, not a standalone MATLAB Runtime application.
 
 ## Identify an animal
@@ -50,17 +50,24 @@ The original repository README has not been changed.
 - **MoE:** the verified fold-00 bundle from source
   `2276e61dedf9671740c1a36fab7d6d976b86de37`. Final production model selection
   remains unresolved. This package preserves the current model and provenance.
-- **GAT:** optional checkpoint `20260601-v1` with matching source and configuration.
+- **GAT:** checkpoint `20260601-v1` with matching source and configuration.
 - **Standalone Spotiflow:** not included. It requires a different frozen
   checkpoint; select MoE to use the detector included in this package.
-- **ZephIR:** its Python runtime is not installed by this identification kit.
+- **YOLO:** the vendored YOLO INF 2 checkpoint and its inference scripts.
+- **Matching pursuit, neural network and Atlas:** the app’s existing MATLAB
+  implementations and model assets, pinned with the app source.
+- **ZephIR:** a separate CPU runtime, version 1.0.4.
+- **Cellpose and CRF:** trained assets are unavailable and are not included.
+  See `MISSING_MODELS.md` for the exact handoff needed.
+
+`METHODS.json` records every registered method, including unavailable ones.
 
 Installation and test details are in `VALIDATION.md`; exact versions and hashes
 are in `catalog.json` and `SHA256SUMS`. Passing the execution checks does not
 establish detection or identity accuracy on a new animal.
 
 Files install under
-`~/Library/Application Support/NeuroPAL_ID/Ev-20260925/`.
+`~/Library/Application Support/NeuroPAL_ID/Methods-20260928/`.
 Existing MATLAB/Python installations and older NeuroPAL setups stay separate.
 No recordings are included or uploaded. Setup downloads software only.
 Once installed, detection and identification run locally.

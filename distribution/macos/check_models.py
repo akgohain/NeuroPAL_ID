@@ -12,7 +12,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ.setdefault('MPLBACKEND', 'Agg')
 os.environ.setdefault('OMP_NUM_THREADS', '4')
 p = argparse.ArgumentParser(description=__doc__)
-p.add_argument('component', choices=['moe', 'gat'])
+p.add_argument('component', choices=['moe', 'gat', 'yolo', 'tracking'])
 p.add_argument('--bundle', type=Path)
 p.add_argument('--app', type=Path, required=True)
 a = p.parse_args()
@@ -50,6 +50,20 @@ if a.component == 'moe':
     assert preprocessed.shape == toy.shape and np.isfinite(preprocessed).all()
     print('PASS: fitted gate, routers, feature order, preprocessing', flush=True)
 
+elif a.component == 'yolo':
+    import numpy as np
+    from ultralytics import YOLO
+    model = YOLO(str(a.app / 'External_Dependencies/yolo_inf2/best.pt'))
+    result = model.predict(np.zeros((128, 128, 3), dtype=np.uint8), device='cpu', verbose=False)
+    assert len(result) == 1
+    print('PASS: standalone YOLO CPU forward pass', flush=True)
+elif a.component == 'tracking':
+    import reference_video
+    import main
+    import torch
+    from zephir.models.zephir import ZephIR
+    assert not torch.cuda.is_available()
+    print('PASS: video bridge and ZephIR CPU imports', flush=True)
 else:
     source = a.bundle / 'source/GAT-NeuroPAL'
     os.chdir(source)

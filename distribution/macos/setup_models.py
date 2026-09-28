@@ -14,7 +14,7 @@ import tempfile
 import zipfile
 
 HERE = Path(__file__).resolve().parent
-VERSION = 'ev-20260925'
+VERSION = 'methods-20260928'
 
 
 def digest(path):
@@ -108,6 +108,9 @@ def environment(name, root):
         raise RuntimeError('Run Setup-Mac.command to prepare the package installer.')
     spec = HERE / ('lock-macos-arm64-' + name + '.txt')
     revision = digest(spec)
+    wheel = HERE / 'zephir-1.0.4-py3-none-any.whl'
+    if name == 'tracking':
+        revision = hashlib.sha256((revision + digest(wheel)).encode()).hexdigest()
     folder = root / 'runtimes' / (name + '-' + revision[:12])
     python = folder / 'bin/python'
     marker = folder / 'neuropal-runtime.json'
@@ -117,6 +120,8 @@ def environment(name, root):
             shutil.rmtree(folder)
         run([uv, 'venv', '--managed-python', '--python', '3.11', folder])
         run([uv, 'pip', 'install', '--python', python, '-r', spec])
+        if name == 'tracking':
+            run([uv, 'pip', 'install', '--python', python, '--no-deps', wheel])
         marker.write_text(json.dumps({'requirements_sha256': revision}) + '\n')
     elif json.loads(marker.read_text())['requirements_sha256'] != revision:
         raise ValueError('The installed runtime does not match this package.')
@@ -165,10 +170,11 @@ def install(args):
         moe = unpack(moe_info, root / 'models' / ('moe-' + moe_info['version']))
         moe_python = environment('moe', root)
         run([moe_python, HERE / 'check_models.py', 'moe', '--bundle', moe, '--app', app])
+        run([moe_python, HERE / 'check_models.py', 'yolo', '--app', app])
         previous = root / 'installation.json'
         with_gat = args.with_gat or (previous.is_file() and json.loads(previous.read_text()).get('with_gat', False))
         config = {'NEUROPAL_DETECTION_MOE_BUNDLE': str(moe), 'NEUROPAL_MOE_PYTHON': str(moe_python),
-                  'CUDA_VISIBLE_DEVICES': '-1', 'NEUROPAL_TRANSFORMER_PYTHON': '',
+                  'NEUROPAL_YOLO_PYTHON': str(moe_python), 'CUDA_VISIBLE_DEVICES': '-1', 'NEUROPAL_TRANSFORMER_PYTHON': '',
                   'NEUROPAL_GAT_REPO': str(root / 'models/gat-not-installed'),
                   'NEUROPAL_GAT_CHECKPOINT': str(root / 'models/gat-not-installed')}
         if with_gat:
@@ -179,6 +185,10 @@ def install(args):
             config.update(NEUROPAL_TRANSFORMER_PYTHON=str(gat_python),
                           NEUROPAL_GAT_REPO=str(gat / 'source/GAT-NeuroPAL'),
                           NEUROPAL_GAT_CHECKPOINT=str(gat / 'models/gat'))
+
+        tracking_python = environment('tracking', root)
+        run([tracking_python, HERE / 'check_models.py', 'tracking', '--app', app])
+        config['NEUROPAL_VIDEO_PYTHON'] = str(tracking_python)
 
         # Register model paths only after the selected components pass their checks.
         run([moe_python, app / 'scripts/install_moe_bundle.py', moe, '--python', moe_python])
@@ -195,8 +205,8 @@ def install(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=Path.home() / 'Library/Application Support/NeuroPAL_ID/Ev-20260925')
-    parser.add_argument('--with-gat', action='store_true', help='Also install optional GAT Auto-ID')
+    parser.add_argument('--root', type=Path, default=Path.home() / 'Library/Application Support/NeuroPAL_ID/Methods-20260928')
+    parser.add_argument('--with-gat', action='store_true', default=True, help='Install GAT Auto-ID (included by default)')
     install(parser.parse_args())
 
 
