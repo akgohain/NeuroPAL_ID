@@ -17,11 +17,66 @@ end
 if isfolder(id_file) || strcmp(id_file, context.path)
     error('NeuroPAL:ProcessingSave', 'The neuron ID destination is not a valid file: %s', id_file);
 end
+expected_image = Annotations.Store.fingerprint(context.path);
+payload = struct();
+if isfile(id_file)
+    [payload, expected_id, issues] = Annotations.Store.loadValidated(id_file);
+    unsafe = ~strcmp({issues.code}, 'evidence-unavailable');
+    if any(unsafe)
+        error('Annotations:ReadOnly', 'Resolve the existing ID recovery issue before saving image changes: %s', ...
+            strjoin({issues(unsafe).message}, ' '));
+    end
+else
+    expected_id = Annotations.Store.fingerprint(id_file);
+    if isfile([id_file '.annotations.lineage.json']) || isfile([id_file '.processing.pending.json'])
+        error('Annotations:ReadOnly', 'ID recovery metadata exists without a usable ID file. Reconcile it before saving image changes.');
+    end
+end
+if ~isempty(snapshot) && isfield(snapshot, 'id_fingerprint') && strcmp(snapshot.id_file, id_file)
+    baseline = snapshot.id_fingerprint;
+    if baseline.exists ~= expected_id.exists || ~strcmp(baseline.sha256, expected_id.sha256) || ...
+            baseline.generation ~= expected_id.generation
+        error('Annotations:StaleSave', 'The original ID file changed after this processing session began. Reload or reconcile that save before publishing image changes.');
+    end
+end
+if ~isempty(snapshot) && isa(snapshot.neurons, 'Neurons.Image') && ...
+        isfield(snapshot.neurons.annotation_store, 'generation') && isfield(payload, 'annotation_store')
+    baseline = snapshot.neurons.annotation_store;
+    if baseline.generation ~= payload.annotation_store.generation || ...
+            ~strcmp(baseline.source_id, payload.annotation_store.source_id)
+        error('Annotations:StaleSave', 'The original identities changed after this processing preview began. Reload or reconcile that save before publishing the image changes.');
+    end
+end
+if ~isempty(app.image_neurons) && ~isempty(app.image_neurons.annotation_read_only_reason)
+    error('Annotations:ReadOnly', '%s', app.image_neurons.annotation_read_only_reason);
+end
+if isempty(app.image_neurons), app.image_neurons = Neurons.Image([]); end
+if isempty(fieldnames(app.image_neurons.annotation_store)) && isfield(payload, 'annotation_store')
+    app.image_neurons.annotation_store = payload.annotation_store;
+end
+store = Program.GUI.ManualIDService.ensure(app);
+geometry = Program.GUI.ManualIDService.digest(struct('positions', app.image_neurons.get_positions(), ...
+    'scale', app.image_um_scale));
+for i = 1:numel(app.image_neurons.neurons)
+    index = strcmp({store.owners.owner_id}, app.image_neurons.neurons(i).annotation_id);
+    if nnz(index) ~= 1
+        error('Annotations:Ownership', 'The processing preview has no stable annotation owner for a neuron. Reopen or reconcile its identity source.');
+    end
+    store.owners(index).geometry_revision = geometry;
+end
+store.context.geometry_revision = geometry;
+store.context.sex = app.worm.sex;
+payload.annotation_store = store;
+payload.neurons = Program.GUI.ManualIDService.copyImage(app.image_neurons);
+Program.GUI.ManualIDService.apply(payload.neurons, store);
+payload.version = Program.ProgramInfo.version;
+payload.mp_params = app.mp_params;
+payload.mp_params.k = numel(app.image_neurons.neurons);
 staging = tempname(folder); mkdir(staging);
-cleanup = onCleanup(@() cleanup_staging(staging));
+cleanup = onCleanup(@() Program.ProcessingSession.removeFolder(staging));
 image_temp = fullfile(staging, 'image.mat');
-id_temp = fullfile(staging, 'neurons.mat');
-copyfile(context.path, image_temp);
+[ok, message] = copyfile(context.path, image_temp);
+if ~ok, error('NeuroPAL:ProcessingSave', 'Cannot stage the image: %s', message); end
 prefs = app.image_prefs;
 info = app.image_info;
 info.scale = app.image_um_scale;
@@ -34,61 +89,14 @@ if ~isempty(app.image_data)
 else
     save(image_temp, 'prefs', 'info', '-append');
 end
-neurons = app.image_neurons;
-version = Program.ProgramInfo.version;
-mp_params = app.mp_params;
-if ~isempty(neurons), mp_params.k = numel(neurons.neurons); end
-save(id_temp, 'neurons', 'version', 'mp_params');
-
-% Retain the previous pair until both replacements have succeeded.
-image_backup = fullfile(staging, 'previous_image.mat');
-id_backup = fullfile(staging, 'previous_ID.mat');
-image_moved = false; id_moved = false; id_published = false;
-try
-    checked_move(context.path, image_backup); image_moved = true;
-    if isfile(id_file), checked_move(id_file, id_backup); id_moved = true; end
-    checked_move(image_temp, context.path);
-    checked_move(id_temp, id_file); id_published = true;
-catch ME
-    recovery_errors = {};
-    try
-        if image_moved, checked_move(image_backup, context.path); end
-    catch recovery
-        recovery_errors{end+1} = recovery.message;
-    end
-    try
-        if id_moved
-            checked_move(id_backup, id_file);
-        elseif id_published && isfile(id_file)
-            delete(id_file);
-        end
-    catch recovery
-        recovery_errors{end+1} = recovery.message;
-    end
-    if ~isempty(recovery_errors)
-        % Never delete the remaining backup if the filesystem also refuses recovery.
-        error('NeuroPAL:ProcessingRecovery', ...
-            'Save failed: %s. Recovery files remain in %s. %s', ...
-            ME.message, staging, strjoin(recovery_errors, ' '));
-    end
-    rethrow(ME);
-end
-if isfile(image_backup), delete(image_backup); end
-if isfile(id_backup), delete(id_backup); end
+[payload, fingerprint] = Annotations.IDWriters.publishPair(context.path, image_temp, ...
+    id_file, payload, expected_image, expected_id);
 app.id_file = id_file;
+Program.GUI.ManualIDService.apply(app.image_neurons, payload.annotation_store);
+setappdata(app.CELL_ID, 'manual_id_file_snapshot', struct('key', ...
+    Program.GUI.ManualIDService.fileKey(app), 'fingerprint', fingerprint));
 app.proc_image = matfile(context.path);
 if isappdata(app.CELL_ID, 'proc_runtime_dirty'), rmappdata(app.CELL_ID, 'proc_runtime_dirty'); end
 Program.GUIHandling.clear_processing_preview_cache(app);
 saved = true;
-end
-
-function cleanup_staging(folder)
-if ~isfile(fullfile(folder, 'previous_image.mat')) && ~isfile(fullfile(folder, 'previous_ID.mat'))
-    Program.ProcessingSession.removeFolder(folder);
-end
-end
-
-function checked_move(source, target)
-[ok, message] = movefile(source, target, 'f');
-if ~ok, error('NeuroPAL:ProcessingSave', '%s', message); end
 end

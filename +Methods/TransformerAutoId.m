@@ -24,7 +24,7 @@ classdef TransformerAutoId
             [~, checkpoint_path] = Methods.ModelSetup.transformer("", options.CheckpointPath, script_name);
             job = Program.HeavyJob.acquire('Transformer auto-ID');
             job_cleanup = onCleanup(@() delete(job));
-            input_context = Program.Helpers.main_job_context(app, true);
+            input_context = Program.Helpers.main_job_context(app, true, false);
             progress = Methods.TransformerAutoId.openProgressDialog(app);
             if ~isempty(progress), progress.Cancelable = 'on'; end
             cleanup = onCleanup(@() Methods.TransformerAutoId.closeProgressDialog(progress));
@@ -376,16 +376,7 @@ classdef TransformerAutoId
             try
                 n = app.image_neurons.num_neurons();
                 labels = strings(n, 1);
-                for i = 1:n
-                    neuron = app.image_neurons.neurons(i);
-                    label = "";
-                    if isprop(neuron, 'annotation') && ~isempty(neuron.annotation)
-                        label = string(neuron.annotation);
-                    elseif isprop(neuron, 'deterministic_id') && ~isempty(neuron.deterministic_id)
-                        label = string(neuron.deterministic_id);
-                    end
-                    labels(i) = label;
-                end
+                % Manual annotations are not implicit model inputs or ground truth.
             catch
                 labels = strings(0, 1);
             end

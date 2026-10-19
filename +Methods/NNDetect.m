@@ -138,11 +138,13 @@ classdef NNDetect < handle
         
         function BatchDetect(file, worm, num_neurons)
             %BATCHDETECT Batch detect neurons.
+            Annotations.IDWriters.guardBatch(file, 'Batch neural-network detection');
             
             % Setup the conversion progress bar.
             % Note: windows wants the interpreter off from the beginning.
             wait_title = 'Converting Image';
             wb = waitbar(0, 'Converting ...', 'Name', wait_title);
+            conversion_cleanup = onCleanup(@() delete(wb(isgraphics(wb))));
             wb.Children.Title.Interpreter = 'none';
             waitbar(0, wb, {file, 'Converting ...'}, 'Name', wait_title);
             
@@ -155,6 +157,7 @@ classdef NNDetect < handle
                 warning('Cannot read: "%s"', file);
                 return;
             end
+            expected = Annotations.IDWriters.legacySnapshot(id_file, 'Batch neural-network detection');
             
             % Done converting.
             try
@@ -199,7 +202,8 @@ classdef NNDetect < handle
             mp_params = mp;
             neurons = Neurons.Image(sp, worm.body, 'scale', info.scale');
             Methods.Utils.removeNearbyNeurons(neurons, 2, 2);
-            save(id_file, 'version', 'neurons', 'mp_params');
+            Annotations.IDWriters.publishLegacy(id_file, ...
+                struct('version', version, 'neurons', neurons, 'mp_params', mp_params), expected);
         end
         
         function [data_zscored,patches] = prepare_image(file)

@@ -12,7 +12,7 @@ classdef CRFCellID2
             Methods.ModelSetup.bundle('crf_cellid_2', options.BundlePath);
             job = Program.HeavyJob.acquire('CRF auto-ID');
             job_cleanup = onCleanup(@() delete(job));
-            input_context = Program.Helpers.main_job_context(app, true);
+            input_context = Program.Helpers.main_job_context(app, true, false);
             if isempty(app.image_neurons) || app.image_neurons.num_neurons() < 1
                 error('Methods:CRFCellID2:NoNeurons', ...
                     'Run auto-detection before CRF Cell-ID 2.0.');

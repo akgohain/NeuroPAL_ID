@@ -82,10 +82,12 @@ classdef CellposeDetect
 
         function BatchDetect(file, worm, ~)
             %BATCHDETECT Batch detect neurons using Cellpose.
+            Annotations.IDWriters.guardBatch(file, 'Batch Cellpose detection');
 
             % Setup the conversion progress bar.
             wait_title = 'Converting Image';
             wb = waitbar(0, 'Converting ...', 'Name', wait_title);
+            conversion_cleanup = onCleanup(@() delete(wb(isgraphics(wb))));
             wb.Children.Title.Interpreter = 'none';
             waitbar(0, wb, {file, 'Converting ...'}, 'Name', wait_title);
 
@@ -96,6 +98,7 @@ classdef CellposeDetect
                 warning('Cannot read: "%s"', file);
                 return;
             end
+            expected = Annotations.IDWriters.legacySnapshot(id_file, 'Batch Cellpose detection');
 
             try
                 close(wb);
@@ -115,7 +118,8 @@ classdef CellposeDetect
             mp_params = mp;
             neurons = Neurons.Image(sp, worm.body, 'scale', info.scale');
             Methods.Utils.removeNearbyNeurons(neurons, 2, 2);
-            save(id_file, 'version', 'neurons', 'mp_params');
+            Annotations.IDWriters.publishLegacy(id_file, ...
+                struct('version', version, 'neurons', neurons, 'mp_params', mp_params), expected);
         end
 
         function supervoxels = centroidsToSupervoxels(centroids, data)

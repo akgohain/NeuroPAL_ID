@@ -9,6 +9,7 @@ classdef ProcessingSession
             if ~strcmp(app.VolumeDropDown.Value, 'Colormap'), return; end
             folder = tempname; mkdir(folder);
             snapshot = struct('path', app.image_file, 'id_file', app.id_file, ...
+                'id_fingerprint', Annotations.Store.fingerprint(app.id_file), ...
                 'prefs', app.image_prefs, 'info', app.image_info, ...
                 'scale', app.image_um_scale, 'gamma', app.image_gamma, ...
                 'neurons', Program.ProcessingSession.copyNeurons(app.image_neurons), ...
@@ -36,6 +37,9 @@ classdef ProcessingSession
             if snapshot.pixels, return; end
             % Include IDs edited in the main tab since this image was opened.
             snapshot.neurons = Program.ProcessingSession.copyNeurons(app.image_neurons);
+            if ~strcmp(snapshot.id_file, app.id_file)
+                snapshot.id_fingerprint = Annotations.Store.fingerprint(app.id_file);
+            end
             snapshot.id_file = app.id_file;
             % Store the original pixels on disk rather than keeping another volume in RAM.
             if ~isempty(app.image_data)
@@ -122,18 +126,7 @@ classdef ProcessingSession
         function copy = copyNeurons(neurons)
             copy = [];
             if isempty(neurons), return; end
-            copy = Neurons.Image([], 'scale', neurons.scale);
-            copy.bodypart = neurons.bodypart;
-            copy.atlas_version = neurons.atlas_version;
-            if isa(neurons.meta_data, 'containers.Map') && neurons.meta_data.Count > 0
-                copy.meta_data = containers.Map(neurons.meta_data.keys, neurons.meta_data.values);
-            end
-            names = properties(Neurons.Neuron);
-            for i = 1:numel(neurons.neurons)
-                n = Neurons.Neuron;
-                for j = 1:numel(names), n.(names{j}) = neurons.neurons(i).(names{j}); end
-                copy.neurons(i) = n;
-            end
+            copy = Program.GUI.ManualIDService.copyImage(neurons);
         end
 
         function refreshColors(app)

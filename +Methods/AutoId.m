@@ -69,6 +69,7 @@ classdef AutoId < handle
         
         function BatchId(file, worm)
             % Batch ID neurons.
+            Annotations.IDWriters.guardBatch(file, 'Batch auto-ID');
             
             % Open the image file.
             try
@@ -79,17 +80,20 @@ classdef AutoId < handle
                 warning('Cannot read: "%s"', file);
                 return;
             end
+
+            expected = Annotations.IDWriters.legacySnapshot(id_file, 'Batch auto-ID');
             
             % Save the auto ID'd neurons.
             Methods.AutoId.instance().id(file, neurons, worm);
+            updates = struct('neurons', neurons);
             if isstruct(mp) && ~isempty(neurons)
                 mp_params = mp;
                 if isfield(neurons, 'neurons')
                     mp_params.k = length(neurons.neurons);
                 end
-                save(id_file, 'mp_params', '-append');
+                updates.mp_params = mp_params;
             end
-            save(id_file, 'neurons', '-append');
+            Annotations.IDWriters.publishLegacy(id_file, updates, expected);
         end
         
         %% Utility functions.
@@ -462,7 +466,7 @@ classdef AutoId < handle
             neurons = obj.atlas.(sex).(body).N;
             
             % neurons that are already annotated
-            annotations = im.get_annotations();
+            annotations = Annotations.constraints(im, 'crf', neurons);
             annotation_confidences = im.get_annotation_confidences();
             is_emphasized = im.get_is_emphasized();
             [annotations{annotation_confidences<=0.5 & is_emphasized}] = deal('');
@@ -773,7 +777,7 @@ classdef AutoId < handle
             end
             
             % find the already annotated neurons
-            annotations = im.get_annotations();
+            annotations = Annotations.constraints(im, 'crf', neurons);
             annotation_confidences = im.get_annotation_confidences();
             is_emphasized = im.get_is_emphasized();
             [annotations{annotation_confidences<=0.5 & is_emphasized}] = deal('');
