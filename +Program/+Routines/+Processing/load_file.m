@@ -59,6 +59,10 @@ function load_file(mode, path)
                     Program.HeavyJob.assertIdle(job.Token);
                     app.proc_image = source.reader;
                     prefs = source.metadata.prefs;
+                    % Processing can open legacy MAT files without the main loader.
+                    if ~isfield(prefs, 'z_center'), prefs.z_center = ceil(source.dims(3) / 2); end
+                    if ~isfield(prefs, 'is_Z_LR'), prefs.is_Z_LR = true; end
+                    if ~isfield(prefs, 'is_Z_flip'), prefs.is_Z_flip = true; end
                     % Old imports can refer to channels that are no longer present.
                     for field = {'RGBW', 'DIC', 'GFP'}
                         name = field{1};

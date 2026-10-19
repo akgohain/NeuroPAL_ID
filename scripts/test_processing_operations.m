@@ -2,8 +2,10 @@ function report = test_processing_operations(app, source, folder)
 % Exercise image-processing callbacks and compare saved pixels with each preview.
 assert(contains(folder, 'processing-format-audit'), 'Use a disposable processing fixture.');
 if ~isfolder(folder), mkdir(folder); end
-path = fullfile(folder, 'operation.mat');
+run_folder=fullfile(folder,['run-' char(java.util.UUID.randomUUID())]); mkdir(run_folder);
+path = fullfile(run_folder, 'baseline.mat');
 copyfile(source, path);
+Program.ProcessingSession.clear(app); app.flags=struct(); app.image_data=[];
 Program.Routines.Processing.load_file('image', path);
 original = app.image_data;
 assert(~isempty(original), 'Use a materialized fixture for this operation suite.');
@@ -12,9 +14,11 @@ assert(state.r.source_idx>0 && state.r.enabled, 'The imported image has no visib
 dims = size(original); dims(end+1:4) = 1;
 scale = app.image_um_scale;
 model = Neurons.Image([], 'scale', scale);
+names={'AVAL','AVAR'};
 for point = [max(1,round(dims(1:3)/2)); 1 1 1]'
     neuron = Neurons.Neuron;
-    neuron.position = point'; neuron.annotation = 'AVAL';
+    neuron.position = point'; neuron.annotation = names{numel(model.neurons)+1};
+    neuron.annotation_confidence=1;
     neuron.color_readout = zeros(1,4);
     model.neurons(end+1) = neuron;
 end
@@ -25,6 +29,8 @@ report = struct('source',source,'dims',dims,'class',class(original),'passed',{{}
 operations = {'hori','vert','mirrorz','cc','acc','rotate','crop','ds','zscore','window','debleed'};
 for i = 1:numel(operations)
     action = operations{i};
+    path=fullfile(run_folder,sprintf('%02d-%s.mat',i,action));
+    load_baseline(app,source,path,model);
     Program.Routines.Processing.reset();
     app.proc_rot_spinner.Value = 90;
     app.ProcXYFactorEditField.Value = 1;
@@ -90,12 +96,16 @@ for i = 1:numel(operations)
     preview = app.image_data;
     positions = app.image_neurons.get_positions();
     labels = app.image_neurons.get_annotations();
+    records=app.image_neurons.annotation_store.records;
+    evidence=app.image_neurons.annotation_store.evidence;
     assert(Program.Routines.Processing.save(),action);
     saved = load(app.image_file,'data','info');
-    ids = load(app.id_file,'neurons');
+    ids = load(app.id_file,'neurons','annotation_store');
     assert(isequal(saved.data,preview),['Save changed the preview for ' action]);
     assert(isequal(ids.neurons.get_positions(),positions));
     assert(isequal(ids.neurons.get_annotations(),labels));
+    assert(isequaln(ids.annotation_store.records,records));
+    assert(isequaln(ids.annotation_store.evidence,evidence));
     assert(isequal(saved.info.scale,app.image_um_scale));
     assert(~Program.ProcessingSession.dirty(app));
     assert(Program.Routines.Processing.save());
@@ -106,17 +116,11 @@ for i = 1:numel(operations)
     fid=fopen(fullfile(folder,'progress.json'),'w');
     fprintf(fid,'%s',jsonencode(report)); fclose(fid);
     fprintf('OPERATION_PASS %s %s\n',source,action);
-    % Restore the independent baseline for the next operation.
-    copyfile(source,path);
-    delete(app.id_file);
-    app.image_data=[];
-    Program.Routines.Processing.load_file('image',path);
-    app.image_neurons=Program.ProcessingSession.copyNeurons(model);
-    app.mp_params.k=2;
-    Program.ProcessingSession.capture(app);
 end
 
 % Display settings must not bake gamma or channel remapping into the pixels.
+path=fullfile(run_folder,'display.mat');
+load_baseline(app,source,path,model);
 app.tl_GammaEditField.Value = 0.6;
 Program.GUIHandling.handle_processing_gamma_changed(app);
 assert(isequal(app.image_data,original));
@@ -136,4 +140,15 @@ fid=fopen(fullfile(folder,'result.json'),'w');
 cleanup=onCleanup(@() fclose(fid));
 fprintf(fid,'%s',jsonencode(report));
 fprintf('PROCESSING_OPERATIONS=PASS %s\n',source);
+end
+
+function load_baseline(app,source,path,model)
+% Keep every operation's image, identities and recovery lineage independent.
+copyfile(source,path);
+Program.ProcessingSession.clear(app); app.flags=struct(); app.image_data=[];
+Program.Routines.Processing.load_file('image',path);
+app.image_neurons=Program.ProcessingSession.copyNeurons(model);
+app.mp_params.k=numel(model.neurons);
+Program.GUI.ManualIDService.ensure(app);
+Program.ProcessingSession.capture(app);
 end

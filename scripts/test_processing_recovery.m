@@ -7,19 +7,25 @@ original=load(source_path,'data');
 original_ids=load(app.id_file,'neurons');
 original_positions=reshape([original_ids.neurons.neurons.position],3,[])';
 
-% Fail after the new image was published, then verify the previous pair survived.
+% Reject a changed ID destination before publishing either half of the pair.
 broken=snapshot;
 broken.id_file=fullfile(tempname,'missing','ids.mat');
 setappdata(app.CELL_ID,'processing_session',broken);
 app.image_data(1)=app.image_data(1)+1;
 setappdata(app.CELL_ID,'proc_runtime_dirty',true);
+image_fingerprint=Annotations.Store.fingerprint(source_path);
+id_fingerprint=Annotations.Store.fingerprint(snapshot.id_file);
 failed=false;
 try
     Program.Helpers.write_processing_colormap_to_file(app);
 catch ME
-    failed=strcmp(ME.identifier,'NeuroPAL:ProcessingSave');
+    assert(strcmp(ME.identifier,'Annotations:StaleSave'),ME.message);
+    failed=true;
 end
 assert(failed);
+assert(isequaln(Annotations.Store.fingerprint(source_path),image_fingerprint));
+assert(isequaln(Annotations.Store.fingerprint(snapshot.id_file),id_fingerprint));
+assert(~isfile([broken.id_file '.processing.pending.json']));
 recovered=load(source_path,'data');
 assert(isequal(recovered.data,original.data));
 recovered_ids=load(snapshot.id_file,'neurons');
