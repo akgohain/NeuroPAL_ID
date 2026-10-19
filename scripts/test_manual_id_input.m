@@ -24,6 +24,39 @@ assert(~Program.Helpers.main_shortcut_allowed(app,ui.input));
 assert(~Program.Helpers.main_shortcut_allowed(app,ui.list));
 assert(~Program.Helpers.main_shortcut_allowed(app,app.UserIDButton));
 
+% Paste/accessibility edits may deliver only a final ValueChanged event.
+Program.GUI.ManualIDController.edited(app,'');
+state=Program.GUI.ManualIDController.state(app); original_count=numel(state.rows);
+owner=state.key; selected=app.selected_neuron; z=app.ZSlider.Value;
+assert(state.open && original_count>1);
+Program.GUI.ManualIDController.noteFocus(app,'actions',ui.all);
+focused=Program.GUI.ManualIDController.state(app);
+ui.input.Value='AVAL'; ui.input.ValueChangedFcn(ui.input,[]);
+state=Program.GUI.ManualIDController.state(app);
+expected=Program.GUI.ManualIDController.suggestions(app,'AVAL','',state.allNames);
+assert(strcmp(state.text,'AVAL') && state.open && strcmp(ui.panel.Visible,'on'));
+assert(isequaln(state.rows,expected) && numel(state.rows)<original_count);
+assert(any(strcmp({state.rows.token},'AVAL')) && ~any(strcmp({state.rows.token},'ADA')));
+assert(strcmp(state.focusRole,focused.focusRole) && state.focusAction==focused.focusAction);
+assert(strcmp(state.focusOwner,focused.focusOwner) && strcmp(state.key,owner));
+assert(app.selected_neuron==selected && app.ZSlider.Value==z);
+assert(isequaln(before,Annotations.Store.fingerprint(app.id_file)));
+
+% A late blur notification updates its draft but never reopens the popup.
+Program.GUI.ManualIDController.close(app);
+Program.GUI.ManualIDController.noteFocus(app,'assign');
+ui.input.Value='IL1L'; ui.input.ValueChangedFcn(ui.input,[]);
+state=Program.GUI.ManualIDController.state(app);
+assert(strcmp(state.text,'IL1L') && ~state.open && strcmp(ui.panel.Visible,'off'));
+assert(strcmp(state.focusRole,'assign') && strcmp(state.focusOwner,owner));
+assert(app.selected_neuron==selected && app.ZSlider.Value==z);
+assert(isequaln(before,Annotations.Store.fingerprint(app.id_file)));
+Program.GUI.ManualIDController.open(app);
+state=Program.GUI.ManualIDController.state(app);
+expected=Program.GUI.ManualIDController.suggestions(app,'IL1L','',state.allNames);
+assert(isequaln(state.rows,expected) && any(strcmp({state.rows.token},'IL1L')));
+Program.GUI.ManualIDController.noteFocus(app,'input');
+
 % Context changes refresh the catalog rather than preserving a filtered model list.
 app.SexDropDown.Value='XO'; app.worm.sex='XO';
 rows=Program.GUI.ManualIDController.suggestions(app,'CEM','',false);

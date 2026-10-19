@@ -130,7 +130,8 @@ classdef ManualIDController
             if show && ~retainFocus, Program.GUI.ManualIDController.noteFocus(app,'input'); end
             Program.GUI.ManualIDController.describe(app,state);
             if show && ~retainFocus, Program.GUI.ManualIDController.open(app);
-            elseif retainFocus && state.open, Program.GUI.ManualIDController.refresh(app); end
+            % Final native or pasted values can arrive without ValueChanging.
+            elseif state.open, Program.GUI.ManualIDController.refresh(app); end
         end
         function draft=capture(app)
             state=Program.GUI.ManualIDController.state(app);
