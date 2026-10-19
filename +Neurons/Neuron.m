@@ -17,6 +17,8 @@ classdef Neuron < handle
         outlier %whenever alignment information is available annotated neurons will be flagged as potential outliers
         
         % User neuron ID.
+        annotation_id = '' % stable owner of this neuron's annotation
+        annotation_record = struct(); % versioned human assertion, separate from model evidence
         annotation = '' % neuron user selected annotation
         is_annotation_on = nan; % is the neuron's annotation ON, OFF, or neither (empty)
         annotation_confidence = -1; % user confidence about annotation
@@ -66,6 +68,13 @@ classdef Neuron < handle
             end
             
             % User neuron ID.
+            if isfield(sp, 'annotation_id') && numel(sp.annotation_id) >= i
+                neuron.annotation_id = sp.annotation_id{i};
+            end
+            if isfield(sp, 'annotation_record') && numel(sp.annotation_record) >= i
+                if iscell(sp.annotation_record), neuron.annotation_record = sp.annotation_record{i};
+                else, neuron.annotation_record = sp.annotation_record(i); end
+            end
             if isfield(sp, 'annotation')
                 neuron.annotation = sp.annotation{i};
                 neuron.annotation_confidence = sp.annotation_confidence(i);
@@ -95,6 +104,41 @@ classdef Neuron < handle
     end
     
     methods
+        function value = has_reviewed_annotation(obj)
+            %HAS_REVIEWED_ANNOTATION Include explicitly reviewed ambiguity.
+            record = obj.annotation_record;
+            if isfield(record, 'review')
+                value = any(strcmp(record.review, {'reviewed', 'legacy-reviewed'})) && ...
+                    ~any(strcmp(record.kind, {'unassigned', 'legacy_issue'}));
+            else
+                value = ~isempty(obj.annotation);
+            end
+        end
+
+        function value = has_confirmed_annotation(obj)
+            %HAS_CONFIRMED_ANNOTATION Only a resolved claim occupies an ID.
+            if isfield(obj.annotation_record, 'kind')
+                value = Annotations.Store.confirmed(obj.annotation_record);
+            else
+                value = ~isempty(obj.annotation) && obj.annotation_confidence == 1;
+            end
+        end
+
+        function value = annotation_label(obj)
+            %ANNOTATION_LABEL Keep rendered uncertainty out of stored names.
+            if isfield(obj.annotation_record, 'kind')
+                value = Annotations.Store.display(obj.annotation_record);
+                return;
+            end
+            value = obj.annotation;
+            if isempty(value), return; end
+            if ~isnan(obj.is_annotation_on)
+                if obj.is_annotation_on, value = [value '-ON']; else, value = [value '-OFF']; end
+            end
+            if obj.annotation_confidence <= .5, value = [value '?']; end
+            if obj.is_emphasized, value = [value '!']; end
+        end
+
         function annotate(obj, name, confidence, is_on, atlas, varargin)
             
             % ANNOTATE annotate the neuron.
@@ -191,7 +235,7 @@ classdef Neuron < handle
                 color = Neurons.Neuron.SELECTED_COLOR;
                 
             % Neuron has a user ID.
-            elseif ~isempty(obj.annotation)
+            elseif ~isempty(obj.annotation) || obj.has_reviewed_annotation()
 
                 % Color the marker by confidence in the neuron's ID.
                 if obj.annotation_confidence == 1
@@ -200,6 +244,16 @@ classdef Neuron < handle
                     color = Neurons.Neuron.LOW_CONFIDENCE_COLOR;
                 elseif obj.annotation_confidence <= 0
                     color = Neurons.Neuron.NO_CONFIDENCE_COLOR;
+                end
+
+                % Unresolved membership is reviewed without asserting a side.
+                if isfield(obj.annotation_record, 'certainty') && ...
+                        any(strcmp(obj.annotation_record.kind, {'individual', 'unresolved_set'}))
+                    if strcmp(obj.annotation_record.certainty, 'confident')
+                        color = Neurons.Neuron.HIGH_CONFIDENCE_COLOR;
+                    else
+                        color = Neurons.Neuron.LOW_CONFIDENCE_COLOR;
+                    end
                 end
                 
                 % Emphasis coloring overrides confidence.

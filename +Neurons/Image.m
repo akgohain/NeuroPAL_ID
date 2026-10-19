@@ -8,6 +8,8 @@ classdef Image < handle
         meta_data % key, value pairs for intermediate analysis
         scale = ones(1,3); % (x,y,z) scale
         atlas_version = []; % the atlas version used to ID the neurons
+        annotation_store = struct(); % authoritative human annotations and their history
+        annotation_read_only_reason = ''; % recovery conflicts must be reconciled before editing
     end
 
     % Public methods.
@@ -41,6 +43,9 @@ classdef Image < handle
             % Get the atlas version.
             if isfield(superpixels, 'atlas_version')
                 obj.atlas_version = superpixels.atlas_version;
+            end
+            if isfield(superpixels, 'annotation_store')
+                obj.annotation_store = superpixels.annotation_store;
             end
             
             % Are there neurons?
@@ -240,7 +245,12 @@ classdef Image < handle
             
         function num = num_user_id_neurons(obj)
             %NUM_USER_ID_NEURONS the number of user ID'd neurons in the image
-            num = sum(arrayfun(@(x) ~isempty(x.annotation), obj.neurons));
+            num = sum(arrayfun(@(x) x.has_confirmed_annotation(), obj.neurons));
+        end
+
+        function num = num_reviewed_neurons(obj)
+            %NUM_REVIEWED_NEURONS Reviewed groups and hypotheses remain distinct from resolved IDs.
+            num = sum(arrayfun(@(x) x.has_reviewed_annotation(), obj.neurons));
         end
         
         function num = num_user_unid_neurons(obj)
@@ -386,7 +396,7 @@ classdef Image < handle
 
         function neurons = user_id_neurons(obj)
             %USER_ID_NEURONS get a list of the user ID neurons
-            id_neurons = arrayfun(@(x) ~isempty(x.annotation), obj.neurons);
+            id_neurons = arrayfun(@(x) x.has_confirmed_annotation(), obj.neurons);
             neurons = obj.neurons(id_neurons);
         end
 
@@ -406,7 +416,7 @@ classdef Image < handle
             
             % Find the neuron.
             for i = 1:length(obj.neurons)
-                if ~obj.neurons(i).is_emphasized && ...
+                if obj.neurons(i).has_confirmed_annotation() && ...
                         strcmp(name, obj.neurons(i).annotation)
                     neuron = obj.neurons(i);
                     return;
@@ -448,6 +458,11 @@ classdef Image < handle
                 return;
             end
             annotations = vertcat({obj.neurons.annotation})';
+        end
+
+        function labels = get_annotation_labels(obj)
+            %GET_ANNOTATION_LABELS Render human assertions without changing legacy fields.
+            labels = arrayfun(@(n) n.annotation_label(), obj.neurons, 'UniformOutput', false)';
         end
 
         function is_annotations_on = get_is_annotations_on(obj)
@@ -607,7 +622,7 @@ classdef Image < handle
             %NEAREST_UNANNOTATED find the nearest unannoted neuron
 
             % Find the unannotated neurons.
-            unIDd_i = find(arrayfun(@(x) isempty(x.annotation), obj.neurons));
+            unIDd_i = find(arrayfun(@(x) ~x.has_reviewed_annotation(), obj.neurons));
             unIDd_i = setdiff(unIDd_i, neuron_i);
             positions = round(vertcat(obj.neurons(unIDd_i).position));
 
@@ -637,7 +652,7 @@ classdef Image < handle
             
             % Find the unannotated neurons.
             position = round(obj.neurons(neuron_i).position);
-            unIDd_i = find(arrayfun(@(x) isempty(x.annotation), obj.neurons));
+            unIDd_i = find(arrayfun(@(x) ~x.has_reviewed_annotation(), obj.neurons));
             positions = round(vertcat(obj.neurons(unIDd_i).position));
             
             % No neurons found.
@@ -907,6 +922,9 @@ classdef Image < handle
             sp.annotation = obj.get_annotations();
             sp.is_annotation_on = obj.get_is_annotations_on();
             sp.annotation_confidence = obj.get_annotation_confidences();
+            sp.annotation_id = {obj.neurons.annotation_id}';
+            sp.annotation_record = {obj.neurons.annotation_record}';
+            sp.annotation_store = obj.annotation_store;
             % Neuron auto ID.
             sp.atlas_version = obj.atlas_version;
             sp.probabilistic_ids = obj.get_probabilistic_ids();

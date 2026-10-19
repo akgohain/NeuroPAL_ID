@@ -1,0 +1,9221 @@
+{
+  "version": "neuropal-individuals-20261015-v1",
+  "provenance": {
+    "individual_sources": {
+      "herm_data.mat": "b74df6d8d2b52997c220540bfc70ef76cf1b5bec779f72b7301712c4ccd72653",
+      "male_data.mat": "581fc2bb117c222b3dbd01d5860ff47139cc2a62a59f56ae28430ada315cb0d3"
+    },
+    "group_notes": "Hermaphrodite exact class membership. Shared male individuals retain curated group identity; male-only memberships are enumerated explicitly, correcting male MAT prefix-derived AS/CA labels. No runtime name suffix inference.",
+    "metadata_notes": "Anatomical descriptors are materialized catalog data. Region/stage unavailable in this version, represented as unknown. Numeric aliases explicitly enumerate supported zero-padded source names."
+  },
+  "individuals": [
+    {
+      "name": "ADAL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ADA",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ADAR"
+    },
+    {
+      "name": "ADAR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ADA",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ADAL"
+    },
+    {
+      "name": "ADEL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ADE",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ADER"
+    },
+    {
+      "name": "ADER",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ADE",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ADEL"
+    },
+    {
+      "name": "ADFL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ADF",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ADFR"
+    },
+    {
+      "name": "ADFR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ADF",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ADFL"
+    },
+    {
+      "name": "ADLL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ADL",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ADLR"
+    },
+    {
+      "name": "ADLR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ADL",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ADLL"
+    },
+    {
+      "name": "AFDL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AFD",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AFDR"
+    },
+    {
+      "name": "AFDR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AFD",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AFDL"
+    },
+    {
+      "name": "AIAL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIA",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AIAR"
+    },
+    {
+      "name": "AIAR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIA",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AIAL"
+    },
+    {
+      "name": "AIBL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIB",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AIBR"
+    },
+    {
+      "name": "AIBR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIB",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AIBL"
+    },
+    {
+      "name": "AIML",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIM",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AIMR"
+    },
+    {
+      "name": "AIMR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIM",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AIML"
+    },
+    {
+      "name": "AINL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIN",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AINR"
+    },
+    {
+      "name": "AINR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIN",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AINL"
+    },
+    {
+      "name": "AIYL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIY",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AIYR"
+    },
+    {
+      "name": "AIYR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIY",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AIYL"
+    },
+    {
+      "name": "AIZL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIZ",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AIZR"
+    },
+    {
+      "name": "AIZR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AIZ",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AIZL"
+    },
+    {
+      "name": "ALA",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ALA",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "ALML",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ALM",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ALMR"
+    },
+    {
+      "name": "ALMR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ALM",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ALML"
+    },
+    {
+      "name": "ALNL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ALN",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ALNR"
+    },
+    {
+      "name": "ALNR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ALN",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ALNL"
+    },
+    {
+      "name": "AQR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AQR",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AS1",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AS",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [
+        "AS01"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AS2",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AS",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [
+        "AS02"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AS3",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AS",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [
+        "AS03"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AS4",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AS",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [
+        "AS04"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AS5",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AS",
+      "description": "number 5",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 5,
+      "subtype": "",
+      "aliases": [
+        "AS05"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AS6",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AS",
+      "description": "number 6",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 6,
+      "subtype": "",
+      "aliases": [
+        "AS06"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AS7",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AS",
+      "description": "number 7",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 7,
+      "subtype": "",
+      "aliases": [
+        "AS07"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AS8",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AS",
+      "description": "number 8",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 8,
+      "subtype": "",
+      "aliases": [
+        "AS08"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AS9",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AS",
+      "description": "number 9",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 9,
+      "subtype": "",
+      "aliases": [
+        "AS09"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AS10",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AS",
+      "description": "number 10",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 10,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AS11",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AS",
+      "description": "number 11",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 11,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "ASEL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASE",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASER"
+    },
+    {
+      "name": "ASER",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASE",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASEL"
+    },
+    {
+      "name": "ASGL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASG",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASGR"
+    },
+    {
+      "name": "ASGR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASG",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASGL"
+    },
+    {
+      "name": "ASHL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASH",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASHR"
+    },
+    {
+      "name": "ASHR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASH",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASHL"
+    },
+    {
+      "name": "ASIL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASI",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASIR"
+    },
+    {
+      "name": "ASIR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASI",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASIL"
+    },
+    {
+      "name": "ASJL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASJ",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASJR"
+    },
+    {
+      "name": "ASJR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASJ",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASJL"
+    },
+    {
+      "name": "ASKL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASK",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASKR"
+    },
+    {
+      "name": "ASKR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "ASK",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "ASKL"
+    },
+    {
+      "name": "AUAL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AUA",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AUAR"
+    },
+    {
+      "name": "AUAR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AUA",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AUAL"
+    },
+    {
+      "name": "AVAL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVA",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVAR"
+    },
+    {
+      "name": "AVAR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVA",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVAL"
+    },
+    {
+      "name": "AVBL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVB",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVBR"
+    },
+    {
+      "name": "AVBR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVB",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVBL"
+    },
+    {
+      "name": "AVDL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVD",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVDR"
+    },
+    {
+      "name": "AVDR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVD",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVDL"
+    },
+    {
+      "name": "AVEL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVE",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVER"
+    },
+    {
+      "name": "AVER",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVE",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVEL"
+    },
+    {
+      "name": "AVFL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVF",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVFR"
+    },
+    {
+      "name": "AVFR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVF",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVFL"
+    },
+    {
+      "name": "AVG",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVG",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AVHL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVH",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVHR"
+    },
+    {
+      "name": "AVHR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVH",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVHL"
+    },
+    {
+      "name": "AVJL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVJ",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVJR"
+    },
+    {
+      "name": "AVJR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVJ",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVJL"
+    },
+    {
+      "name": "AVKL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVK",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVKR"
+    },
+    {
+      "name": "AVKR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVK",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AVKL"
+    },
+    {
+      "name": "AVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVL",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AVM",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AVM",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "AWAL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AWA",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AWAR"
+    },
+    {
+      "name": "AWAR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AWA",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AWAL"
+    },
+    {
+      "name": "AWBL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AWB",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AWBR"
+    },
+    {
+      "name": "AWBR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AWB",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AWBL"
+    },
+    {
+      "name": "AWCL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AWC",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": true,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AWCR"
+    },
+    {
+      "name": "AWCR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "AWC",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": true,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "AWCL"
+    },
+    {
+      "name": "BAGL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "BAG",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "BAGR"
+    },
+    {
+      "name": "BAGR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "BAG",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "BAGL"
+    },
+    {
+      "name": "BDUL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "BDU",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "BDUR"
+    },
+    {
+      "name": "BDUR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "BDU",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "BDUL"
+    },
+    {
+      "name": "CA1",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CA",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CA2",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CA",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CA3",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CA",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CA4",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CA",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CA5",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CA",
+      "description": "number 5",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 5,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CA6",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CA",
+      "description": "number 6",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 6,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CA7",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CA",
+      "description": "number 7",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 7,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CA8",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CA",
+      "description": "number 8",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 8,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CA9",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CA",
+      "description": "number 9",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 9,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CANL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "CAN",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "CANR"
+    },
+    {
+      "name": "CANR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "CAN",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "CANL"
+    },
+    {
+      "name": "CEMDL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CEM",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "CEMDR"
+    },
+    {
+      "name": "CEMDR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CEM",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "CEMDL"
+    },
+    {
+      "name": "CEMVL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CEM",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "CEMVR"
+    },
+    {
+      "name": "CEMVR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CEM",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "CEMVL"
+    },
+    {
+      "name": "CEPDL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "CEP",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "CEPDR"
+    },
+    {
+      "name": "CEPDR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "CEP",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "CEPDL"
+    },
+    {
+      "name": "CEPVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "CEP",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "CEPVR"
+    },
+    {
+      "name": "CEPVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "CEP",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "CEPVL"
+    },
+    {
+      "name": "CP0",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CP",
+      "description": "number 0",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 0,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CP1",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CP",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CP2",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CP",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CP3",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CP",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CP4",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CP",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CP5",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CP",
+      "description": "number 5",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 5,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CP6",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CP",
+      "description": "number 6",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 6,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CP7",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CP",
+      "description": "number 7",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 7,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CP8",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CP",
+      "description": "number 8",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 8,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "CP9",
+      "sexes": [
+        "XO"
+      ],
+      "group": "CP",
+      "description": "number 9",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 9,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DA1",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DA",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [
+        "DA01"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DA2",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DA",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [
+        "DA02"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DA3",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DA",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [
+        "DA03"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DA4",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DA",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [
+        "DA04"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DA5",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DA",
+      "description": "number 5",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 5,
+      "subtype": "",
+      "aliases": [
+        "DA05"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DA6",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DA",
+      "description": "number 6",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 6,
+      "subtype": "",
+      "aliases": [
+        "DA06"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DA7",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DA",
+      "description": "number 7",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 7,
+      "subtype": "",
+      "aliases": [
+        "DA07"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DA8",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DA",
+      "description": "number 8",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 8,
+      "subtype": "",
+      "aliases": [
+        "DA08"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DA9",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DA",
+      "description": "number 9",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 9,
+      "subtype": "",
+      "aliases": [
+        "DA09"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DB1",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DB",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [
+        "DB01"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DB2",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DB",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [
+        "DB02"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DB3",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DB",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [
+        "DB03"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DB4",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DB",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [
+        "DB04"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DB5",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DB",
+      "description": "number 5",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 5,
+      "subtype": "",
+      "aliases": [
+        "DB05"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DB6",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DB",
+      "description": "number 6",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 6,
+      "subtype": "",
+      "aliases": [
+        "DB06"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DB7",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DB",
+      "description": "number 7",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 7,
+      "subtype": "",
+      "aliases": [
+        "DB07"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DD1",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DD",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [
+        "DD01"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DD2",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DD",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [
+        "DD02"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DD3",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DD",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [
+        "DD03"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DD4",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DD",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [
+        "DD04"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DD5",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DD",
+      "description": "number 5",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 5,
+      "subtype": "",
+      "aliases": [
+        "DD05"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DD6",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DD",
+      "description": "number 6",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 6,
+      "subtype": "",
+      "aliases": [
+        "DD06"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DVA",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DVA",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DVB",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DVB",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DVC",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "DVC",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DVE",
+      "sexes": [
+        "XO"
+      ],
+      "group": "DVE",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DVF",
+      "sexes": [
+        "XO"
+      ],
+      "group": "DVF",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DX1",
+      "sexes": [
+        "XO"
+      ],
+      "group": "DX",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DX2",
+      "sexes": [
+        "XO"
+      ],
+      "group": "DX",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DX3",
+      "sexes": [
+        "XO"
+      ],
+      "group": "DX",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "DX4",
+      "sexes": [
+        "XO"
+      ],
+      "group": "DX",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "EF1",
+      "sexes": [
+        "XO"
+      ],
+      "group": "EF",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "EF2",
+      "sexes": [
+        "XO"
+      ],
+      "group": "EF",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "EF3",
+      "sexes": [
+        "XO"
+      ],
+      "group": "EF",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "EF4",
+      "sexes": [
+        "XO"
+      ],
+      "group": "EF",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "FLPL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "FLP",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "FLPR"
+    },
+    {
+      "name": "FLPR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "FLP",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "FLPL"
+    },
+    {
+      "name": "HOA",
+      "sexes": [
+        "XO"
+      ],
+      "group": "HOA",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "HOB",
+      "sexes": [
+        "XO"
+      ],
+      "group": "HOB",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "HSNL",
+      "sexes": [
+        "XX"
+      ],
+      "group": "HSN",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "HSNR"
+    },
+    {
+      "name": "HSNR",
+      "sexes": [
+        "XX"
+      ],
+      "group": "HSN",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "HSNL"
+    },
+    {
+      "name": "I1L",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "I1",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "I1R"
+    },
+    {
+      "name": "I1R",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "I1",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "I1L"
+    },
+    {
+      "name": "I2L",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "I2",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "I2R"
+    },
+    {
+      "name": "I2R",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "I2",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "I2L"
+    },
+    {
+      "name": "I3",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "I3",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "I4",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "I4",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "I5",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "I5",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "I6",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "I6",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "IL1DL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL1",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL1DR"
+    },
+    {
+      "name": "IL1DR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL1",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL1DL"
+    },
+    {
+      "name": "IL1L",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL1",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL1R"
+    },
+    {
+      "name": "IL1R",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL1",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL1L"
+    },
+    {
+      "name": "IL1VL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL1",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL1VR"
+    },
+    {
+      "name": "IL1VR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL1",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL1VL"
+    },
+    {
+      "name": "IL2DL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL2",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL2DR"
+    },
+    {
+      "name": "IL2DR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL2",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL2DL"
+    },
+    {
+      "name": "IL2L",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL2",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL2R"
+    },
+    {
+      "name": "IL2R",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL2",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL2L"
+    },
+    {
+      "name": "IL2VL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL2",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL2VR"
+    },
+    {
+      "name": "IL2VR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "IL2",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "IL2VL"
+    },
+    {
+      "name": "LUAL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "LUA",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "LUAR"
+    },
+    {
+      "name": "LUAR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "LUA",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "LUAL"
+    },
+    {
+      "name": "M1",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "M1",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "M2L",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "M2",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "M2R"
+    },
+    {
+      "name": "M2R",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "M2",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "M2L"
+    },
+    {
+      "name": "M3L",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "M3",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "M3R"
+    },
+    {
+      "name": "M3R",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "M3",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "M3L"
+    },
+    {
+      "name": "M4",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "M4",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "M5",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "M5",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "MCL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "MC",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "MCR"
+    },
+    {
+      "name": "MCML",
+      "sexes": [
+        "XO"
+      ],
+      "group": "MCM",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "MCMR"
+    },
+    {
+      "name": "MCMR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "MCM",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "MCML"
+    },
+    {
+      "name": "MCR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "MC",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "MCL"
+    },
+    {
+      "name": "MI",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "MI",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "NSML",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "NSM",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "NSMR"
+    },
+    {
+      "name": "NSMR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "NSM",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "NSML"
+    },
+    {
+      "name": "OLLL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "OLL",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "OLLR"
+    },
+    {
+      "name": "OLLR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "OLL",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "OLLL"
+    },
+    {
+      "name": "OLQDL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "OLQ",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "OLQDR"
+    },
+    {
+      "name": "OLQDR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "OLQ",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "OLQDL"
+    },
+    {
+      "name": "OLQVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "OLQ",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "OLQVR"
+    },
+    {
+      "name": "OLQVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "OLQ",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "OLQVL"
+    },
+    {
+      "name": "PCAL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PCA",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PCAR"
+    },
+    {
+      "name": "PCAR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PCA",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PCAL"
+    },
+    {
+      "name": "PCBL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PCB",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PCBR"
+    },
+    {
+      "name": "PCBR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PCB",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PCBL"
+    },
+    {
+      "name": "PCCL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PCC",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PCCR"
+    },
+    {
+      "name": "PCCR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PCC",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PCCL"
+    },
+    {
+      "name": "PDA",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PDA",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "PDB",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PDB",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "PDC",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PDC",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "PDEL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PDE",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PDER"
+    },
+    {
+      "name": "PDER",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PDE",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PDEL"
+    },
+    {
+      "name": "PGA",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PGA",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "PHAL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PHA",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PHAR"
+    },
+    {
+      "name": "PHAR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PHA",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PHAL"
+    },
+    {
+      "name": "PHBL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PHB",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PHBR"
+    },
+    {
+      "name": "PHBR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PHB",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PHBL"
+    },
+    {
+      "name": "PHCL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PHC",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PHCR"
+    },
+    {
+      "name": "PHCR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PHC",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PHCL"
+    },
+    {
+      "name": "PHDL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PHD",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PHDR"
+    },
+    {
+      "name": "PHDR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PHD",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PHDL"
+    },
+    {
+      "name": "PLML",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PLM",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PLMR"
+    },
+    {
+      "name": "PLMR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PLM",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PLML"
+    },
+    {
+      "name": "PLNL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PLN",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PLNR"
+    },
+    {
+      "name": "PLNR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PLN",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PLNL"
+    },
+    {
+      "name": "PQR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PQR",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "PVCL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVC",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVCR"
+    },
+    {
+      "name": "PVCR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVC",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVCL"
+    },
+    {
+      "name": "PVDL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVD",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVDR"
+    },
+    {
+      "name": "PVDR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVD",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVDL"
+    },
+    {
+      "name": "PVM",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVM",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "PVNL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVN",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVNR"
+    },
+    {
+      "name": "PVNR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVN",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVNL"
+    },
+    {
+      "name": "PVPL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVP",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVPR"
+    },
+    {
+      "name": "PVPR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVP",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVPL"
+    },
+    {
+      "name": "PVQL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVQ",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVQR"
+    },
+    {
+      "name": "PVQR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVQ",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVQL"
+    },
+    {
+      "name": "PVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVR",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "PVT",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVT",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "PVV",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PVV",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "PVWL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVW",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVWR"
+    },
+    {
+      "name": "PVWR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "PVW",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "PVWL"
+    },
+    {
+      "name": "PVX",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PVX",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "PVY",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PVY",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "PVZ",
+      "sexes": [
+        "XO"
+      ],
+      "group": "PVZ",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "R1AL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R1",
+      "description": "subtype A left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R1AR"
+    },
+    {
+      "name": "R1AR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R1",
+      "description": "subtype A right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R1AL"
+    },
+    {
+      "name": "R1BL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R1",
+      "description": "subtype B left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R1BR"
+    },
+    {
+      "name": "R1BR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R1",
+      "description": "subtype B right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R1BL"
+    },
+    {
+      "name": "R2AL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R2",
+      "description": "subtype A left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R2AR"
+    },
+    {
+      "name": "R2AR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R2",
+      "description": "subtype A right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R2AL"
+    },
+    {
+      "name": "R2BL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R2",
+      "description": "subtype B left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R2BR"
+    },
+    {
+      "name": "R2BR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R2",
+      "description": "subtype B right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R2BL"
+    },
+    {
+      "name": "R3AL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R3",
+      "description": "subtype A left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R3AR"
+    },
+    {
+      "name": "R3AR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R3",
+      "description": "subtype A right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R3AL"
+    },
+    {
+      "name": "R3BL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R3",
+      "description": "subtype B left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R3BR"
+    },
+    {
+      "name": "R3BR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R3",
+      "description": "subtype B right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R3BL"
+    },
+    {
+      "name": "R4AL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R4",
+      "description": "subtype A left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R4AR"
+    },
+    {
+      "name": "R4AR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R4",
+      "description": "subtype A right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R4AL"
+    },
+    {
+      "name": "R4BL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R4",
+      "description": "subtype B left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R4BR"
+    },
+    {
+      "name": "R4BR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R4",
+      "description": "subtype B right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R4BL"
+    },
+    {
+      "name": "R5AL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R5",
+      "description": "subtype A left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R5AR"
+    },
+    {
+      "name": "R5AR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R5",
+      "description": "subtype A right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R5AL"
+    },
+    {
+      "name": "R5BL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R5",
+      "description": "subtype B left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R5BR"
+    },
+    {
+      "name": "R5BR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R5",
+      "description": "subtype B right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R5BL"
+    },
+    {
+      "name": "R6AL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R6",
+      "description": "subtype A left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R6AR"
+    },
+    {
+      "name": "R6AR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R6",
+      "description": "subtype A right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R6AL"
+    },
+    {
+      "name": "R6BL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R6",
+      "description": "subtype B left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R6BR"
+    },
+    {
+      "name": "R6BR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R6",
+      "description": "subtype B right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R6BL"
+    },
+    {
+      "name": "R7AL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R7",
+      "description": "subtype A left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R7AR"
+    },
+    {
+      "name": "R7AR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R7",
+      "description": "subtype A right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R7AL"
+    },
+    {
+      "name": "R7BL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R7",
+      "description": "subtype B left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R7BR"
+    },
+    {
+      "name": "R7BR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R7",
+      "description": "subtype B right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R7BL"
+    },
+    {
+      "name": "R8AL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R8",
+      "description": "subtype A left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R8AR"
+    },
+    {
+      "name": "R8AR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R8",
+      "description": "subtype A right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R8AL"
+    },
+    {
+      "name": "R8BL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R8",
+      "description": "subtype B left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R8BR"
+    },
+    {
+      "name": "R8BR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R8",
+      "description": "subtype B right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R8BL"
+    },
+    {
+      "name": "R9AL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R9",
+      "description": "subtype A left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R9AR"
+    },
+    {
+      "name": "R9AR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R9",
+      "description": "subtype A right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "A",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R9AL"
+    },
+    {
+      "name": "R9BL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R9",
+      "description": "subtype B left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R9BR"
+    },
+    {
+      "name": "R9BR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "R9",
+      "description": "subtype B right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "B",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "R9BL"
+    },
+    {
+      "name": "RIAL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIA",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIAR"
+    },
+    {
+      "name": "RIAR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIA",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIAL"
+    },
+    {
+      "name": "RIBL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIB",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIBR"
+    },
+    {
+      "name": "RIBR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIB",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIBL"
+    },
+    {
+      "name": "RICL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIC",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RICR"
+    },
+    {
+      "name": "RICR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIC",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RICL"
+    },
+    {
+      "name": "RID",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RID",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "RIFL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIF",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIFR"
+    },
+    {
+      "name": "RIFR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIF",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIFL"
+    },
+    {
+      "name": "RIGL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIG",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIGR"
+    },
+    {
+      "name": "RIGR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIG",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIGL"
+    },
+    {
+      "name": "RIH",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIH",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "RIML",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIM",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIMR"
+    },
+    {
+      "name": "RIMR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIM",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIML"
+    },
+    {
+      "name": "RIPL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIP",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIPR"
+    },
+    {
+      "name": "RIPR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIP",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIPL"
+    },
+    {
+      "name": "RIR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIR",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "RIS",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIS",
+      "description": "individual neuron",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "RIVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIV",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIVR"
+    },
+    {
+      "name": "RIVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RIV",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RIVL"
+    },
+    {
+      "name": "RMDDL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMD",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMDDR"
+    },
+    {
+      "name": "RMDDR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMD",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMDDL"
+    },
+    {
+      "name": "RMDL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMD",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMDR"
+    },
+    {
+      "name": "RMDR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMD",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMDL"
+    },
+    {
+      "name": "RMDVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMD",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMDVR"
+    },
+    {
+      "name": "RMDVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMD",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMDVL"
+    },
+    {
+      "name": "RMED",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RME",
+      "description": "dorsal",
+      "laterality": "none",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "RMEL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RME",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMER"
+    },
+    {
+      "name": "RMER",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RME",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMEL"
+    },
+    {
+      "name": "RMEV",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RME",
+      "description": "ventral",
+      "laterality": "none",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "RMFL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMF",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMFR"
+    },
+    {
+      "name": "RMFR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMF",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMFL"
+    },
+    {
+      "name": "RMGL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMG",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMGR"
+    },
+    {
+      "name": "RMGR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMG",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMGL"
+    },
+    {
+      "name": "RMHL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMH",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMHR"
+    },
+    {
+      "name": "RMHR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "RMH",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "RMHL"
+    },
+    {
+      "name": "SAADL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SAA",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SAADR"
+    },
+    {
+      "name": "SAADR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SAA",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SAADL"
+    },
+    {
+      "name": "SAAVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SAA",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SAAVR"
+    },
+    {
+      "name": "SAAVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SAA",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SAAVL"
+    },
+    {
+      "name": "SABD",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SAB",
+      "description": "dorsal",
+      "laterality": "none",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "SABVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SAB",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SABVR"
+    },
+    {
+      "name": "SABVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SAB",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SABVL"
+    },
+    {
+      "name": "SDQL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SDQ",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SDQR"
+    },
+    {
+      "name": "SDQR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SDQ",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SDQL"
+    },
+    {
+      "name": "SIADL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SIA",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SIADR"
+    },
+    {
+      "name": "SIADR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SIA",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SIADL"
+    },
+    {
+      "name": "SIAVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SIA",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SIAVR"
+    },
+    {
+      "name": "SIAVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SIA",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SIAVL"
+    },
+    {
+      "name": "SIBDL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SIB",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SIBDR"
+    },
+    {
+      "name": "SIBDR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SIB",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SIBDL"
+    },
+    {
+      "name": "SIBVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SIB",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SIBVR"
+    },
+    {
+      "name": "SIBVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SIB",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SIBVL"
+    },
+    {
+      "name": "SMBDL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SMB",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SMBDR"
+    },
+    {
+      "name": "SMBDR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SMB",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SMBDL"
+    },
+    {
+      "name": "SMBVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SMB",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SMBVR"
+    },
+    {
+      "name": "SMBVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SMB",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SMBVL"
+    },
+    {
+      "name": "SMDDL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SMD",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SMDDR"
+    },
+    {
+      "name": "SMDDR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SMD",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SMDDL"
+    },
+    {
+      "name": "SMDVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SMD",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SMDVR"
+    },
+    {
+      "name": "SMDVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "SMD",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SMDVL"
+    },
+    {
+      "name": "SPCL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "SPC",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SPCR"
+    },
+    {
+      "name": "SPCR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "SPC",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SPCL"
+    },
+    {
+      "name": "SPDL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "SPD",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SPDR"
+    },
+    {
+      "name": "SPDR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "SPD",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SPDL"
+    },
+    {
+      "name": "SPVL",
+      "sexes": [
+        "XO"
+      ],
+      "group": "SPV",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SPVR"
+    },
+    {
+      "name": "SPVR",
+      "sexes": [
+        "XO"
+      ],
+      "group": "SPV",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "SPVL"
+    },
+    {
+      "name": "URADL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URA",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URADR"
+    },
+    {
+      "name": "URADR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URA",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URADL"
+    },
+    {
+      "name": "URAVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URA",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URAVR"
+    },
+    {
+      "name": "URAVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URA",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URAVL"
+    },
+    {
+      "name": "URBL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URB",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URBR"
+    },
+    {
+      "name": "URBR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URB",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URBL"
+    },
+    {
+      "name": "URXL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URX",
+      "description": "left",
+      "laterality": "L",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URXR"
+    },
+    {
+      "name": "URXR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URX",
+      "description": "right",
+      "laterality": "R",
+      "dorsoventral": "none",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URXL"
+    },
+    {
+      "name": "URYDL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URY",
+      "description": "dorsal left",
+      "laterality": "L",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URYDR"
+    },
+    {
+      "name": "URYDR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URY",
+      "description": "dorsal right",
+      "laterality": "R",
+      "dorsoventral": "D",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URYDL"
+    },
+    {
+      "name": "URYVL",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URY",
+      "description": "ventral left",
+      "laterality": "L",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URYVR"
+    },
+    {
+      "name": "URYVR",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "URY",
+      "description": "ventral right",
+      "laterality": "R",
+      "dorsoventral": "V",
+      "ordinal": null,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": "URYVL"
+    },
+    {
+      "name": "VA1",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [
+        "VA01"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VA2",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [
+        "VA02"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VA3",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [
+        "VA03"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VA4",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [
+        "VA04"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VA5",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 5",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 5,
+      "subtype": "",
+      "aliases": [
+        "VA05"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VA6",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 6",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 6,
+      "subtype": "",
+      "aliases": [
+        "VA06"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VA7",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 7",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 7,
+      "subtype": "",
+      "aliases": [
+        "VA07"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VA8",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 8",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 8,
+      "subtype": "",
+      "aliases": [
+        "VA08"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VA9",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 9",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 9,
+      "subtype": "",
+      "aliases": [
+        "VA09"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VA10",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 10",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 10,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VA11",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 11",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 11,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VA12",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VA",
+      "description": "number 12",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 12,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VB1",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VB",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [
+        "VB01"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VB2",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VB",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [
+        "VB02"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VB3",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VB",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [
+        "VB03"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VB4",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VB",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [
+        "VB04"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VB5",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VB",
+      "description": "number 5",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 5,
+      "subtype": "",
+      "aliases": [
+        "VB05"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VB6",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VB",
+      "description": "number 6",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 6,
+      "subtype": "",
+      "aliases": [
+        "VB06"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VB7",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VB",
+      "description": "number 7",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 7,
+      "subtype": "",
+      "aliases": [
+        "VB07"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VB8",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VB",
+      "description": "number 8",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 8,
+      "subtype": "",
+      "aliases": [
+        "VB08"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VB9",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VB",
+      "description": "number 9",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 9,
+      "subtype": "",
+      "aliases": [
+        "VB09"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VB10",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VB",
+      "description": "number 10",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 10,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VB11",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VB",
+      "description": "number 11",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 11,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VC1",
+      "sexes": [
+        "XX"
+      ],
+      "group": "VC",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [
+        "VC01"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VC2",
+      "sexes": [
+        "XX"
+      ],
+      "group": "VC",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [
+        "VC02"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VC3",
+      "sexes": [
+        "XX"
+      ],
+      "group": "VC",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [
+        "VC03"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VC4",
+      "sexes": [
+        "XX"
+      ],
+      "group": "VC",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [
+        "VC04"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VC5",
+      "sexes": [
+        "XX"
+      ],
+      "group": "VC",
+      "description": "number 5",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 5,
+      "subtype": "",
+      "aliases": [
+        "VC05"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VC6",
+      "sexes": [
+        "XX"
+      ],
+      "group": "VC",
+      "description": "number 6",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 6,
+      "subtype": "",
+      "aliases": [
+        "VC06"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD1",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 1",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 1,
+      "subtype": "",
+      "aliases": [
+        "VD01"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD2",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 2",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 2,
+      "subtype": "",
+      "aliases": [
+        "VD02"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD3",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 3",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 3,
+      "subtype": "",
+      "aliases": [
+        "VD03"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD4",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 4",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 4,
+      "subtype": "",
+      "aliases": [
+        "VD04"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD5",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 5",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 5,
+      "subtype": "",
+      "aliases": [
+        "VD05"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD6",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 6",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 6,
+      "subtype": "",
+      "aliases": [
+        "VD06"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD7",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 7",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 7,
+      "subtype": "",
+      "aliases": [
+        "VD07"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD8",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 8",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 8,
+      "subtype": "",
+      "aliases": [
+        "VD08"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD9",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 9",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 9,
+      "subtype": "",
+      "aliases": [
+        "VD09"
+      ],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD10",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 10",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 10,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD11",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 11",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 11,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD12",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 12",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 12,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    },
+    {
+      "name": "VD13",
+      "sexes": [
+        "XX",
+        "XO"
+      ],
+      "group": "VD",
+      "description": "number 13",
+      "laterality": "none",
+      "dorsoventral": "none",
+      "ordinal": 13,
+      "subtype": "",
+      "aliases": [],
+      "on_off_allowed": false,
+      "region": "unknown",
+      "stage": "unknown",
+      "bilateral_partner": ""
+    }
+  ],
+  "groups": [
+    {
+      "token": "ADA",
+      "members": [
+        "ADAL",
+        "ADAR"
+      ]
+    },
+    {
+      "token": "ADE",
+      "members": [
+        "ADEL",
+        "ADER"
+      ]
+    },
+    {
+      "token": "ADF",
+      "members": [
+        "ADFL",
+        "ADFR"
+      ]
+    },
+    {
+      "token": "ADL",
+      "members": [
+        "ADLL",
+        "ADLR"
+      ]
+    },
+    {
+      "token": "AFD",
+      "members": [
+        "AFDL",
+        "AFDR"
+      ]
+    },
+    {
+      "token": "AIA",
+      "members": [
+        "AIAL",
+        "AIAR"
+      ]
+    },
+    {
+      "token": "AIB",
+      "members": [
+        "AIBL",
+        "AIBR"
+      ]
+    },
+    {
+      "token": "AIM",
+      "members": [
+        "AIML",
+        "AIMR"
+      ]
+    },
+    {
+      "token": "AIN",
+      "members": [
+        "AINL",
+        "AINR"
+      ]
+    },
+    {
+      "token": "AIY",
+      "members": [
+        "AIYL",
+        "AIYR"
+      ]
+    },
+    {
+      "token": "AIZ",
+      "members": [
+        "AIZL",
+        "AIZR"
+      ]
+    },
+    {
+      "token": "ALA",
+      "members": [
+        "ALA"
+      ]
+    },
+    {
+      "token": "ALM",
+      "members": [
+        "ALML",
+        "ALMR"
+      ]
+    },
+    {
+      "token": "ALN",
+      "members": [
+        "ALNL",
+        "ALNR"
+      ]
+    },
+    {
+      "token": "AQR",
+      "members": [
+        "AQR"
+      ]
+    },
+    {
+      "token": "AS",
+      "members": [
+        "AS1",
+        "AS2",
+        "AS3",
+        "AS4",
+        "AS5",
+        "AS6",
+        "AS7",
+        "AS8",
+        "AS9",
+        "AS10",
+        "AS11"
+      ]
+    },
+    {
+      "token": "ASE",
+      "members": [
+        "ASEL",
+        "ASER"
+      ]
+    },
+    {
+      "token": "ASG",
+      "members": [
+        "ASGL",
+        "ASGR"
+      ]
+    },
+    {
+      "token": "ASH",
+      "members": [
+        "ASHL",
+        "ASHR"
+      ]
+    },
+    {
+      "token": "ASI",
+      "members": [
+        "ASIL",
+        "ASIR"
+      ]
+    },
+    {
+      "token": "ASJ",
+      "members": [
+        "ASJL",
+        "ASJR"
+      ]
+    },
+    {
+      "token": "ASK",
+      "members": [
+        "ASKL",
+        "ASKR"
+      ]
+    },
+    {
+      "token": "AUA",
+      "members": [
+        "AUAL",
+        "AUAR"
+      ]
+    },
+    {
+      "token": "AVA",
+      "members": [
+        "AVAL",
+        "AVAR"
+      ]
+    },
+    {
+      "token": "AVB",
+      "members": [
+        "AVBL",
+        "AVBR"
+      ]
+    },
+    {
+      "token": "AVD",
+      "members": [
+        "AVDL",
+        "AVDR"
+      ]
+    },
+    {
+      "token": "AVE",
+      "members": [
+        "AVEL",
+        "AVER"
+      ]
+    },
+    {
+      "token": "AVF",
+      "members": [
+        "AVFL",
+        "AVFR"
+      ]
+    },
+    {
+      "token": "AVG",
+      "members": [
+        "AVG"
+      ]
+    },
+    {
+      "token": "AVH",
+      "members": [
+        "AVHL",
+        "AVHR"
+      ]
+    },
+    {
+      "token": "AVJ",
+      "members": [
+        "AVJL",
+        "AVJR"
+      ]
+    },
+    {
+      "token": "AVK",
+      "members": [
+        "AVKL",
+        "AVKR"
+      ]
+    },
+    {
+      "token": "AVL",
+      "members": [
+        "AVL"
+      ]
+    },
+    {
+      "token": "AVM",
+      "members": [
+        "AVM"
+      ]
+    },
+    {
+      "token": "AWA",
+      "members": [
+        "AWAL",
+        "AWAR"
+      ]
+    },
+    {
+      "token": "AWB",
+      "members": [
+        "AWBL",
+        "AWBR"
+      ]
+    },
+    {
+      "token": "AWC",
+      "members": [
+        "AWCL",
+        "AWCR"
+      ]
+    },
+    {
+      "token": "BAG",
+      "members": [
+        "BAGL",
+        "BAGR"
+      ]
+    },
+    {
+      "token": "BDU",
+      "members": [
+        "BDUL",
+        "BDUR"
+      ]
+    },
+    {
+      "token": "CA",
+      "members": [
+        "CA1",
+        "CA2",
+        "CA3",
+        "CA4",
+        "CA5",
+        "CA6",
+        "CA7",
+        "CA8",
+        "CA9"
+      ]
+    },
+    {
+      "token": "CAN",
+      "members": [
+        "CANL",
+        "CANR"
+      ]
+    },
+    {
+      "token": "CEM",
+      "members": [
+        "CEMDL",
+        "CEMDR",
+        "CEMVL",
+        "CEMVR"
+      ]
+    },
+    {
+      "token": "CEP",
+      "members": [
+        "CEPDL",
+        "CEPDR",
+        "CEPVL",
+        "CEPVR"
+      ]
+    },
+    {
+      "token": "CP",
+      "members": [
+        "CP0",
+        "CP1",
+        "CP2",
+        "CP3",
+        "CP4",
+        "CP5",
+        "CP6",
+        "CP7",
+        "CP8",
+        "CP9"
+      ]
+    },
+    {
+      "token": "DA",
+      "members": [
+        "DA1",
+        "DA2",
+        "DA3",
+        "DA4",
+        "DA5",
+        "DA6",
+        "DA7",
+        "DA8",
+        "DA9"
+      ]
+    },
+    {
+      "token": "DB",
+      "members": [
+        "DB1",
+        "DB2",
+        "DB3",
+        "DB4",
+        "DB5",
+        "DB6",
+        "DB7"
+      ]
+    },
+    {
+      "token": "DD",
+      "members": [
+        "DD1",
+        "DD2",
+        "DD3",
+        "DD4",
+        "DD5",
+        "DD6"
+      ]
+    },
+    {
+      "token": "DVA",
+      "members": [
+        "DVA"
+      ]
+    },
+    {
+      "token": "DVB",
+      "members": [
+        "DVB"
+      ]
+    },
+    {
+      "token": "DVC",
+      "members": [
+        "DVC"
+      ]
+    },
+    {
+      "token": "DVE",
+      "members": [
+        "DVE"
+      ]
+    },
+    {
+      "token": "DVF",
+      "members": [
+        "DVF"
+      ]
+    },
+    {
+      "token": "DX",
+      "members": [
+        "DX1",
+        "DX2",
+        "DX3",
+        "DX4"
+      ]
+    },
+    {
+      "token": "EF",
+      "members": [
+        "EF1",
+        "EF2",
+        "EF3",
+        "EF4"
+      ]
+    },
+    {
+      "token": "FLP",
+      "members": [
+        "FLPL",
+        "FLPR"
+      ]
+    },
+    {
+      "token": "HOA",
+      "members": [
+        "HOA"
+      ]
+    },
+    {
+      "token": "HOB",
+      "members": [
+        "HOB"
+      ]
+    },
+    {
+      "token": "HSN",
+      "members": [
+        "HSNL",
+        "HSNR"
+      ]
+    },
+    {
+      "token": "I1",
+      "members": [
+        "I1L",
+        "I1R"
+      ]
+    },
+    {
+      "token": "I2",
+      "members": [
+        "I2L",
+        "I2R"
+      ]
+    },
+    {
+      "token": "I3",
+      "members": [
+        "I3"
+      ]
+    },
+    {
+      "token": "I4",
+      "members": [
+        "I4"
+      ]
+    },
+    {
+      "token": "I5",
+      "members": [
+        "I5"
+      ]
+    },
+    {
+      "token": "I6",
+      "members": [
+        "I6"
+      ]
+    },
+    {
+      "token": "IL1",
+      "members": [
+        "IL1DL",
+        "IL1DR",
+        "IL1L",
+        "IL1R",
+        "IL1VL",
+        "IL1VR"
+      ]
+    },
+    {
+      "token": "IL2",
+      "members": [
+        "IL2DL",
+        "IL2DR",
+        "IL2L",
+        "IL2R",
+        "IL2VL",
+        "IL2VR"
+      ]
+    },
+    {
+      "token": "LUA",
+      "members": [
+        "LUAL",
+        "LUAR"
+      ]
+    },
+    {
+      "token": "M1",
+      "members": [
+        "M1"
+      ]
+    },
+    {
+      "token": "M2",
+      "members": [
+        "M2L",
+        "M2R"
+      ]
+    },
+    {
+      "token": "M3",
+      "members": [
+        "M3L",
+        "M3R"
+      ]
+    },
+    {
+      "token": "M4",
+      "members": [
+        "M4"
+      ]
+    },
+    {
+      "token": "M5",
+      "members": [
+        "M5"
+      ]
+    },
+    {
+      "token": "MC",
+      "members": [
+        "MCL",
+        "MCR"
+      ]
+    },
+    {
+      "token": "MCM",
+      "members": [
+        "MCML",
+        "MCMR"
+      ]
+    },
+    {
+      "token": "MI",
+      "members": [
+        "MI"
+      ]
+    },
+    {
+      "token": "NSM",
+      "members": [
+        "NSML",
+        "NSMR"
+      ]
+    },
+    {
+      "token": "OLL",
+      "members": [
+        "OLLL",
+        "OLLR"
+      ]
+    },
+    {
+      "token": "OLQ",
+      "members": [
+        "OLQDL",
+        "OLQDR",
+        "OLQVL",
+        "OLQVR"
+      ]
+    },
+    {
+      "token": "PCA",
+      "members": [
+        "PCAL",
+        "PCAR"
+      ]
+    },
+    {
+      "token": "PCB",
+      "members": [
+        "PCBL",
+        "PCBR"
+      ]
+    },
+    {
+      "token": "PCC",
+      "members": [
+        "PCCL",
+        "PCCR"
+      ]
+    },
+    {
+      "token": "PDA",
+      "members": [
+        "PDA"
+      ]
+    },
+    {
+      "token": "PDB",
+      "members": [
+        "PDB"
+      ]
+    },
+    {
+      "token": "PDC",
+      "members": [
+        "PDC"
+      ]
+    },
+    {
+      "token": "PDE",
+      "members": [
+        "PDEL",
+        "PDER"
+      ]
+    },
+    {
+      "token": "PGA",
+      "members": [
+        "PGA"
+      ]
+    },
+    {
+      "token": "PHA",
+      "members": [
+        "PHAL",
+        "PHAR"
+      ]
+    },
+    {
+      "token": "PHB",
+      "members": [
+        "PHBL",
+        "PHBR"
+      ]
+    },
+    {
+      "token": "PHC",
+      "members": [
+        "PHCL",
+        "PHCR"
+      ]
+    },
+    {
+      "token": "PHD",
+      "members": [
+        "PHDL",
+        "PHDR"
+      ]
+    },
+    {
+      "token": "PLM",
+      "members": [
+        "PLML",
+        "PLMR"
+      ]
+    },
+    {
+      "token": "PLN",
+      "members": [
+        "PLNL",
+        "PLNR"
+      ]
+    },
+    {
+      "token": "PQR",
+      "members": [
+        "PQR"
+      ]
+    },
+    {
+      "token": "PVC",
+      "members": [
+        "PVCL",
+        "PVCR"
+      ]
+    },
+    {
+      "token": "PVD",
+      "members": [
+        "PVDL",
+        "PVDR"
+      ]
+    },
+    {
+      "token": "PVM",
+      "members": [
+        "PVM"
+      ]
+    },
+    {
+      "token": "PVN",
+      "members": [
+        "PVNL",
+        "PVNR"
+      ]
+    },
+    {
+      "token": "PVP",
+      "members": [
+        "PVPL",
+        "PVPR"
+      ]
+    },
+    {
+      "token": "PVQ",
+      "members": [
+        "PVQL",
+        "PVQR"
+      ]
+    },
+    {
+      "token": "PVR",
+      "members": [
+        "PVR"
+      ]
+    },
+    {
+      "token": "PVT",
+      "members": [
+        "PVT"
+      ]
+    },
+    {
+      "token": "PVV",
+      "members": [
+        "PVV"
+      ]
+    },
+    {
+      "token": "PVW",
+      "members": [
+        "PVWL",
+        "PVWR"
+      ]
+    },
+    {
+      "token": "PVX",
+      "members": [
+        "PVX"
+      ]
+    },
+    {
+      "token": "PVY",
+      "members": [
+        "PVY"
+      ]
+    },
+    {
+      "token": "PVZ",
+      "members": [
+        "PVZ"
+      ]
+    },
+    {
+      "token": "R1",
+      "members": [
+        "R1AL",
+        "R1AR",
+        "R1BL",
+        "R1BR"
+      ]
+    },
+    {
+      "token": "R2",
+      "members": [
+        "R2AL",
+        "R2AR",
+        "R2BL",
+        "R2BR"
+      ]
+    },
+    {
+      "token": "R3",
+      "members": [
+        "R3AL",
+        "R3AR",
+        "R3BL",
+        "R3BR"
+      ]
+    },
+    {
+      "token": "R4",
+      "members": [
+        "R4AL",
+        "R4AR",
+        "R4BL",
+        "R4BR"
+      ]
+    },
+    {
+      "token": "R5",
+      "members": [
+        "R5AL",
+        "R5AR",
+        "R5BL",
+        "R5BR"
+      ]
+    },
+    {
+      "token": "R6",
+      "members": [
+        "R6AL",
+        "R6AR",
+        "R6BL",
+        "R6BR"
+      ]
+    },
+    {
+      "token": "R7",
+      "members": [
+        "R7AL",
+        "R7AR",
+        "R7BL",
+        "R7BR"
+      ]
+    },
+    {
+      "token": "R8",
+      "members": [
+        "R8AL",
+        "R8AR",
+        "R8BL",
+        "R8BR"
+      ]
+    },
+    {
+      "token": "R9",
+      "members": [
+        "R9AL",
+        "R9AR",
+        "R9BL",
+        "R9BR"
+      ]
+    },
+    {
+      "token": "RIA",
+      "members": [
+        "RIAL",
+        "RIAR"
+      ]
+    },
+    {
+      "token": "RIB",
+      "members": [
+        "RIBL",
+        "RIBR"
+      ]
+    },
+    {
+      "token": "RIC",
+      "members": [
+        "RICL",
+        "RICR"
+      ]
+    },
+    {
+      "token": "RID",
+      "members": [
+        "RID"
+      ]
+    },
+    {
+      "token": "RIF",
+      "members": [
+        "RIFL",
+        "RIFR"
+      ]
+    },
+    {
+      "token": "RIG",
+      "members": [
+        "RIGL",
+        "RIGR"
+      ]
+    },
+    {
+      "token": "RIH",
+      "members": [
+        "RIH"
+      ]
+    },
+    {
+      "token": "RIM",
+      "members": [
+        "RIML",
+        "RIMR"
+      ]
+    },
+    {
+      "token": "RIP",
+      "members": [
+        "RIPL",
+        "RIPR"
+      ]
+    },
+    {
+      "token": "RIR",
+      "members": [
+        "RIR"
+      ]
+    },
+    {
+      "token": "RIS",
+      "members": [
+        "RIS"
+      ]
+    },
+    {
+      "token": "RIV",
+      "members": [
+        "RIVL",
+        "RIVR"
+      ]
+    },
+    {
+      "token": "RMD",
+      "members": [
+        "RMDDL",
+        "RMDDR",
+        "RMDL",
+        "RMDR",
+        "RMDVL",
+        "RMDVR"
+      ]
+    },
+    {
+      "token": "RME",
+      "members": [
+        "RMED",
+        "RMEL",
+        "RMER",
+        "RMEV"
+      ]
+    },
+    {
+      "token": "RMF",
+      "members": [
+        "RMFL",
+        "RMFR"
+      ]
+    },
+    {
+      "token": "RMG",
+      "members": [
+        "RMGL",
+        "RMGR"
+      ]
+    },
+    {
+      "token": "RMH",
+      "members": [
+        "RMHL",
+        "RMHR"
+      ]
+    },
+    {
+      "token": "SAA",
+      "members": [
+        "SAADL",
+        "SAADR",
+        "SAAVL",
+        "SAAVR"
+      ]
+    },
+    {
+      "token": "SAB",
+      "members": [
+        "SABD",
+        "SABVL",
+        "SABVR"
+      ]
+    },
+    {
+      "token": "SDQ",
+      "members": [
+        "SDQL",
+        "SDQR"
+      ]
+    },
+    {
+      "token": "SIA",
+      "members": [
+        "SIADL",
+        "SIADR",
+        "SIAVL",
+        "SIAVR"
+      ]
+    },
+    {
+      "token": "SIB",
+      "members": [
+        "SIBDL",
+        "SIBDR",
+        "SIBVL",
+        "SIBVR"
+      ]
+    },
+    {
+      "token": "SMB",
+      "members": [
+        "SMBDL",
+        "SMBDR",
+        "SMBVL",
+        "SMBVR"
+      ]
+    },
+    {
+      "token": "SMD",
+      "members": [
+        "SMDDL",
+        "SMDDR",
+        "SMDVL",
+        "SMDVR"
+      ]
+    },
+    {
+      "token": "SPC",
+      "members": [
+        "SPCL",
+        "SPCR"
+      ]
+    },
+    {
+      "token": "SPD",
+      "members": [
+        "SPDL",
+        "SPDR"
+      ]
+    },
+    {
+      "token": "SPV",
+      "members": [
+        "SPVL",
+        "SPVR"
+      ]
+    },
+    {
+      "token": "URA",
+      "members": [
+        "URADL",
+        "URADR",
+        "URAVL",
+        "URAVR"
+      ]
+    },
+    {
+      "token": "URB",
+      "members": [
+        "URBL",
+        "URBR"
+      ]
+    },
+    {
+      "token": "URX",
+      "members": [
+        "URXL",
+        "URXR"
+      ]
+    },
+    {
+      "token": "URY",
+      "members": [
+        "URYDL",
+        "URYDR",
+        "URYVL",
+        "URYVR"
+      ]
+    },
+    {
+      "token": "VA",
+      "members": [
+        "VA1",
+        "VA2",
+        "VA3",
+        "VA4",
+        "VA5",
+        "VA6",
+        "VA7",
+        "VA8",
+        "VA9",
+        "VA10",
+        "VA11",
+        "VA12"
+      ]
+    },
+    {
+      "token": "VB",
+      "members": [
+        "VB1",
+        "VB2",
+        "VB3",
+        "VB4",
+        "VB5",
+        "VB6",
+        "VB7",
+        "VB8",
+        "VB9",
+        "VB10",
+        "VB11"
+      ]
+    },
+    {
+      "token": "VC",
+      "members": [
+        "VC1",
+        "VC2",
+        "VC3",
+        "VC4",
+        "VC5",
+        "VC6"
+      ]
+    },
+    {
+      "token": "VD",
+      "members": [
+        "VD1",
+        "VD2",
+        "VD3",
+        "VD4",
+        "VD5",
+        "VD6",
+        "VD7",
+        "VD8",
+        "VD9",
+        "VD10",
+        "VD11",
+        "VD12",
+        "VD13"
+      ]
+    }
+  ],
+  "classifications": [
+    {
+      "name": "ARTIFACT",
+      "description": "artifact"
+    },
+    {
+      "name": "MUTATION",
+      "description": "legacy mutation classification"
+    },
+    {
+      "name": "AMSOL",
+      "description": "non-neuronal cell"
+    },
+    {
+      "name": "AMSOR",
+      "description": "non-neuronal cell"
+    },
+    {
+      "name": "HMC",
+      "description": "non-neuronal cell"
+    },
+    {
+      "name": "PHSO1L",
+      "description": "non-neuronal cell"
+    },
+    {
+      "name": "PHSO1R",
+      "description": "non-neuronal cell"
+    }
+  ],
+  "model_mappings": [
+    {
+      "bundle_id": "gat-20260601-v1",
+      "vocabulary_version": "gat117-477b12e883de8d19",
+      "source_sha256": "477b12e883de8d19f05fbbb25cf8ae075e837828fcd471b315c0672c25628f54",
+      "classes": [
+        {
+          "token": "ADA",
+          "members": [
+            "ADAL",
+            "ADAR"
+          ]
+        },
+        {
+          "token": "ADE",
+          "members": [
+            "ADEL",
+            "ADER"
+          ]
+        },
+        {
+          "token": "ADF",
+          "members": [
+            "ADFL",
+            "ADFR"
+          ]
+        },
+        {
+          "token": "ADL",
+          "members": [
+            "ADLL",
+            "ADLR"
+          ]
+        },
+        {
+          "token": "AFD",
+          "members": [
+            "AFDL",
+            "AFDR"
+          ]
+        },
+        {
+          "token": "AIA",
+          "members": [
+            "AIAL",
+            "AIAR"
+          ]
+        },
+        {
+          "token": "AIB",
+          "members": [
+            "AIBL",
+            "AIBR"
+          ]
+        },
+        {
+          "token": "AIM",
+          "members": [
+            "AIML",
+            "AIMR"
+          ]
+        },
+        {
+          "token": "AIN",
+          "members": [
+            "AINL",
+            "AINR"
+          ]
+        },
+        {
+          "token": "AIY",
+          "members": [
+            "AIYL",
+            "AIYR"
+          ]
+        },
+        {
+          "token": "AIZ",
+          "members": [
+            "AIZL",
+            "AIZR"
+          ]
+        },
+        {
+          "token": "ALA",
+          "members": [
+            "ALA"
+          ]
+        },
+        {
+          "token": "ALM",
+          "members": [
+            "ALML",
+            "ALMR"
+          ]
+        },
+        {
+          "token": "ALN",
+          "members": [
+            "ALNL",
+            "ALNR"
+          ]
+        },
+        {
+          "token": "AQR",
+          "members": [
+            "AQR"
+          ]
+        },
+        {
+          "token": "AS",
+          "members": [
+            "AS1",
+            "AS2",
+            "AS3",
+            "AS4",
+            "AS5",
+            "AS6",
+            "AS7",
+            "AS8",
+            "AS9",
+            "AS10",
+            "AS11"
+          ]
+        },
+        {
+          "token": "ASE",
+          "members": [
+            "ASEL",
+            "ASER"
+          ]
+        },
+        {
+          "token": "ASG",
+          "members": [
+            "ASGL",
+            "ASGR"
+          ]
+        },
+        {
+          "token": "ASH",
+          "members": [
+            "ASHL",
+            "ASHR"
+          ]
+        },
+        {
+          "token": "ASI",
+          "members": [
+            "ASIL",
+            "ASIR"
+          ]
+        },
+        {
+          "token": "ASJ",
+          "members": [
+            "ASJL",
+            "ASJR"
+          ]
+        },
+        {
+          "token": "ASK",
+          "members": [
+            "ASKL",
+            "ASKR"
+          ]
+        },
+        {
+          "token": "AUA",
+          "members": [
+            "AUAL",
+            "AUAR"
+          ]
+        },
+        {
+          "token": "AVA",
+          "members": [
+            "AVAL",
+            "AVAR"
+          ]
+        },
+        {
+          "token": "AVB",
+          "members": [
+            "AVBL",
+            "AVBR"
+          ]
+        },
+        {
+          "token": "AVD",
+          "members": [
+            "AVDL",
+            "AVDR"
+          ]
+        },
+        {
+          "token": "AVE",
+          "members": [
+            "AVEL",
+            "AVER"
+          ]
+        },
+        {
+          "token": "AVF",
+          "members": [
+            "AVFL",
+            "AVFR"
+          ]
+        },
+        {
+          "token": "AVG",
+          "members": [
+            "AVG"
+          ]
+        },
+        {
+          "token": "AVH",
+          "members": [
+            "AVHL",
+            "AVHR"
+          ]
+        },
+        {
+          "token": "AVJ",
+          "members": [
+            "AVJL",
+            "AVJR"
+          ]
+        },
+        {
+          "token": "AVK",
+          "members": [
+            "AVKL",
+            "AVKR"
+          ]
+        },
+        {
+          "token": "AVL",
+          "members": [
+            "AVL"
+          ]
+        },
+        {
+          "token": "AVM",
+          "members": [
+            "AVM"
+          ]
+        },
+        {
+          "token": "AWA",
+          "members": [
+            "AWAL",
+            "AWAR"
+          ]
+        },
+        {
+          "token": "AWB",
+          "members": [
+            "AWBL",
+            "AWBR"
+          ]
+        },
+        {
+          "token": "AWC",
+          "members": [
+            "AWCL",
+            "AWCR"
+          ]
+        },
+        {
+          "token": "BAG",
+          "members": [
+            "BAGL",
+            "BAGR"
+          ]
+        },
+        {
+          "token": "BDU",
+          "members": [
+            "BDUL",
+            "BDUR"
+          ]
+        },
+        {
+          "token": "CEP",
+          "members": [
+            "CEPDL",
+            "CEPDR",
+            "CEPVL",
+            "CEPVR"
+          ]
+        },
+        {
+          "token": "DA",
+          "members": [
+            "DA1",
+            "DA2",
+            "DA3",
+            "DA4",
+            "DA5",
+            "DA6",
+            "DA7",
+            "DA8",
+            "DA9"
+          ]
+        },
+        {
+          "token": "DB",
+          "members": [
+            "DB1",
+            "DB2",
+            "DB3",
+            "DB4",
+            "DB5",
+            "DB6",
+            "DB7"
+          ]
+        },
+        {
+          "token": "DD",
+          "members": [
+            "DD1",
+            "DD2",
+            "DD3",
+            "DD4",
+            "DD5",
+            "DD6"
+          ]
+        },
+        {
+          "token": "DVA",
+          "members": [
+            "DVA"
+          ]
+        },
+        {
+          "token": "DVB",
+          "members": [
+            "DVB"
+          ]
+        },
+        {
+          "token": "DVC",
+          "members": [
+            "DVC"
+          ]
+        },
+        {
+          "token": "FLP",
+          "members": [
+            "FLPL",
+            "FLPR"
+          ]
+        },
+        {
+          "token": "HSN",
+          "members": [
+            "HSNL",
+            "HSNR"
+          ]
+        },
+        {
+          "token": "I1",
+          "members": [
+            "I1L",
+            "I1R"
+          ]
+        },
+        {
+          "token": "I2",
+          "members": [
+            "I2L",
+            "I2R"
+          ]
+        },
+        {
+          "token": "I3",
+          "members": [
+            "I3"
+          ]
+        },
+        {
+          "token": "I4",
+          "members": [
+            "I4"
+          ]
+        },
+        {
+          "token": "I5",
+          "members": [
+            "I5"
+          ]
+        },
+        {
+          "token": "I6",
+          "members": [
+            "I6"
+          ]
+        },
+        {
+          "token": "IL1",
+          "members": [
+            "IL1DL",
+            "IL1DR",
+            "IL1L",
+            "IL1R",
+            "IL1VL",
+            "IL1VR"
+          ]
+        },
+        {
+          "token": "IL2",
+          "members": [
+            "IL2DL",
+            "IL2DR",
+            "IL2L",
+            "IL2R",
+            "IL2VL",
+            "IL2VR"
+          ]
+        },
+        {
+          "token": "LUA",
+          "members": [
+            "LUAL",
+            "LUAR"
+          ]
+        },
+        {
+          "token": "M1",
+          "members": [
+            "M1"
+          ]
+        },
+        {
+          "token": "M2",
+          "members": [
+            "M2L",
+            "M2R"
+          ]
+        },
+        {
+          "token": "M3",
+          "members": [
+            "M3L",
+            "M3R"
+          ]
+        },
+        {
+          "token": "M4",
+          "members": [
+            "M4"
+          ]
+        },
+        {
+          "token": "M5",
+          "members": [
+            "M5"
+          ]
+        },
+        {
+          "token": "MC",
+          "members": [
+            "MCL",
+            "MCR"
+          ]
+        },
+        {
+          "token": "MI",
+          "members": [
+            "MI"
+          ]
+        },
+        {
+          "token": "NSM",
+          "members": [
+            "NSML",
+            "NSMR"
+          ]
+        },
+        {
+          "token": "OLL",
+          "members": [
+            "OLLL",
+            "OLLR"
+          ]
+        },
+        {
+          "token": "OLQ",
+          "members": [
+            "OLQDL",
+            "OLQDR",
+            "OLQVL",
+            "OLQVR"
+          ]
+        },
+        {
+          "token": "PDA",
+          "members": [
+            "PDA"
+          ]
+        },
+        {
+          "token": "PDB",
+          "members": [
+            "PDB"
+          ]
+        },
+        {
+          "token": "PDE",
+          "members": [
+            "PDEL",
+            "PDER"
+          ]
+        },
+        {
+          "token": "PHA",
+          "members": [
+            "PHAL",
+            "PHAR"
+          ]
+        },
+        {
+          "token": "PHB",
+          "members": [
+            "PHBL",
+            "PHBR"
+          ]
+        },
+        {
+          "token": "PHC",
+          "members": [
+            "PHCL",
+            "PHCR"
+          ]
+        },
+        {
+          "token": "PLM",
+          "members": [
+            "PLML",
+            "PLMR"
+          ]
+        },
+        {
+          "token": "PLN",
+          "members": [
+            "PLNL",
+            "PLNR"
+          ]
+        },
+        {
+          "token": "PQR",
+          "members": [
+            "PQR"
+          ]
+        },
+        {
+          "token": "PVC",
+          "members": [
+            "PVCL",
+            "PVCR"
+          ]
+        },
+        {
+          "token": "PVD",
+          "members": [
+            "PVDL",
+            "PVDR"
+          ]
+        },
+        {
+          "token": "PVM",
+          "members": [
+            "PVM"
+          ]
+        },
+        {
+          "token": "PVN",
+          "members": [
+            "PVNL",
+            "PVNR"
+          ]
+        },
+        {
+          "token": "PVP",
+          "members": [
+            "PVPL",
+            "PVPR"
+          ]
+        },
+        {
+          "token": "PVQ",
+          "members": [
+            "PVQL",
+            "PVQR"
+          ]
+        },
+        {
+          "token": "PVR",
+          "members": [
+            "PVR"
+          ]
+        },
+        {
+          "token": "PVT",
+          "members": [
+            "PVT"
+          ]
+        },
+        {
+          "token": "PVW",
+          "members": [
+            "PVWL",
+            "PVWR"
+          ]
+        },
+        {
+          "token": "RIA",
+          "members": [
+            "RIAL",
+            "RIAR"
+          ]
+        },
+        {
+          "token": "RIB",
+          "members": [
+            "RIBL",
+            "RIBR"
+          ]
+        },
+        {
+          "token": "RIC",
+          "members": [
+            "RICL",
+            "RICR"
+          ]
+        },
+        {
+          "token": "RID",
+          "members": [
+            "RID"
+          ]
+        },
+        {
+          "token": "RIF",
+          "members": [
+            "RIFL",
+            "RIFR"
+          ]
+        },
+        {
+          "token": "RIG",
+          "members": [
+            "RIGL",
+            "RIGR"
+          ]
+        },
+        {
+          "token": "RIH",
+          "members": [
+            "RIH"
+          ]
+        },
+        {
+          "token": "RIM",
+          "members": [
+            "RIML",
+            "RIMR"
+          ]
+        },
+        {
+          "token": "RIP",
+          "members": [
+            "RIPL",
+            "RIPR"
+          ]
+        },
+        {
+          "token": "RIR",
+          "members": [
+            "RIR"
+          ]
+        },
+        {
+          "token": "RIS",
+          "members": [
+            "RIS"
+          ]
+        },
+        {
+          "token": "RIV",
+          "members": [
+            "RIVL",
+            "RIVR"
+          ]
+        },
+        {
+          "token": "RMD",
+          "members": [
+            "RMDDL",
+            "RMDDR",
+            "RMDL",
+            "RMDR",
+            "RMDVL",
+            "RMDVR"
+          ]
+        },
+        {
+          "token": "RME",
+          "members": [
+            "RMED",
+            "RMEL",
+            "RMER",
+            "RMEV"
+          ]
+        },
+        {
+          "token": "RMF",
+          "members": [
+            "RMFL",
+            "RMFR"
+          ]
+        },
+        {
+          "token": "RMG",
+          "members": [
+            "RMGL",
+            "RMGR"
+          ]
+        },
+        {
+          "token": "RMH",
+          "members": [
+            "RMHL",
+            "RMHR"
+          ]
+        },
+        {
+          "token": "SAA",
+          "members": [
+            "SAADL",
+            "SAADR",
+            "SAAVL",
+            "SAAVR"
+          ]
+        },
+        {
+          "token": "SAB",
+          "members": [
+            "SABD",
+            "SABVL",
+            "SABVR"
+          ]
+        },
+        {
+          "token": "SDQ",
+          "members": [
+            "SDQL",
+            "SDQR"
+          ]
+        },
+        {
+          "token": "SIA",
+          "members": [
+            "SIADL",
+            "SIADR",
+            "SIAVL",
+            "SIAVR"
+          ]
+        },
+        {
+          "token": "SIB",
+          "members": [
+            "SIBDL",
+            "SIBDR",
+            "SIBVL",
+            "SIBVR"
+          ]
+        },
+        {
+          "token": "SMB",
+          "members": [
+            "SMBDL",
+            "SMBDR",
+            "SMBVL",
+            "SMBVR"
+          ]
+        },
+        {
+          "token": "SMD",
+          "members": [
+            "SMDDL",
+            "SMDDR",
+            "SMDVL",
+            "SMDVR"
+          ]
+        },
+        {
+          "token": "URA",
+          "members": [
+            "URADL",
+            "URADR",
+            "URAVL",
+            "URAVR"
+          ]
+        },
+        {
+          "token": "URB",
+          "members": [
+            "URBL",
+            "URBR"
+          ]
+        },
+        {
+          "token": "URX",
+          "members": [
+            "URXL",
+            "URXR"
+          ]
+        },
+        {
+          "token": "URY",
+          "members": [
+            "URYDL",
+            "URYDR",
+            "URYVL",
+            "URYVR"
+          ]
+        },
+        {
+          "token": "VA",
+          "members": [
+            "VA1",
+            "VA2",
+            "VA3",
+            "VA4",
+            "VA5",
+            "VA6",
+            "VA7",
+            "VA8",
+            "VA9",
+            "VA10",
+            "VA11",
+            "VA12"
+          ]
+        },
+        {
+          "token": "VB",
+          "members": [
+            "VB1",
+            "VB2",
+            "VB3",
+            "VB4",
+            "VB5",
+            "VB6",
+            "VB7",
+            "VB8",
+            "VB9",
+            "VB10",
+            "VB11"
+          ]
+        },
+        {
+          "token": "VC",
+          "members": [
+            "VC1",
+            "VC2",
+            "VC3",
+            "VC4",
+            "VC5",
+            "VC6"
+          ]
+        },
+        {
+          "token": "VD",
+          "members": [
+            "VD1",
+            "VD2",
+            "VD3",
+            "VD4",
+            "VD5",
+            "VD6",
+            "VD7",
+            "VD8",
+            "VD9",
+            "VD10",
+            "VD11",
+            "VD12",
+            "VD13"
+          ]
+        }
+      ]
+    }
+  ]
+}
