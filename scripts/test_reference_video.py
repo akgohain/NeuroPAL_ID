@@ -86,6 +86,9 @@ class ReferenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):bridge.validate_observations([row,row],self.info)
         for frame in (-1,3,.5):
             with self.assertRaises(ValueError):bridge.read_frame(self.info,frame)
+        for channel in (-1,self.info['nc'],.5,float('nan'),True,'0'):
+            with self.assertRaisesRegex(ValueError, 'Channel index'):
+                bridge.read_frame(self.info,0,channel)
         self.meta['axis_order']='TCZXY';(self.root/'metadata.json').write_text(json.dumps(self.meta))
         with self.assertRaises(ValueError):bridge.source_info(self.root/'data.h5')
 

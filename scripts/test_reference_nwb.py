@@ -37,7 +37,42 @@ class NWBTests(unittest.TestCase):
         with h5py.File(self.path,'r') as f:np.testing.assert_array_equal(video.frame_times(f,self.info,1,3),[5.5,6,6.5])
         self.assertEqual(self.info['spacing_um_xyz'],[.4,.6,1.5])
 
+    def test_single_channel_series_without_channel_axis(self):
+        raw=self.raw[...,0]
+        with h5py.File(self.path,'r+') as f:
+            series=f['acquisition/CalciumImageSeries']
+            del series['data']
+            series.create_dataset('data',data=raw,chunks=(1,11,9,3),compression='gzip')
+        self.info=video.source_info(self.path)
+        self.assertEqual(self.info['axis_order'],'TXYZ')
+        self.assertEqual((self.info['nt'],self.info['nc'],self.info['nz'],self.info['ny'],self.info['nx']),
+                         (4,1,3,9,11))
+        self.assertEqual(self.info['spacing_um_xyz'],[.4,.6,1.5])
+        for frame in (0,2,3):
+            expected=raw[frame].transpose(2,1,0)[None,...]
+            np.testing.assert_array_equal(video.read_frame(self.info,frame),expected)
+            np.testing.assert_array_equal(video.read_frame(self.info,frame,0),expected)
+        with self.assertRaises(ValueError):video.read_frame(self.info,0,1)
+        self.assert_named_activity_and_roundtrip()
+
+    def test_single_channel_series_preserves_singleton_spatial_axes(self):
+        raw=np.arange(4*9,dtype=np.uint16).reshape(4,1,9,1)
+        with h5py.File(self.path,'r+') as f:
+            series=f['acquisition/CalciumImageSeries']
+            del series['data'];series['data']=raw
+        info=video.source_info(self.path)
+        self.assertEqual(video.read_frame(info,2,0).shape,(1,1,9,1))
+        np.testing.assert_array_equal(video.read_frame(info,2,0),raw[2].transpose(2,1,0)[None,...])
+
+    def test_static_volume_is_not_a_calcium_series(self):
+        with h5py.File(self.path,'r+') as f:del f['acquisition/CalciumImageSeries']
+        with self.assertRaisesRegex(ValueError,'MultiChannelVolumeSeries'):
+            video.source_info(self.path)
+
     def test_named_activity_and_roundtrip(self):
+        self.assert_named_activity_and_roundtrip()
+
+    def assert_named_activity_and_roundtrip(self):
         rows=[dict(track_id=8,t=t,x=5.,y=4.,z=2.,confidence=.9,channel=0,name='AVAL',
                    identity_source='auto-id',identity_confidence=.8,provenance='reviewed') for t in range(1,5)]
         result=analysis.activity(dict(source=self.info,observations=rows,frame_range=[0,3],output_dir=str(self.root),

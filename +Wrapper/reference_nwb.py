@@ -29,21 +29,23 @@ def source_info(path):
         acquisition = f.get('acquisition', {})
         candidates = [g for g in acquisition.values() if isinstance(g, h5py.Group)
                       and text(g.attrs.get('neurodata_type', '')) == 'MultiChannelVolumeSeries'
-                      and 'data' in g and g['data'].ndim == 5]
+                      and 'data' in g and g['data'].ndim in (4, 5)]
         if len(candidates) != 1:
-            raise ValueError('Expected one five-dimensional MultiChannelVolumeSeries calcium recording in this NWB')
+            raise ValueError('Expected one four- or five-dimensional MultiChannelVolumeSeries calcium recording in this NWB')
         series = candidates[0]; data = series['data']
-        # MultiChannelVolumeSeries stores time, X, Y, Z, channel on disk.
-        nt, nx, ny, nz, nc = data.shape
+        # Single-channel series may omit the trailing channel axis.
+        nt, nx, ny, nz = data.shape[:4]
+        nc = data.shape[4] if data.ndim == 5 else 1
+        order = 'TXYZC' if data.ndim == 5 else 'TXYZ'
         if min(data.shape) < 1 or data.dtype.kind not in 'uif' or data.dtype.itemsize > 8:
             raise ValueError('Unsupported or empty NWB calcium series')
         if np.prod(data.shape[1:], dtype=np.int64)*data.dtype.itemsize > 256*2**20:
             raise MemoryError('A calcium frame exceeds the 256 MiB viewer limit')
         if data.chunks and np.prod(data.chunks,dtype=np.int64)*data.dtype.itemsize > 256*2**20:
             raise MemoryError('An NWB chunk exceeds the 256 MiB viewer limit')
-        metadata = dict(axis_order='TXYZC', data_path=data.name)
+        metadata = dict(axis_order=order, data_path=data.name)
         info = dict(file=str(path), nx=nx, ny=ny, nz=nz, nc=nc, nt=nt,
-                    dtype=str(data.dtype), axis_order='TXYZC', data_path=data.name,
+                    dtype=str(data.dtype), axis_order=order, data_path=data.name,
                     metadata=metadata, spacing_measured=False, has_times=False, time_units='unknown')
         scale = spacing(series['imaging_volume']) if 'imaging_volume' in series else None
         if scale is not None:
@@ -66,7 +68,8 @@ def source_info(path):
                 info['neuropal'] = dict(dtype=str(ref['data'].dtype),itemsize=ref['data'].dtype.itemsize,data_path=ref['data'].name, axis_order=order, dimensions_xyzc=dimensions,
                     rgbw_channels=rgbw, spacing_um_xyz=spacing(ref['imaging_volume']) if 'imaging_volume' in ref else None)
         stat = path.stat()
-        sample = data[0, ::max(1,nx//8), ::max(1,ny//8), ::max(1,nz//4), :]
+        sample = data[(0, slice(None,None,max(1,nx//8)), slice(None,None,max(1,ny//8)),
+                       slice(None,None,max(1,nz//4))) + ((slice(None),) if data.ndim == 5 else ())]
         identity = (str(path),stat.st_size,stat.st_mtime_ns,info)
         info['source_id'] = hashlib.sha256(json.dumps(identity,sort_keys=True).encode()+sample.tobytes()).hexdigest()
     return info

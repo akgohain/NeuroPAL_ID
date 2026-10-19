@@ -65,8 +65,14 @@ def source_info(path):
 def read_frame(info, frame, channel=None):
     if int(frame) != frame or not 0 <= frame < info['nt']:
         raise ValueError('Frame index is outside recording')
-    if channel is not None and not 0 <= channel < info['nc']:
-        raise ValueError('Channel index is outside recording')
+    if channel is not None:
+        try:
+            valid = (not isinstance(channel, (bool, np.bool_)) and np.isfinite(channel)
+                     and int(channel) == channel and 0 <= channel < info['nc'])
+        except (TypeError, ValueError, OverflowError):
+            valid = False
+        if not valid:
+            raise ValueError('Channel index must be an integer inside recording')
     frame = int(frame)
     if channel is not None: channel = int(channel)
     with h5py.File(info['file'], 'r') as f:
@@ -75,7 +81,9 @@ def read_frame(info, frame, channel=None):
 
 def frame_from_file(source, info, frame, channel=None):
     data = source[info.get('data_path', '/data')]
-    if info['axis_order'] == 'TXYZC':
+    if info['axis_order'] == 'TXYZ':
+        raw = data[frame].transpose(2, 1, 0)[None, ...]
+    elif info['axis_order'] == 'TXYZC':
         raw = data[frame] if channel is None else data[frame, :, :, :, channel:channel+1]
         raw = raw.transpose(3, 2, 1, 0)
     else:
@@ -209,6 +217,9 @@ def run(request):
     if action == 'name_activity':
         from reference_analysis import update_activity_names
         return update_activity_names(request['directory'],request['observations'])
+    if action == 'recommend_frames':
+        from reference_recommendation import recommend
+        return recommend(request)
     if action == 'inspect': return source_info(request['file'])
     if action == 'frame':
         info = request['source']

@@ -34,11 +34,17 @@ class FrameServerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             data = np.arange(np.prod(shape), dtype=np.uint16).reshape(shape)
-            stored = data if order == 'TCZYX' else data.transpose(0, 1, 2, 4, 3)
-            with h5py.File(root / 'data.h5', 'w') as file:
-                file.create_dataset('data', data=stored, compression='lzf')
+            source = root / ('data.nwb' if order == 'TXYZ' else 'data.h5')
+            with h5py.File(source, 'w') as file:
+                if order == 'TXYZ':
+                    series = file.create_group('acquisition/CalciumImageSeries')
+                    series.attrs['neurodata_type'] = 'MultiChannelVolumeSeries'
+                    series.create_dataset('data', data=data[:,0].transpose(0,3,2,1), compression='lzf')
+                else:
+                    stored = data if order == 'TCZYX' else data.transpose(0, 1, 2, 4, 3)
+                    file.create_dataset('data', data=stored, compression='lzf')
             (root / 'metadata.json').write_text(json.dumps({'axis_order': order}))
-            info = source_info(root / 'data.h5')
+            info = source_info(source)
             (root / 'source.json').write_text(json.dumps(info))
             process = subprocess.Popen([sys.executable, str(ROOT / '+Wrapper/reference_frame_server.py'),
                                         '--directory', str(root), '--parent', str(os.getpid())])
@@ -52,8 +58,8 @@ class FrameServerTest(unittest.TestCase):
                     np.testing.assert_array_equal(pixels, expected)
                 publish(root / 'request.json', {'frame': shape[0], 'sequence': 4})
                 self.assertIn('outside', wait(root / 'response.json')['error'])
-                stat = (root / 'data.h5').stat()
-                os.utime(root / 'data.h5', ns=(stat.st_atime_ns, stat.st_mtime_ns + 1000000))
+                stat = source.stat()
+                os.utime(source, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1000000))
                 publish(root / 'request.json', {'frame': 0, 'sequence': 5})
                 self.assertIn('changed', wait(root / 'response.json')['error'])
                 (root / 'stop').touch()
@@ -71,6 +77,9 @@ class FrameServerTest(unittest.TestCase):
 
     def test_singleton(self):
         self.exercise('TCZYX', (1, 1, 1, 3, 5))
+
+    def test_single_channel_nwb(self):
+        self.exercise('TXYZ', (3, 1, 2, 5, 7))
 
 
 def make_fixtures(folder, recording):

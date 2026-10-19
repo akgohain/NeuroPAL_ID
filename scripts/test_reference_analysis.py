@@ -165,4 +165,35 @@ class AnalysisTests(unittest.TestCase):
             again=analysis.track_sequence(dict(request,resume_dir=str(directory)))
             self.assertEqual(again['observations'],result['observations'])
 
+    def test_multiple_reference_constraints_reach_tracking_and_named_activity(self):
+        root=[dict(self.rows[3],track_id=7,name='AVAL',identity_source='reviewed',identity_confidence=1),
+              dict(self.rows[3],track_id=8,x=16.,channel=1,name='AVAR',identity_source='reviewed',identity_confidence=1)]
+        partial=dict(root[0],t=6,x=13.25,confidence=1.,provenance='reviewed')
+        another=dict(root[1],t=2,x=16.5,confidence=1.,provenance='confirmed')
+        seed_rows=root+[partial,another]; constrained=[]
+        def worker(request,directory,number):
+            constrained.extend((r['track_id'],r['t']) for r in request['observations'] if r['provenance']!='zephir')
+            stage=directory/f'zephir-{number}'; stage.mkdir()
+            # Deliberately move every prediction: explicit constraints must win exactly.
+            rows=[dict(seed,t=t+1,x=seed['x']+.2,channel=1,provenance='zephir',confidence=0.)
+                  for seed in root for t in range(request['frame_range'][0],request['frame_range'][1]+1)]
+            return dict(directory=str(stage),observations=rows)
+        request=dict(source=self.info,observations=seed_rows,frame_range=[0,6],reference_frame=3,channel=1,
+                     window_size=3,epochs=1,output_dir=str(self.root))
+        with patch.object(analysis,'run_window',worker):
+            result=analysis.track_sequence(request)
+        self.assertEqual(len(result['observations']),14)
+        self.assertIn((7,6),constrained); self.assertIn((8,2),constrained)
+        by_key={(r['track_id'],r['t']):r for r in result['observations']}
+        for seed in seed_rows:
+            for key,value in seed.items(): self.assertEqual(by_key[(seed['track_id'],seed['t'])][key],value)
+        exported=read_seeds(Path(result['directory'])/'tracks',self.info)
+        self.assertEqual(exported,result['observations'])
+        measured=analysis.activity(self.request(result['observations']))
+        with h5py.File(Path(measured['directory'])/'activity.h5') as f:
+            self.assertEqual(list(f['neuron_id'][:]),[7,8])
+            self.assertEqual(list(f['neuron_name'].asstr()[:]),['AVAL','AVAR'])
+            self.assertEqual(f['centers_xyz'][5,0,0],partial['x'])
+            self.assertTrue(np.isfinite(f['dff'][:,0]).all())
+
 if __name__=='__main__':unittest.main()
