@@ -109,50 +109,11 @@ function get_slice(~, view, ~, reset_limits, requested_z)
         % Are we showing the neuron annotations?
         if app.show_labels
 
-            % Get the labels.
-            labels = app.image_neurons.get_annotations();
+            % Render the structured human assertion, including unresolved membership.
+            labels = app.image_neurons.get_annotation_labels();
             labels = labels(current_z_indices);
-
-            % Get the ON/OFF annotations.
-            is_on = app.image_neurons.get_is_annotations_on();
-            is_on = is_on(current_z_indices);
-
-            % Get the confidences.
-            confidences = app.image_neurons.get_annotation_confidences();
-            confidences = confidences(current_z_indices);
-
-            % Get the emphasized neurons.
-            is_emphasized = app.image_neurons.get_is_emphasized();
-            is_emphasized = is_emphasized(current_z_indices);
-
-            % Remove empty labels.
             is_label = ~cellfun('isempty', labels);
             labels = labels(is_label);
-            is_on = is_on(is_label);
-            confidences = confidences(is_label);
-            is_emphasized = is_emphasized(is_label);
-
-            % Add ON/OFF & confidence to the labels.
-            for i = 1:length(confidences)
-
-                % Is the neuron ON/OFF.
-                switch is_on(i)
-                    case false
-                        labels{i} = [labels{i} '-OFF'];
-                    case true
-                        labels{i} = [labels{i} '-ON'];
-                end
-
-                % Is the user uncertain about the ID?
-                if confidences(i) <= 0.5
-                    labels{i} = [labels{i} '?'];
-                end
-
-                % Is the neuron emphasized?
-                if is_emphasized(i)
-                    labels{i} = [labels{i} '!'];
-                end
-            end
 
             % Draw the labels.
             app.DrawImageLabels(positions(is_label,:), labels);

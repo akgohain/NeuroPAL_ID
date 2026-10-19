@@ -1,20 +1,34 @@
 function test_manual_id_selection(app)
-% Exercise manual IDs with saved predictions and an empty prediction list.
-assert(~isempty(app.image_neurons.neurons));
+% Exercise selection with model predictions while requiring an explicit save.
+assert(numel(app.image_neurons.neurons)>=3);
 folder = tempname; mkdir(folder);
 neurons = app.image_neurons;
 id_file = app.id_file;
-save(fullfile(folder, 'neurons.mat'), 'neurons');
-copy = load(fullfile(folder, 'neurons.mat'), 'neurons');
+saved=struct('selected',app.selected_neuron,'auto',app.AutoNameCheckBox.Value, ...
+    'state',Program.GUI.ManualIDController.state(app), ...
+    'after',getappdata(app.CELL_ID,'manual_id_after_commit'), ...
+    'snapshot',getappdata(app.CELL_ID,'manual_id_file_snapshot'));
+copy=Program.GUI.ManualIDService.copyImage(neurons);
+copy.annotation_store=struct();
+for i=1:numel(copy.neurons)
+    copy.neurons(i).annotation=''; copy.neurons(i).annotation_confidence=-1;
+    copy.neurons(i).annotation_id=''; copy.neurons(i).annotation_record=struct();
+    copy.neurons(i).rank=i; copy.neurons(i).deterministic_id='AVA';
+    copy.neurons(i).probabilistic_ids={'AVA','RIM'};
+    copy.neurons(i).probabilistic_probs=[.8 .2];
+end
 Program.Handlers.neurons.unselect_neuron(false);
-app.image_neurons = copy.neurons;
+app.image_neurons = copy;
 app.selected_neuron = [];
 app.id_file = fullfile(folder, 'test_ID.mat');
-cleanup = onCleanup(@() restore_neurons(app, neurons, id_file, folder));
+app.AutoNameCheckBox.Value=false;
+setappdata(app.CELL_ID,'manual_id_after_commit',@(~,~,~) []);
+Program.GUI.ManualIDController.invalidate(app);
+cleanup = onCleanup(@() restore_neurons(app, neurons, id_file, folder,saved));
 
 unlabelled = find(arrayfun(@(n) isempty(n.annotation) && ...
     ~isempty(n.deterministic_id) && ~isempty(n.rank), app.image_neurons.neurons));
-assert(numel(unlabelled) >= 3, 'Use an example with saved auto-ID predictions.');
+assert(numel(unlabelled) >= 3);
 first = unlabelled(1); second = unlabelled(2);
 app.refreshAutoIDList();
 assert(~isempty(app.UserNeuronIDsListBox.Items));
@@ -40,16 +54,24 @@ callback = app.UserNeuronIDsListBox.ValueChangedFcn;
 callback(app.UserNeuronIDsListBox, []);
 assert(app.selected_neuron == second);
 
-% Save through the edit callback and continue to another unlabelled neuron.
+% Whitespace and native blur update the draft without persisting it.
 names = {'AVAR', 'RIMR'};
 for i = 1:2
     assert(isempty(app.image_neurons.find_user_id_neuron(names{i})));
     click_neuron(app, unlabelled(i));
-    app.IDEditField.Tag = '';
-    callback = app.IDEditField.ValueChangingFcn;
-    callback(app.IDEditField, struct('Value', [names{i} ' ']));
+    before=Annotations.Store.fingerprint(app.id_file);
+    evidence=app.image_neurons.annotation_store.evidence;
+    ui=Program.GUI.ManualIDController.ui(app);
+    ui.input.ValueChangingFcn(ui.input, struct('Value', [names{i} ' ']));
+    ui.input.Value=[names{i} ' ']; ui.input.ValueChangedFcn(ui.input,[]);
+    assert(isempty(app.image_neurons.neurons(unlabelled(i)).annotation));
+    assert(isequaln(before,Annotations.Store.fingerprint(app.id_file)));
+    Program.GUI.ManualIDController.beginMouseGesture(app,'normal');
+    result=Program.GUI.ManualIDInput.commit(app,[],unlabelled(i));
+    assert(result.changed);
     assert(strcmp(app.image_neurons.neurons(unlabelled(i)).annotation, names{i}));
-    assert(~app.is_saving_ID && ~isempty(app.selected_neuron));
+    assert(~app.is_saving_ID && isequal(app.selected_neuron,unlabelled(i)));
+    assert(isequaln(evidence,app.image_neurons.annotation_store.evidence));
     saved = load(app.id_file, 'neurons');
     assert(strcmp(saved.neurons.neurons(unlabelled(i)).annotation, names{i}));
 end
@@ -79,10 +101,15 @@ app.NeuronClicked([], struct('IntersectionPoint', [position(2), position(1), 0],
 assert(app.selected_neuron == index);
 end
 
-function restore_neurons(app, neurons, id_file, folder)
+function restore_neurons(app, neurons, id_file, folder,saved)
+Program.GUI.ManualIDController.close(app);
 app.image_neurons = neurons;
 app.id_file = id_file;
-app.selected_neuron = [];
+app.selected_neuron = saved.selected;
+app.AutoNameCheckBox.Value=saved.auto;
+setappdata(app.CELL_ID,'manual_id_after_commit',saved.after);
+setappdata(app.CELL_ID,'manual_id_file_snapshot',saved.snapshot);
+Program.GUI.ManualIDController.put(app,saved.state);
 app.refreshAutoIDList();
 Program.Routines.ID.hot_neuron_reset();
 Program.Routines.ID.get_slice(app.ZSlider, app.image_view, app.XY);

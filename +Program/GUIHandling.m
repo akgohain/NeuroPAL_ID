@@ -301,7 +301,7 @@ classdef GUIHandling
             id_items = Program.GUIHandling.main_auto_id_method_items(app);
             id_dropdown = uidropdown(parent, ...
                 'Tag', 'MainIDMethodDropDown', ...
-                'Items', id_items, ...
+                'Items', id_items, 'ItemsData', id_items, ...
                 'Tooltip', 'Auto-ID method.', ...
                 'Value', id_items{1}, ...
                 'ValueChangedFcn', @(src, event) ...
@@ -376,6 +376,7 @@ classdef GUIHandling
                 id_items = Program.GUIHandling.main_auto_id_method_items(app);
                 current_value = char(string(controls.id_dropdown.Value));
                 controls.id_dropdown.Items = id_items;
+                controls.id_dropdown.ItemsData = id_items;
                 if any(strcmp(id_items, current_value))
                     controls.id_dropdown.Value = current_value;
                 else
@@ -403,7 +404,7 @@ classdef GUIHandling
                 old_params_grid = findobj(sidebar_grid, 'Tag', 'MainMethodParamsGrid');
                 delete(old_params_grid);
                 if isprop(app, 'SideGrid') && ~isempty(app.SideGrid) && isvalid(app.SideGrid)
-                    app.SideGrid.RowHeight = {78, 430, '1x'};
+                    app.SideGrid.RowHeight = {78, '2x', '1x'};
                     app.SideGrid.RowSpacing = 8;
                     app.SideGrid.Padding = [0 10 10 8];
                 end
@@ -418,7 +419,7 @@ classdef GUIHandling
                 app.NeuronRankPanel.Title = '';
                 app.NeuronRankPanel.BorderType = 'none';
                 app.NeuronListBoxPanel.Title = 'Identity coverage';
-                sidebar_grid.RowHeight = {26, 96, 96, 0, 22, '1x'};
+                sidebar_grid.RowHeight = {0, 0, 0, 0, 22, '1x'};
                 sidebar_grid.RowSpacing = 3;
                 sidebar_grid.Padding = [0 0 0 0];
                 app.UserNeuronIDsListBoxLabel.Layout.Row = 5;
@@ -497,7 +498,7 @@ classdef GUIHandling
             id_items = Program.GUIHandling.main_auto_id_method_items(app);
             id_dropdown = uidropdown(id_row, ...
                 'Tag', 'MainIDMethodDropDown', ...
-                'Items', id_items, ...
+                'Items', id_items, 'ItemsData', id_items, ...
                 'Tooltip', 'Auto-ID method.', ...
                 'Value', id_items{1}, ...
                 'ValueChangedFcn', @(src, event) ...
@@ -536,10 +537,11 @@ classdef GUIHandling
             id_settings_button.Layout.Column = 3;
 
             header_grid = app.GridLayout24_2;
-            header_grid.ColumnWidth = {0, 0, 0, 0, 0, 0, 0, 0, 52, 100, 70, ...
-                12, 0, 0, 0, 82, 24, 12, 0, '1x', 0, 80, 24};
+            header_grid.ColumnWidth = {0, 0, 0, 0, 0, 0, 0, 0, 24, 160, 70, ...
+                12, 0, 0, 0, 112, 24, 12, 280, '1x', 8, 80, 24};
             app.UserLabel.Parent = header_grid;
-            app.UserLabel.Text = 'Review:';
+            app.SexDropDown.Items = {'XX', 'XO', 'Unknown'};
+            app.UserLabel.Text = 'ID:';
             app.UserLabel.FontWeight = 'bold';
             app.UserLabel.HorizontalAlignment = 'left';
             app.UserLabel.Layout.Row = 1;
@@ -552,6 +554,54 @@ classdef GUIHandling
             app.UserIDButton.Layout.Row = 1;
             app.UserIDButton.Layout.Column = 11;
             app.UserIDButton.Text = 'Assign';
+
+            Program.GUI.ManualIDInput.build(app);
+            setappdata(app.CELL_ID, 'manual_id_after_commit', ...
+                @(index, result, advance) app.manualIDDidCommit(index, result, advance));
+            if isempty(findall(app.NeuronsMenu, 'Tag', 'UndoManualIDMenu'))
+                uimenu(app.NeuronsMenu, 'Text', 'Undo ID edit', 'Tag', 'UndoManualIDMenu', ...
+                    'MenuSelectedFcn', @(~,~) Program.GUI.ManualIDController.undo(app));
+                uimenu(app.NeuronsMenu, 'Text', 'Next unresolved ID', 'Tag', 'ResolveManualIDMenu', ...
+                    'MenuSelectedFcn', @(~,~) Program.GUI.ManualIDService.nextUnresolved(app));
+                uimenu(app.FileMenu, 'Text', 'Import annotations…', 'Tag', 'ImportAnnotationsMenu', ...
+                    'MenuSelectedFcn', @(~,~) Program.GUI.ManualIDService.importDialog(app));
+            end
+
+            if isempty(findall(app.FileMenu, 'Tag', 'ReviewIDRecoveryMenu'))
+                uimenu(app.FileMenu, 'Text', 'Review ID recovery…', 'Tag', 'ReviewIDRecoveryMenu', ...
+                    'MenuSelectedFcn', @(~,~) Program.GUI.ManualIDService.recoveryDialog(app));
+            end
+            app.SaveIDInfoMenu.Text = 'Export neuron IDs…';
+
+            % Keep run actions compact; model choices live in their settings.
+            app.IdMetadataGridLayout.RowHeight={26,28,0};
+            methods_panel=uipanel(header_grid,'BorderType','none','Tag','MainMethodsPanel');
+            methods_panel.Layout.Row=1; methods_panel.Layout.Column=19;
+            methods_grid=uigridlayout(methods_panel,[1 4]);
+            methods_grid.RowHeight={'1x'}; methods_grid.ColumnWidth={'1x',28,'1x',28};
+            methods_grid.ColumnSpacing=6; methods_grid.Padding=[0 0 0 0];
+            rows={detect_row,id_row}; labels={app.NeuronsLabel,app.AutoLabel};
+            dropdowns={detect_dropdown,id_dropdown}; buttons={app.AutoDetectButton,app.AutoIDButton};
+            settings={detect_settings_button,id_settings_button}; crops={detect_crop_checkbox,id_crop_checkbox};
+            groups={'detect','id'}; titles={'Auto-detect','Auto-ID'};
+            for row_i=1:2
+                settings_grid=Program.GUI.MainMethodSettings.build(app,groups{row_i},titles{row_i});
+                row=rows{row_i}; row.Parent=settings_grid; row.Layout.Row=1; row.Layout.Column=1;
+                row.RowHeight={30}; row.ColumnWidth={65,'1x',90};
+                labels{row_i}.Text='Model'; labels{row_i}.Layout.Row=1; labels{row_i}.Layout.Column=1;
+                dropdowns{row_i}.Layout.Row=1; dropdowns{row_i}.Layout.Column=2;
+                settings{row_i}.Layout.Row=1; settings{row_i}.Layout.Column=3;
+                settings{row_i}.Text='Parameters…';
+                crops{row_i}.Layout.Row=1; crops{row_i}.Layout.Column=1;
+                buttons{row_i}.Parent=methods_grid; buttons{row_i}.Layout.Row=1;
+                buttons{row_i}.Layout.Column=2*row_i-1; buttons{row_i}.Text=titles{row_i};
+                group=groups{row_i};
+                icon=uibutton(methods_grid,'Text','⚙','FontSize',18, ...
+                    'Tooltip',[titles{row_i} ' settings'], ...
+                    'ButtonPushedFcn',@(~,~) Program.GUI.MainMethodSettings.open(app,group));
+                icon.Layout.Column=2*row_i;
+                if row_i==1, Program.GUI.MainDetectionInput.build(app,settings_grid); end
+            end
 
             old_manual_row = findobj(sidebar_grid, 'Tag', 'MainManualIDControlRow');
             delete(old_manual_row);
@@ -599,6 +649,7 @@ classdef GUIHandling
                     app.(content_name).Visible = 'on';
                 end
             end
+            Program.GUI.MainDetectionInput.refresh(app);
             controls = Program.GUIHandling.main_detect_id_controls(app);
             if isempty(controls)
                 return
@@ -664,16 +715,12 @@ classdef GUIHandling
                 controls.workflow_status.Tooltip = '';
             end
             if isprop(app, 'UserNeuronIDsListBoxLabel') && isvalid(app.UserNeuronIDsListBoxLabel)
-                candidate_count = 0;
-                try
-                    candidate_count = numel(app.UserNeuronIDsListBox.Items);
-                catch
-                end
-                if candidate_count == 0
+                if isempty(app.image_neurons)
                     app.UserNeuronIDsListBoxLabel.Text = 'Ranked auto-ID candidates';
                 else
-                    app.UserNeuronIDsListBoxLabel.Text = sprintf( ...
-                        'Ranked candidates for %d neurons', candidate_count);
+                    app.UserNeuronIDsListBoxLabel.Text = sprintf('Reviewed %d/%d · Resolved %d', ...
+                        app.image_neurons.num_reviewed_neurons(), app.image_neurons.num_neurons(), ...
+                        app.image_neurons.num_user_id_neurons());
                 end
             end
             if isprop(app, 'IDdLabel') && isvalid(app.IDdLabel)
@@ -707,7 +754,7 @@ classdef GUIHandling
                 controls.id_settings_button.Enable = Program.GUIHandling.on_off(neuron_count > 0);
             end
             if isprop(app, 'IDEditField') && isvalid(app.IDEditField)
-                app.IDEditField.Enable = Program.GUIHandling.on_off(neuron_count > 0);
+                Program.GUI.ManualIDInput.setEnabled(app, Program.GUIHandling.on_off(neuron_count > 0));
             end
             if isprop(app, 'UserIDButton') && isvalid(app.UserIDButton)
                 app.UserIDButton.Enable = Program.GUIHandling.on_off(neuron_count > 0);
@@ -831,6 +878,7 @@ classdef GUIHandling
                 'Tooltip', 'Edit method parameters. Values are validated when applied.');
             table.Layout.Row = 1;
             table.Layout.Column = 1;
+            setappdata(table,'main_method_identity',Program.GUIHandling.main_method_identity(app,group));
 
             button_grid = uigridlayout(grid, ...
                 'RowHeight', {'1x'}, ...
@@ -986,13 +1034,22 @@ classdef GUIHandling
                 return
             end
 
+            owner=getappdata(table,'main_method_identity');
+            if ~isempty(owner) && ~strcmp(owner,Program.GUIHandling.main_method_identity(app,group))
+                uialert(ancestor(table,'figure'),'The selected method changed. Reopen its settings.','Method parameters'); return;
+            end
+            Program.GUIHandling.main_method_params(app,group);
             data = table.Data;
             params = struct();
-            for i = 1:min(numel(specs), size(data, 1))
-                spec = specs{i};
-                value = Program.GUIHandling.coerce_param_table_value(data{i, 2}, spec);
-                data{i, 2} = Program.GUIHandling.param_table_value(value);
-                params.(spec.key) = value;
+            try
+                for i = 1:min(numel(specs), size(data, 1))
+                    spec = specs{i};
+                    value = Program.GUIHandling.coerce_param_table_value(data{i, 2}, spec);
+                    data{i, 2} = Program.GUIHandling.param_table_value(value);
+                    params.(spec.key) = value;
+                end
+            catch ME
+                uialert(ancestor(table,'figure'),ME.message,'Method parameters'); return;
             end
             table.Data = data;
             setappdata(app.CELL_ID, sprintf('main_%s_params', char(string(group))), params);
@@ -1007,6 +1064,12 @@ classdef GUIHandling
             if isfield(spec, 'enabled') && ~spec.enabled
                 value = spec.value;
                 return
+            end
+
+            if strcmp(spec.key,'score_threshold')
+                threshold=Program.GUIHandling.moe_score_threshold(raw_value);
+                if isnan(threshold), value='default'; else, value=sprintf('%.12g',threshold); end
+                return;
             end
 
             if isnumeric(spec.value)
@@ -1035,6 +1098,18 @@ classdef GUIHandling
             end
         end
 
+        function value = moe_score_threshold(raw)
+            if isnumeric(raw) && isscalar(raw) && isnan(raw), value=NaN; return; end
+            text=strtrim(string(raw));
+            if isscalar(text) && (strlength(text)==0 || strcmpi(text,'default'))
+                value=NaN; return;
+            end
+            value=str2double(text);
+            if ~isscalar(value) || ~isfinite(value) || value<0 || value>1
+                error('Methods:MoEScoreThreshold','Enter default or a score threshold from 0 to 1.');
+            end
+        end
+
         function text = param_table_value(value)
             if isnumeric(value)
                 text = sprintf('%g', double(value));
@@ -1044,6 +1119,9 @@ classdef GUIHandling
         end
 
         function text = param_allowed_text(spec)
+            if strcmp(spec.key,'score_threshold')
+                text='default or [0, 1]'; return;
+            end
             if isnumeric(spec.value) && ~isempty(spec.limits)
                 text = sprintf('[%g, %g]', spec.limits(1), spec.limits(2));
             elseif isfield(spec, 'allowed') && ~isempty(spec.allowed)
@@ -1086,6 +1164,7 @@ classdef GUIHandling
                         struct('key', 'bundle_path', 'label', 'Bundle', 'value', Methods.MethodBundle.resolve('detection_moe', ''), 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'folder'), ...
                         struct('key', 'python_executable', 'label', 'Python', 'value', '', 'limits', [], 'integer', false, 'enabled', true, 'path_kind', 'file'), ...
                         struct('key', 'dataset_id', 'label', 'Dataset', 'value', 'unknown', 'limits', [], 'integer', false, 'enabled', true, 'allowed', {{'unknown', '000541', '000692', '000714', '000715', '000981'}}), ...
+                        struct('key', 'score_threshold', 'label', 'Score threshold', 'value', 'default', 'limits', [], 'integer', false, 'enabled', true), ...
                         struct('key', 'device', 'label', 'Device', 'value', 'cpu', 'limits', [], 'integer', false, 'enabled', true, 'allowed', {{'cpu', 'cuda', 'auto'}})};
                 case "spotiflow_supervised"
                     specs = { ...
@@ -1171,10 +1250,7 @@ classdef GUIHandling
 
         function store_main_method_param(app, group, spec, field)
             key = sprintf('main_%s_params', char(string(group)));
-            params = struct();
-            if isappdata(app.CELL_ID, key)
-                params = getappdata(app.CELL_ID, key);
-            end
+            params = Program.GUIHandling.main_method_params(app,group);
 
             if isnumeric(field.Value)
                 value = double(field.Value);
@@ -1445,17 +1521,12 @@ classdef GUIHandling
                     'User confirmed overwrite.');
             end
 
+            if ~Program.GUI.ManualIDService.prepareClose(app), return; end
+
+            detection_mode='rgbw'; selected_channels=[]; detection_merge_radius=2;
             if strcmp(backend, 'detection_moe')
-                % Display toggles must not remove channels from the four-channel model.
-                rgbw = double(app.image_prefs.RGBW(:)');
-                if numel(rgbw) ~= 4 || any(~isfinite(rgbw)) || ...
-                        any(rgbw < 1 | rgbw > size(app.image_data,4) | mod(rgbw,1) ~= 0) || ...
-                        numel(unique(rgbw)) ~= 4
-                    Program.GUIHandling.safe_uialert(app, ...
-                        'MoE requires four distinct assigned RGBW channels. Check image channel metadata.', ...
-                        'MoE Channel Mapping', 'Icon', 'error');
-                    return
-                end
+                [detection_mode,rgbw,detection_merge_radius]=Program.GUI.MainDetectionInput.get(app);
+                selected_channels=rgbw-1;
             else
                 rgbw = Program.GUIHandling.main_detection_channel_indices(app);
             end
@@ -1464,6 +1535,10 @@ classdef GUIHandling
             detected_params = previous_params;
             data_rgbw = app.image_data(:, :, :, rgbw);
             readout_rgbw = Methods.ColorReadout(data_rgbw);
+            if strcmp(backend,'detection_moe')
+                readout_rgbw=Methods.ColorReadout(app.image_data,app.image_prefs.RGBW);
+                if strcmp(detection_mode,'multi_channel'), data_rgbw=app.image_data; end
+            end
             params = Program.GUIHandling.main_method_params(app, 'detect');
             if strcmp(backend, 'yolo')
                 params = Program.GUIHandling.migrate_yolo_detect_params(params);
@@ -1509,6 +1584,9 @@ classdef GUIHandling
                             'LogFcn', @(message) Program.GUIHandling.auto_detect_log(app, '%s', message));
                     case 'detection_moe'
                         [sp, moe_params] = Methods.MoEDetect.detect(app.image_file, data_rgbw, app.image_um_scale', ...
+                            'InputMode', string(detection_mode), 'SelectedChannels', selected_channels, ...
+                            'ScoreThreshold',Program.GUIHandling.moe_score_threshold(Program.GUIHandling.param_value(params,'score_threshold','default')), ...
+                            'MergeRadiusUm', detection_merge_radius, ...
                             'JobToken', job.Token, ...
                             'ColorReadoutData', readout_rgbw, ...
                             'BundlePath', Program.GUIHandling.param_value(params, 'bundle_path', ''), ...
@@ -1517,6 +1595,9 @@ classdef GUIHandling
                             'Device', Program.GUIHandling.param_value(params, 'device', 'cpu'), ...
                             'OutputDir', Program.GUIHandling.method_output_dir(app, 'moe'), ...
                             'KeepArtifacts', true);
+                        moe_params.selected_source_channels=rgbw;
+                        moe_params.source_channel_index_base=1;
+                        moe_params.color_readout_channels=app.image_prefs.RGBW;
                         detected_params = moe_params;
                         if ~isempty(sp)
                             prepared_moe_neurons = Neurons.Image(sp, source_context.worm.body, 'scale', source_context.scale');
@@ -1611,12 +1692,6 @@ classdef GUIHandling
                     'After Z restore: slider=%s.', Program.GUIHandling.safe_mat2str(app.ZSlider.Value));
 
                 Program.GUIHandling.auto_detect_log(app, ...
-                    'Saving ID state...');
-                Program.GUIHandling.save_auto_detect_id_state(app);
-                Program.GUIHandling.auto_detect_log(app, ...
-                    'ID state save complete.');
-
-                Program.GUIHandling.auto_detect_log(app, ...
                     'Calling Program.Routines.ID.hot_neuron_reset...');
                 Program.Routines.ID.hot_neuron_reset();
                 Program.GUIHandling.auto_detect_log(app, ...
@@ -1637,11 +1712,16 @@ classdef GUIHandling
                     app.image_neurons.num_neurons(), ...
                     Program.GUIHandling.graphics_child_count(app.XY), ...
                     Program.GUIHandling.graphics_child_count(app.MaxProjection));
+                % Preserve the previous file if importing or rendering fails.
+                Program.GUIHandling.save_auto_detect_id_state(app);
             catch ME
-                if strcmp(backend, 'detection_moe') && ...
-                        isequaln(Program.Helpers.main_job_context(app), source_context)
+                if isequaln(Program.Helpers.main_job_context(app), source_context)
                     app.image_neurons = previous_neurons;
                     app.mp_params = previous_params;
+                    Program.GUIHandling.try_auto_detect_ui_step(app, 'restore previous annotations', ...
+                        @() Program.Routines.ID.hot_neuron_reset());
+                    Program.GUIHandling.try_auto_detect_ui_step(app, 'render previous annotations', ...
+                        @() Program.Routines.ID.render());
                 end
                 Program.GUIHandling.auto_detect_log(app, ...
                     'ERROR post-detect propagation threw %s: %s', ME.identifier, ME.message);
@@ -1758,24 +1838,18 @@ classdef GUIHandling
         end
 
         function save_auto_detect_id_state(app)
+            % Share the authoritative ID writer with manual edits and geometry saves.
             if isempty(app.image_neurons)
-                error('Program:GUIHandling:NoImageNeurons', ...
-                    'Cannot save auto-detect results because image_neurons is empty.');
+                error('Program:GUIHandling:NoImageNeurons', 'Cannot save without a neuron source.');
             end
-            if ~isprop(app, 'id_file') || isempty(app.id_file)
-                error('Program:GUIHandling:NoIDFile', ...
-                    'Cannot save auto-detect results because app.id_file is empty.');
+            if isfolder(app.id_file)
+                error('Program:GUIHandling:IDFile', 'The ID destination is a directory, not a MAT file.');
             end
+            Program.GUI.ManualIDService.save(app);
+        end
 
-            id_file = char(string(app.id_file));
-            version = Program.ProgramInfo.version;
-            neurons = app.image_neurons;
-            mp_params = app.mp_params;
-            if isempty(mp_params) || ~isstruct(mp_params)
-                mp_params = struct();
-            end
-            mp_params.k = neurons.num_neurons();
-            save(id_file, 'version', 'neurons', 'mp_params', '-v7.3');
+        function remove_id_stage(path)
+            if isfile(path), delete(path); end
         end
 
         function text = array_summary(value)
@@ -1867,6 +1941,11 @@ classdef GUIHandling
         end
 
         function run_transformer_auto_id(app)
+            store = Program.GUI.ManualIDService.ensure(app);
+            if store.constraints_enabled
+                uialert(app.CELL_ID, 'This backend does not consume manual identity constraints. Turn off CRF constraints in Auto-ID settings or select the supported CRF backend.', 'Unsupported annotation constraints');
+                return;
+            end
             params = Program.GUIHandling.main_method_params(app, 'id');
             try
                 Methods.TransformerAutoId.run(app, ...
@@ -1891,6 +1970,11 @@ classdef GUIHandling
         end
 
         function run_crfid2_auto_id(app)
+            store = Program.GUI.ManualIDService.ensure(app);
+            if store.constraints_enabled
+                uialert(app.CELL_ID, 'This backend does not consume manual identity constraints. Turn off CRF constraints in Auto-ID settings or select the supported CRF backend.', 'Unsupported annotation constraints');
+                return;
+            end
             params = Program.GUIHandling.main_method_params(app, 'id');
             try
                 Methods.CRFCellID2.run(app, ...
@@ -2186,12 +2270,32 @@ classdef GUIHandling
                 'External_Dependencies', 'yolo_inf2', 'best.pt'));
         end
 
+        function method = main_method_identity(app, group)
+            if strcmp(group,'detect')
+                method=char(string(Program.GUIPreferences.get_detection_backend()));
+            else
+                controls=Program.GUIHandling.main_detect_id_controls(app); method='GAT';
+                if ~isempty(controls), method=char(string(controls.id_dropdown.Value)); end
+            end
+            method=matlab.lang.makeValidName(lower(method));
+        end
+
         function params = main_method_params(app, group)
             key = sprintf('main_%s_params', char(string(group)));
-            params = struct();
-            if isappdata(app.CELL_ID, key)
-                params = getappdata(app.CELL_ID, key);
+            owner_key=[key '_method']; bank_key=[key '_by_method'];
+            method=Program.GUIHandling.main_method_identity(app,group);
+            params=struct(); bank=struct(); owner='';
+            if isappdata(app.CELL_ID,key), params=getappdata(app.CELL_ID,key); end
+            if isappdata(app.CELL_ID,owner_key), owner=getappdata(app.CELL_ID,owner_key); end
+            if isappdata(app.CELL_ID,bank_key), bank=getappdata(app.CELL_ID,bank_key); end
+            % Keep bundle paths and hyperparameters with their selected backend.
+            if ~isempty(owner) && ~strcmp(owner,method)
+                bank.(owner)=params; params=struct();
+                if isfield(bank,method), params=bank.(method); end
+                setappdata(app.CELL_ID,key,params);
+                setappdata(app.CELL_ID,bank_key,bank);
             end
+            setappdata(app.CELL_ID,owner_key,method);
         end
 
         function value = param_value(params, field_name, default_value)
@@ -3437,6 +3541,13 @@ classdef GUIHandling
         function send_focus(ui_element)
             % Send focus to a UI element.
             % Hack: Matlab App Designer!!!
+            input=getappdata(ui_element,'manual_id_input');
+            if ~isempty(input) && isvalid(input)
+                owner=getappdata(ui_element,'manual_id_owner');
+                Program.GUI.ManualIDInput.sync(owner);
+                Program.GUI.ManualIDController.noteFocus(owner,'input');
+                ui_element=input;
+            end
             focus(ui_element);
         end
 

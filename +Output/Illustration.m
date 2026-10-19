@@ -209,11 +209,11 @@ classdef Illustration
                 
                 % Determine the neuron names, image coordinates, ID
                 % confidence, ON/OFF annotations, & emphasis.
-                neuron_name = arrayfun(@(x) x.annotation, neurons, 'UniformOutput' , false);
+                neuron_name = arrayfun(@(x) x.annotation_label(), neurons, 'UniformOutput', false);
                 neuron_pos(:,1:2) = neuron_pos(:,1:2) * image_size;
-                neuron_conf = arrayfun(@(x) x.annotation_confidence, neurons);
-                neuron_on = arrayfun(@(x) double(x.is_annotation_on), neurons);
-                neuron_emphasized = arrayfun(@(x) x.is_emphasized, neurons);
+                neuron_conf = ones(1, numel(neurons));
+                neuron_on = nan(1, numel(neurons));
+                neuron_emphasized = false(1, numel(neurons));
             end
             
             % Divide the selected display range into non-overlapping slabs.

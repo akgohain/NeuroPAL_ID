@@ -78,12 +78,10 @@ function hot_neuron_reset()
     else
         % Show the neuron counts.
         user_id_neurons = app.image_neurons.user_id_neurons();
-        app.UserNeuronIDsListBoxLabel.Text = sprintf('User Neuron IDs = %d/%d', ...
-            length(user_id_neurons), app.image_neurons.num_neurons());
+        app.UserNeuronIDsListBoxLabel.Text = sprintf('Reviewed %d/%d · Resolved %d', ...
+            app.image_neurons.num_reviewed_neurons(), app.image_neurons.num_neurons(), length(user_id_neurons));
 
-        % Remove emphasized neurons. They're not really ID'd.
-        is_emphasized = vertcat(user_id_neurons.is_emphasized);
-        user_id_neurons = user_id_neurons(~is_emphasized);
+        % Emphasis changes presentation, never canonical identity occupancy.
 
         % Separate the neurons into those with & without user IDs.
         user_id_names = vertcat({user_id_neurons.annotation});

@@ -7,13 +7,15 @@ function open(path)
     if app.is_opening_file
         return;
     end
+    if ~Program.GUI.ManualIDService.prepareClose(app), return; end
     if ~Program.ProcessingSession.prepareOpen(app), return; end
     app.is_opening_file = true;
     opening_guard = onCleanup(@() local_finish_open(app));
     
     % Unselect any neurons.
     Program.Handlers.neurons.unselect_neuron();
-    if ~isempty(app.id_file) && exist(app.id_file, 'file')
+    if ~isempty(app.id_file) && exist(app.id_file, 'file') && ...
+            (isempty(app.image_neurons) || isempty(app.image_neurons.annotation_read_only_reason))
         source = dbstack();
         if numel(source) < 2 || ~contains(source(2).name, 'pass_to_main')
             Program.Handlers.neurons.save_id_file();
@@ -229,7 +231,10 @@ function open(path)
         app.AgeDropDown.Value = 'Adult';
         app.worm.age = 'Adult';
     end
-    app.SexDropDown.Value = worm.sex;
+    sex = Annotations.Catalog.normalizeSex(worm.sex);
+    if isempty(sex), sex = 'Unknown'; end
+    app.worm.sex = sex;
+    app.SexDropDown.Value = sex;
     app.StrainEditField.Value = worm.strain;
     app.SubjectNotesTextArea.Value = worm.notes;
 
@@ -308,6 +313,9 @@ function open(path)
     app.selected_neuron = [];
 
     % Draw everything.
+    Program.GUI.ManualIDController.invalidate(app);
+    if isappdata(app.CELL_ID, 'manual_id_file_snapshot'), rmappdata(app.CELL_ID, 'manual_id_file_snapshot'); end
+    Program.GUI.ManualIDService.ensure(app);
     app.refreshAutoIDList();
 
     if ismember('is_matched', fieldnames(app.image_prefs))
@@ -332,6 +340,9 @@ function open(path)
     close(d)
 
     Program.Helpers.drag_event_listeners(app);
+    if ~isempty(app.image_neurons.annotation_read_only_reason)
+        uialert(app.CELL_ID, app.image_neurons.annotation_read_only_reason, 'Annotation recovery needs review');
+    end
     
     % Done.
     app.is_opening_file = false;

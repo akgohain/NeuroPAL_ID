@@ -59,11 +59,7 @@ classdef neuron_gui
                 end
 
                 % If it does, save our neuron identities to that file.
-                version = Program.ProgramInfo.version;
-                mp_params = app.mp_params;
-                mp_params.k = length(obj.neurons);
-                neurons = obj.neurons;
-                save(id_file, 'version', 'neurons', 'mp_params');
+                Program.GUI.ManualIDService.save(app);
             end
         end
 
@@ -97,11 +93,11 @@ classdef neuron_gui
                 % neuron currently being selected.
                 app.AutoIDDropDown.Items = {''};
                 app.AutoIDDropDown.Value = '';
-                app.IDEditField.Value = '';
+                Program.GUI.ManualIDInput.setValue(app, '');
 
                 % Disable those same gui components.
                 app.AutoIDDropDown.Enable = 'off';
-                app.IDEditField.Enable = 'off';
+                Program.GUI.ManualIDInput.setEnabled(app, 'off');
                 app.AutoIDButton.Enable = 'off';
                 app.UserIDButton.Enable = 'off';
 

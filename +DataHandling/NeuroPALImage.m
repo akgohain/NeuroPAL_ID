@@ -177,7 +177,7 @@ classdef NeuroPALImage
                 % Correct the worm info.
                 worm.body = prefs.body_part;
                 worm.age = 'Adult';
-                worm.sex = 'XX';
+                worm.sex = 'Unknown';
                 worm.strain = '';
                 worm.notes = '';
                 prefs = rmfield(prefs, 'body_part');
@@ -301,7 +301,14 @@ classdef NeuroPALImage
             if isempty(neurons) && exist(id_file, 'file')
 
                 % Load the neurons file.
-                id_data = load(id_file);
+                try
+                    [id_data, ~, annotation_issues] = Annotations.Store.loadValidated(id_file);
+                catch annotation_failure
+                    sex = '';
+                    if isstruct(worm) && isfield(worm, 'sex'), sex = worm.sex; end
+                    [id_data, annotation_issues] = DataHandling.NeuroPALImage.readOnlyIDProjection( ...
+                        id_file, sex, info.scale, size(data), annotation_failure);
+                end
 
                 % Get the ID file version.
                 if isfield(id_data, 'version')
@@ -350,7 +357,7 @@ classdef NeuroPALImage
                     % Update the file version.
                     version = ProgramInfo.version;
                     mp_params = mp;
-                    save(id_file, 'version', 'neurons', 'mp_params', '-v7.3');
+                    % Preserve the original legacy file; migration is saved with the next deliberate edit.
                 
                 % No version.
                 elseif version < 1
@@ -409,9 +416,129 @@ classdef NeuroPALImage
                     
                     % Update the file version.
                     version = ProgramInfo.version;
-                    save(id_file, 'version', 'neurons', 'mp_params', '-v7.3');
+                    % Preserve the original legacy file; migration is saved with the next deliberate edit.
                 end
             end
+            % The top-level store is authoritative over the legacy projection.
+            if exist('id_data', 'var') && ~isempty(neurons)
+                if isfield(id_data, 'annotation_store')
+                    Annotations.Store.validate(id_data.annotation_store);
+                    Program.GUI.ManualIDService.apply(neurons, id_data.annotation_store);
+                end
+                if ~isempty(annotation_issues)
+                    blocking = ~ismember({annotation_issues.code}, {'embedded-store-mismatch', 'evidence-unavailable'});
+                    if any(blocking)
+                        neurons.annotation_read_only_reason = strjoin({annotation_issues(blocking).message}, ' ');
+                    end
+                end
+            end
+        end
+
+        function [payload, issues] = readOnlyIDProjection(path, sex, scale, dims, failure)
+            % Keep the image inspectable without blessing a damaged ID store.
+            reason = sprintf('The authoritative ID file failed validation (%s): %s. Compatibility labels are unverified and read-only; use ID recovery before editing.', ...
+                failure.identifier, failure.message);
+            image = Neurons.Image([], 'scale', scale);
+            raw = struct();
+            try
+                variables = whos('-file', path, 'neurons');
+                if ~isempty(variables), raw = load(path, 'neurons'); end
+            catch projection_failure
+                reason = sprintf('%s The compatibility projection is also unreadable: %s', reason, projection_failure.message);
+            end
+            if isfield(raw, 'neurons') && isa(raw.neurons, 'Neurons.Image') && isscalar(raw.neurons)
+                dims(end+1:3) = 1;
+                bounds = double(dims(1:3));
+                omitted = 0;
+                for i = 1:numel(raw.neurons.neurons)
+                    previous = raw.neurons.neurons(i);
+                    position = previous.position;
+                    if ~isnumeric(position) || ~isreal(position) || numel(position) ~= 3 || ...
+                            any(~isfinite(position(:))) || any(position(:)' < 1) || any(position(:)' > bounds)
+                        omitted = omitted + 1; continue;
+                    end
+                    neuron = Neurons.Neuron();
+                    neuron.position = reshape(double(position), 1, 3);
+                    for field = {'annotation', 'annotation_id'}
+                        value = previous.(field{1});
+                        if (ischar(value) && (isrow(value) || isempty(value))) || ...
+                                (isstring(value) && isscalar(value) && ~ismissing(value))
+                            neuron.(field{1}) = char(value);
+                        elseif strcmp(field{1}, 'annotation')
+                            neuron.annotation = 'UNREADABLE_LEGACY_LABEL';
+                        end
+                    end
+                    confidence = previous.annotation_confidence;
+                    if isnumeric(confidence) && isreal(confidence) && isscalar(confidence) && isfinite(confidence)
+                        neuron.annotation_confidence = confidence;
+                    end
+                    state = previous.is_annotation_on;
+                    if (isnumeric(state) || islogical(state)) && isreal(state) && isscalar(state) && ...
+                            (isnan(state) || any(state == [0 1]))
+                        neuron.is_annotation_on = state;
+                    end
+                    emphasized = previous.is_emphasized;
+                    if (isnumeric(emphasized) || islogical(emphasized)) && isreal(emphasized) && ...
+                            isscalar(emphasized) && any(emphasized == [0 1])
+                        neuron.is_emphasized = logical(emphasized);
+                    end
+                    for field = {'color', 'color_readout', 'baseline'}
+                        value = previous.(field{1}); replacement = nan(1, 4);
+                        if isnumeric(value) && isreal(value) && isvector(value)
+                            count = min(4, numel(value)); replacement(1:count) = value(1:count);
+                        end
+                        neuron.(field{1}) = replacement;
+                    end
+                    covariance = previous.covariance;
+                    if isnumeric(covariance) && isreal(covariance) && numel(covariance) == 9
+                        neuron.covariance = reshape(covariance, 1, 3, 3);
+                    end
+                    image.neurons(end+1) = neuron;
+                end
+                if omitted > 0
+                    reason = sprintf('%s %d compatibility centers with invalid geometry were omitted from this display only.', reason, omitted);
+                end
+            end
+            % Duplicate/missing legacy owner tokens cannot establish correspondence.
+            ids = {image.neurons.annotation_id};
+            for i = 1:numel(ids)
+                if ~isempty(ids{i}) && sum(strcmp(ids, ids{i})) > 1
+                    image.neurons(i).annotation_id = '';
+                end
+            end
+            context = struct('sex', sex, 'recovery_mode', 'compatibility-only', ...
+                'recovery_id_file', path, 'recovery_error_identifier', failure.identifier, ...
+                'recovery_error', failure.message);
+            for i = 1:numel(image.neurons)
+                parsed = Annotations.Catalog.parse(image.neurons(i).annotation, sex, true);
+                if ~isnan(image.neurons(i).is_annotation_on) && ...
+                        (isempty(parsed.candidates) || ~all(ismember(parsed.candidates, {'AWCL', 'AWCR'})))
+                    image.neurons(i).is_annotation_on = NaN;
+                end
+            end
+            [store, owners] = Annotations.Store.create(image, context);
+            for i = 1:numel(store.records)
+                image.neurons(i).annotation_id = owners{i};
+                record = store.records(i);
+                record.review = 'needs-review';
+                record.issue = strtrim(sprintf('%s Read-only compatibility projection; authoritative identity integrity is unresolved.', record.issue));
+                record.provenance.source = 'read-only-compatibility-projection';
+                store.records(i) = record;
+                store.migration_issues(end+1) = struct('owner_id', record.owner_id, ...
+                    'message', record.issue, 'raw', record.provenance.raw);
+                store.evidence(i).origin = 'read-only-compatibility-snapshot';
+                store.evidence(i).originality = 'Unverified display projection; original model evidence remains in the untouched ID file.';
+                store.evidence(i).values.recovery_reference_file = path;
+                digest = java.security.MessageDigest.getInstance('SHA-256');
+                bytes = unicode2native(jsonencode(store.evidence(i).values, 'ConvertInfAndNaN', false), 'UTF-8');
+                digest.update(typecast(uint8(bytes(:)), 'int8'));
+                store.evidence(i).sha256 = lower(reshape(dec2hex(typecast(digest.digest(), 'uint8'), 2).', 1, []));
+            end
+            Annotations.Store.validate(store);
+            Program.GUI.ManualIDService.apply(image, store);
+            image.annotation_read_only_reason = reason;
+            payload = struct('version', Program.ProgramInfo.version, 'neurons', image, 'annotation_store', store);
+            issues = struct('code', 'authoritative-store-invalid', 'message', reason);
         end
 
         function np_file = convertCZI(czi_file, parent_token)
@@ -498,7 +625,7 @@ classdef NeuroPALImage
             % Initialize the worm info.
             worm.body = 'Head';
             worm.age = 'Adult';
-            worm.sex = 'XX';
+            worm.sex = 'Unknown';
             worm.strain = '';
             worm.notes = '';
                 
@@ -573,7 +700,7 @@ classdef NeuroPALImage
                 DataHandling.NeuroPALImage.h5_read_string( ...
                     nwb_file, '/general/subject/growth_stage', 'Adult'));
             worm.sex = DataHandling.NeuroPALImage.normalize_sex( ...
-                DataHandling.NeuroPALImage.h5_read_string(nwb_file, '/general/subject/sex', 'XX'));
+                DataHandling.NeuroPALImage.h5_read_string(nwb_file, '/general/subject/sex', 'Unknown'));
             worm.strain = DataHandling.NeuroPALImage.h5_read_string( ...
                 nwb_file, '/general/subject/strain', '');
             worm.notes = DataHandling.NeuroPALImage.h5_read_string( ...
@@ -658,8 +785,10 @@ classdef NeuroPALImage
             raw_sex = char(string(raw_sex));
             if any(strcmp(raw_sex, {'XO', 'O', 'o', 'M', 'm', 'Male', 'male'}))
                 sex = 'XO';
-            else
+            elseif any(strcmpi(raw_sex, {'XX', 'F', 'Female', 'Hermaphrodite', 'H'}))
                 sex = 'XX';
+            else
+                sex = 'Unknown';
             end
         end
 
@@ -1067,7 +1196,7 @@ classdef NeuroPALImage
             % Initialize the worm info.
             worm.body = 'Head';
             worm.age = 'Adult';
-            worm.sex = 'XX';
+            worm.sex = 'Unknown';
             worm.strain = '';
             worm.notes = '';
             
