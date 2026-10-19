@@ -59,7 +59,12 @@ class PerformanceAppContract(unittest.TestCase):
         self.assertIn("main_drag_event_callbacks", self.method("startupFcn"))
         self.assertNotIn("addlistener(app.CELL_ID, 'WindowMousePress'", self.code)
         self.assertIn("Program.Helpers.log_event", self.method("logEvent"))
-        self.assertIn("Program.Helpers.cleanup_ui_runtime", self.method("delete"))
+        self.assertIn("Program.Routines.initialize()", self.method("startupFcn"))
+        initialize_code = (ROOT / "+Program/+Routines/initialize.m").read_text()
+        self.assertIn("window = Program.GUIHandling.window_fig;", initialize_code)
+        self.assertIn("window.DeleteFcn = @(~, ~) Program.Helpers.cleanup_ui_runtime(app);",
+                      initialize_code)
+        self.assertIn("delete(app.CELL_ID)", self.method("delete"))
         open_code = (ROOT / "+Program/+Routines/open.m").read_text()
         self.assertIn("Program.Helpers.drag_event_listeners(app)", open_code)
         self.assertNotIn("addlistener(app.CELL_ID, 'WindowMousePress'", open_code)

@@ -9,6 +9,7 @@ for name={'native','legacy','singleton'}
     if ~strcmp(name{1},'singleton'), assert(strcmp(reader.Backend,'native')); end
     clear cleanup
 end
+w.View.DisplayMode.Value='Slab'; w.View.redraw();
 w.Analysis.Mode.Value='ΔF/F'; w.Analysis.showActivity();
 frames=[400 401 402 401 400]; times=zeros(size(frames)); reads=times;
 for i=1:numel(frames)
@@ -21,12 +22,13 @@ for i=1:numel(frames)
 end
 assert(w.Reader.Capacity==5 && numel(w.Reader.Frames)<=5);
 trace=findobj(w.Analysis.Axes,'Tag','activity_trace'); image=getappdata(w.Axes,'main_slice_image'); cursor=w.Analysis.FrameCursor;
-markers=findobj(w.View.Projection,'Tag','reference_neurons_0');
+markers=findobj(w.Axes,'Tag','reference_neurons_0');
 for frame=410:419, w.Frame.Value=frame; w.render(); drawnow; end
 assert(numel(w.Reader.Frames)==5 && isequal(w.Reader.Frames,415:419));
+assert(isscalar(trace) && isscalar(cursor) && isscalar(markers));
 assert(isvalid(trace) && isvalid(cursor) && isvalid(markers));
 assert(isequal(image,getappdata(w.Axes,'main_slice_image')) && cursor.Value==419);
-assert(size(w.View.ListRows,1)==39 && all(w.View.ListRows(:,2)==419));
+assert(size(w.View.ListRows,1)==nnz(w.Rows(:,2)==419) && all(w.View.ListRows(:,2)==419));
 for frame=420:450, w.View.FramePreview.request(frame); end
 w.View.FramePreview.flush(); assert(w.CacheFrame==450 && w.Frame.Value==450);
 w.View.FramePreview.request(451); w.Frame.Value=460; w.View.FramePreview.finish(w.Frame,[]);

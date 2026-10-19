@@ -21,12 +21,18 @@ classdef VideoPlayback < handle
         Playing = false
         Worker
         Lifetime
+        Window
+        Parent
+        PreviousResize
+        ResizeCallback
+        Disposing = false
         PreviousKey
         KeyCallback
     end
     methods
         function obj = VideoPlayback(view,parent)
             obj.View=view; c=view.Controller;
+            obj.Window=c.App.CELL_ID; obj.Parent=parent;
             obj.Panel=uigridlayout(parent,[3 1]); obj.Panel.Padding=[8 2 8 2];
             obj.Panel.RowHeight={30,0,42}; obj.Panel.RowSpacing=2;
             bar=uigridlayout(obj.Panel,[1 13]); bar.Padding=[0 0 0 0]; bar.ColumnSpacing=5;
@@ -63,17 +69,21 @@ classdef VideoPlayback < handle
             columns=[1 2 3 4 5 6 7 9 0 0 0 11 0];
             for i=[1:8 12], obj.Controls{i}.Layout.Row=1; obj.Controls{i}.Layout.Column=columns(i); end
             bar.RowHeight={30};
-            parent.AutoResizeChildren='off'; parent.SizeChangedFcn=@(~,~) obj.resize();
+            obj.PreviousResize=parent.SizeChangedFcn;
+            obj.ResizeCallback=@(~,~) Tracking.VideoPlayback.resizeIfAlive(obj);
+            parent.AutoResizeChildren='off'; parent.SizeChangedFcn=obj.ResizeCallback;
             obj.Slider=uislider(obj.Panel,'Limits',[1 max(2,c.Source.nt)],'Value',1,'MinorTicks',[]);
             obj.Slider.Layout.Row=3;
             ticks=unique(round(linspace(1,c.Source.nt,min(5,c.Source.nt))));
             obj.Slider.MajorTicks=ticks; obj.Slider.MajorTickLabels=string(ticks);
             % Leave time for navigation callbacks between movie frames.
             obj.Worker=timer('Name','NeuroPAL video playback','ExecutionMode','fixedSpacing', ...
-                'Period',.01,'BusyMode','drop','TimerFcn',@(~,~) obj.tick());
-            obj.Lifetime=addlistener(parent,'ObjectBeingDestroyed',@(~,~) delete(obj));
-            obj.PreviousKey=c.App.CELL_ID.WindowKeyPressFcn;
-            obj.KeyCallback=@(src,event) obj.key(src,event); c.App.CELL_ID.WindowKeyPressFcn=obj.KeyCallback;
+                'Period',.01,'BusyMode','drop','TimerFcn',@(~,~) Tracking.VideoPlayback.tickIfAlive(obj));
+            obj.Lifetime=addlistener(parent,'ObjectBeingDestroyed',@(~,~) Tracking.VideoPlayback.deleteIfAlive(obj));
+            obj.PreviousKey=obj.Window.WindowKeyPressFcn;
+            previous=obj.PreviousKey;
+            obj.KeyCallback=@(src,event) Tracking.VideoPlayback.dispatchKey(obj,previous,src,event);
+            obj.Window.WindowKeyPressFcn=obj.KeyCallback;
         end
         function resize(obj)
             width=obj.Panel.Parent.Position(3); obj.Compact=width<1000;
@@ -190,10 +200,9 @@ classdef VideoPlayback < handle
             for i=1:numel(handles), handles{i}.Enable=enabled; end
         end
         function key(obj,src,event)
-            c=obj.View.Controller;
-            if c.App.TabGroup.SelectedTab~=c.App.VideoTrackingTab
-                if isa(obj.PreviousKey,'function_handle'), obj.PreviousKey(src,event);
-                elseif iscell(obj.PreviousKey), feval(obj.PreviousKey{1},src,event,obj.PreviousKey{2:end}); end
+            c=obj.liveController();
+            if isempty(c) || c.App.TabGroup.SelectedTab~=c.App.VideoTrackingTab
+                Tracking.VideoPlayback.invokeKey(obj.PreviousKey,src,event);
                 return;
             end
             focused=src.CurrentObject;
@@ -213,13 +222,67 @@ classdef VideoPlayback < handle
             end
         end
         function delete(obj)
+            if obj.Disposing, return; end
+            obj.Disposing=true;
+            % The view/controller may already be invalid while construction unwinds.
+            if ~isempty(obj.Window) && isvalid(obj.Window) && strcmp(obj.Window.BeingDeleted,'off') && ...
+                    isequal(obj.Window.WindowKeyPressFcn,obj.KeyCallback)
+                obj.Window.WindowKeyPressFcn=obj.PreviousKey;
+            end
+            if ~isempty(obj.Parent) && isvalid(obj.Parent) && strcmp(obj.Parent.BeingDeleted,'off') && ...
+                    isequal(obj.Parent.SizeChangedFcn,obj.ResizeCallback)
+                obj.Parent.SizeChangedFcn=obj.PreviousResize;
+            end
             obj.stop();
             if ~isempty(obj.Worker) && isvalid(obj.Worker), delete(obj.Worker); end
             if ~isempty(obj.Lifetime) && isvalid(obj.Lifetime), delete(obj.Lifetime); end
-            c=obj.View.Controller;
-            if isvalid(c) && isvalid(c.App) && isvalid(c.App.CELL_ID) && isequal(c.App.CELL_ID.WindowKeyPressFcn,obj.KeyCallback)
-                c.App.CELL_ID.WindowKeyPressFcn=obj.PreviousKey;
+            if ~isempty(obj.Panel) && isvalid(obj.Panel), delete(obj.Panel); end
+        end
+    end
+    methods (Access=private)
+        function c=liveController(obj)
+            c=[];
+            try
+                view=obj.View;
+                if isempty(view) || (isa(view,'handle') && ~isvalid(view)), return; end
+                candidate=view.Controller;
+                if isempty(candidate) || (isa(candidate,'handle') && ~isvalid(candidate)), return; end
+                app=candidate.App;
+                if isempty(app) || (isa(app,'handle') && ~isvalid(app)), return; end
+                if isempty(app.CELL_ID) || ~isvalid(app.CELL_ID), return; end
+                c=candidate;
+            catch
+                % A partially constructed view has no live keyboard owner.
             end
+        end
+    end
+    methods (Static)
+        function dispatchKey(obj,previous,src,event)
+            if ~isempty(obj) && isvalid(obj) && ~obj.Disposing
+                obj.key(src,event);
+            else
+                % A newer dispatcher may still retain this callback in its chain.
+                Tracking.VideoPlayback.invokeKey(previous,src,event);
+            end
+        end
+        function invokeKey(callback,src,event)
+            if isa(callback,'function_handle'), callback(src,event);
+            elseif iscell(callback), feval(callback{1},src,event,callback{2:end});
+            elseif ischar(callback), evalin('base',callback); end
+        end
+        function resizeIfAlive(obj)
+            if ~isempty(obj) && isvalid(obj) && ~obj.Disposing && ...
+                    ~isempty(obj.Panel) && isvalid(obj.Panel) && isvalid(obj.Panel.Parent) && ...
+                    strcmp(obj.Panel.Parent.BeingDeleted,'off')
+                obj.resize();
+            end
+        end
+        function tickIfAlive(obj)
+            if isempty(obj) || ~isvalid(obj) || obj.Disposing, return; end
+            if isempty(obj.liveController()), obj.stop(); else, obj.tick(); end
+        end
+        function deleteIfAlive(obj)
+            if ~isempty(obj) && isvalid(obj) && ~obj.Disposing, delete(obj); end
         end
     end
 end
