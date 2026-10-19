@@ -15,6 +15,9 @@ classdef ReferenceView < handle
         FrameIndices = {}
         TableRows = []
         AddMode = false
+        AddIdentity = []
+        AddFrame = 0
+        AddReplace = false
         DisplayKey = []
         DisplayMaximum = 1
         DisplayMinimum = 0
@@ -45,6 +48,7 @@ classdef ReferenceView < handle
         Orthogonal = cell(1,3)
         CorrectMode = false
         TableWindow = []
+        CoordinateTable = []
         Rendering = false
         PendingRender = false
     end
@@ -99,7 +103,7 @@ classdef ReferenceView < handle
         end
         function armCorrect(obj)
             c=obj.Controller; if c.Busy || isempty(obj.Selection), return; end
-            obj.Playback.stop(); obj.CorrectMode=true; obj.AddMode=false;
+            obj.Playback.stop(); obj.CorrectMode=true; obj.AddMode=false; obj.AddIdentity=[]; obj.AddFrame=0; obj.AddReplace=false;
             obj.DisplayMode.Value='Slice'; obj.redraw();
             c.Status.Text='Click the selected neuron’s new center in this Z slice.';
         end
@@ -119,18 +123,55 @@ classdef ReferenceView < handle
             c.render();
         end
         function openTable(obj)
+            if obj.Controller.Busy, return; end
             obj.Playback.stop();
             if ~isempty(obj.TableWindow) && isvalid(obj.TableWindow)
-                figure(obj.TableWindow); return;
+                obj.refreshTables(); figure(obj.TableWindow); return;
             end
             obj.TableWindow=uifigure('Name','Neuron coordinates','Position',[200 200 720 420]);
             grid=uigridlayout(obj.TableWindow,[1 1]); c=obj.Controller;
-            uitable(grid,'Data',c.Rows,'ColumnName',c.Table.ColumnName,'ColumnEditable',c.Table.ColumnEditable, ...
-                'CellEditCallback',@(src,event) obj.editTable(src,event), ...
-                'CellSelectionCallback',@(~,event) obj.chooseTable(event));
+            obj.CoordinateTable=uitable(grid,'Data',c.Rows,'ColumnName',c.Table.ColumnName,'ColumnEditable',c.Table.ColumnEditable);
+            obj.refreshTables();
         end
-        function editTable(obj,src,event)
-            obj.Controller.safe(@() obj.Controller.edit(event)); src.Data=obj.Controller.Rows;
+        function refreshTables(obj)
+            c=obj.Controller; obj.TableRows=c.Rows;
+            tables={c.Table,obj.CoordinateTable};
+            for i=1:numel(tables)
+                table=tables{i};
+                if isempty(table) || ~isvalid(table), continue; end
+                rows=c.Rows;
+                if ~isequaln(getappdata(table,'reference_coordinate_rows'),rows) || ~isequaln(table.Data,rows)
+                    table.Data=rows;
+                    % A queued callback keeps the IDs from the display it came from.
+                    table.CellEditCallback=@(src,event) obj.editTable(src,event,rows);
+                    table.CellSelectionCallback=@(~,event) obj.chooseTable(event,rows);
+                    setappdata(table,'reference_coordinate_rows',rows);
+                end
+                if c.Busy, table.Enable='off'; else, table.Enable='on'; end
+            end
+        end
+        function editTable(obj,src,event,displayed)
+            if nargin<4, displayed=obj.TableRows; end
+            c=obj.Controller;
+            if ~isempty(src) && ~isvalid(src), return; end
+            if c.Busy, obj.refreshTables(); return; end
+            index=obj.coordinateTableRow(event,displayed);
+            has_previous=(isstruct(event) && isfield(event,'PreviousData')) || (isobject(event) && isprop(event,'PreviousData'));
+            if isempty(index) || ~ismember(event.Indices(2),3:5) || ...
+                    (has_previous && ~isequaln(event.PreviousData,displayed(event.Indices(1),event.Indices(2)))) || ...
+                    ~isequaln(c.Rows(index,3:7),displayed(event.Indices(1),3:7))
+                obj.refreshTables(); c.Status.Text='This observation changed. Select its current row before editing.'; return;
+            end
+            mapped=struct('Indices',[index event.Indices(2)],'NewData',event.NewData);
+            c.safe(@() c.edit(mapped)); obj.refreshTables();
+        end
+        function index = coordinateTableRow(obj,event,displayed)
+            index=[];
+            if isempty(event.Indices) || size(event.Indices,2)~=2, return; end
+            row=event.Indices(1);
+            if ~isfinite(row) || row~=round(row) || row<1 || row>size(displayed,1), return; end
+            matches=find(all(obj.Controller.Rows(:,1:2)==displayed(row,1:2),2));
+            if isscalar(matches), index=matches; end
         end
         function drawTrail(obj,ax)
             c=obj.Controller; trail=findobj(ax,'Tag','selected_trail');
@@ -177,7 +218,7 @@ classdef ReferenceView < handle
                 if ~isempty(window) && isvalid(window), delete(window); end
                 menus=getappdata(grid,'tracking_session_menus');
                 for i=1:numel(menus), if isvalid(menus{i}), delete(menus{i}); end, end
-                for key={'activity_settings_window','neuron_actions_menu','tracking_run_menu'}
+                for key={'activity_settings_window','neuron_actions_menu','tracking_run_menu','reference_frames_window','reference_constraints_window','detection_settings_window'}
                     control=getappdata(grid,key{1});
                     if ~isempty(control) && isvalid(control), delete(control); end
                 end
@@ -276,12 +317,7 @@ classdef ReferenceView < handle
                 title(obj.Projection,'');
                 obj.ProjectionKey = projection_key;
             end
-            if ~isequaln(obj.TableRows,c.Rows)
-                c.Table.Data=c.Rows; obj.TableRows=c.Rows;
-                if ~isempty(obj.TableWindow) && isvalid(obj.TableWindow)
-                    table=findobj(obj.TableWindow,'Type','uitable'); table.Data=c.Rows;
-                end
-            end
+            obj.refreshTables();
             c.Status.Text = '';
             if mip, obj.drawTrail(obj.Projection); end
             obj.drawOrthogonal(volume);
@@ -449,6 +485,7 @@ classdef ReferenceView < handle
             end
             obj.NeuronList.Tooltip=Tracking.NeuronNames.tooltip(c,obj.PreferredID);
             obj.ListKey = {c.Frame.Value,c.Channel.Value,c.Rows,c.Candidates,obj.Selection,c.Excluded};
+            Tracking.ReferenceConstraints.refresh(c);
             c.Buttons.remove.Text='Delete track';
             if ~isempty(obj.Selection) && obj.Selection(1), c.Buttons.remove.Text='Delete candidate'; end
             obj.Exclude.Value=~isempty(obj.Selection) && ismember(obj.Selection([2 3]),c.Excluded,'rows');
@@ -463,6 +500,9 @@ classdef ReferenceView < handle
             reference=getappdata(obj.Controller.Grid,'paired_reference_controller');
             if ~isempty(reference) && isvalid(reference), reference.setBusy(busy); end
             Tracking.DetectionChannels.setBusy(obj.Controller,busy);
+            Tracking.ReferenceFrames.setBusy(obj.Controller,busy);
+            Tracking.ReferenceConstraints.setBusy(obj.Controller,busy);
+            Tracking.DetectionSettings.setBusy(obj.Controller,busy);
             obj.Contrast.setBusy(busy); obj.Playback.setBusy(busy);
             if ~isempty(obj.Review) && ~isempty(obj.Review.Confirm)
                 obj.Review.Confirm.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(obj.Selection) && ~obj.Selection(1));
@@ -475,6 +515,9 @@ classdef ReferenceView < handle
             obj.Labels.Enable = state; obj.LabelMode.Enable=state; obj.ShowROI.Enable=state; obj.NeuronList.Enable = state;
             obj.Exclude.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(obj.Selection) && ~obj.Selection(1));
             obj.SliceValue.Enable = matlab.lang.OnOffSwitchState(~busy && obj.Controller.Source.nz>1);
+            if ~isempty(obj.CoordinateTable) && isvalid(obj.CoordinateTable)
+                if busy, obj.CoordinateTable.Enable='off'; else, obj.CoordinateTable.Enable='on'; end
+            end
             for i=1:3
                 obj.Position{i}.Enable = matlab.lang.OnOffSwitchState(~isempty(obj.Selection) && ~busy);
             end
@@ -485,10 +528,13 @@ classdef ReferenceView < handle
             row = obj.ListRows(obj.NeuronList.Value,:);
             obj.select(row,row(8));
         end
-        function chooseTable(obj,event)
+        function chooseTable(obj,event,displayed)
+            if nargin<3, displayed=obj.TableRows; end
             c = obj.Controller;
             if c.Busy || isempty(event.Indices), return; end
-            row = c.Rows(event.Indices(1),:); obj.select(row,false);
+            index=obj.coordinateTableRow(event,displayed);
+            if isempty(index), obj.refreshTables(); return; end
+            obj.select(c.Rows(index,:),false);
         end
         function select(obj,row,pending)
             c = obj.Controller; obj.Playback.stop(); obj.Selection = [pending,row(1),row(2)]; obj.PreferredID=row(1);
@@ -511,6 +557,7 @@ classdef ReferenceView < handle
         function armAdd(obj)
             if obj.Controller.Busy, return; end
             obj.Playback.stop(); obj.CorrectMode=false; obj.DisplayMode.Value='Slice'; obj.redraw();
+            obj.AddIdentity=[]; obj.AddFrame=0; obj.AddReplace=false;
             obj.AddMode = ~obj.AddMode;
             if obj.AddMode
                 obj.Controller.Buttons.add.Text='Cancel adding neuron';

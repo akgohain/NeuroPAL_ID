@@ -33,6 +33,9 @@ classdef ReferenceWorkflow < handle
         Cursor = []
         OutputRoot
         CloseCallback
+        CloseWindow
+        InstalledCloseCallback
+        Disposing = false
         Origins
         View
         Analysis
@@ -85,8 +88,8 @@ classdef ReferenceWorkflow < handle
             if isappdata(app.CELL_ID,key)
                 previous = getappdata(app.CELL_ID,key);
                 if isvalid(previous), previous.View.Playback.stop(); end
-                if isvalid(previous) && ~isempty(previous.Rows)
-                    answer = uiconfirm(app.CELL_ID,'Close the current reference session? Save seeds first to retain edits.', ...
+                if isvalid(previous) && (~isempty(previous.Rows) || ~isempty(previous.Candidates))
+                    answer = uiconfirm(app.CELL_ID,'Close the current reference session? Unsaved neurons and pending detection candidates will be lost.', ...
                         'Open recording','Options',{'Cancel','Close session'},'DefaultOption','Cancel','CancelOption','Cancel');
                     if strcmp(answer,'Cancel'), workflow = previous; return; end
                 end
@@ -124,48 +127,101 @@ classdef ReferenceWorkflow < handle
             if status ~= 0, error('Tracking:ReferenceFailed','%s',detail); end
             response = jsondecode(fileread(output));
         end
+        function dispatchClose(obj, previous, src, event)
+            if isempty(src) || ~isvalid(src), return; end
+            if ~isempty(obj) && isvalid(obj) && ~obj.Disposing
+                obj.closeSession(src,event);
+            else
+                % Later handlers can still retain a disposed workflow in their chain.
+                Tracking.ReferenceWorkflow.invokeClose(previous,src,event);
+            end
+        end
+        function invokeClose(callback, src, event)
+            if isempty(src) || ~isvalid(src), return; end
+            if iscell(callback), feval(callback{1},src,event,callback{2:end});
+            elseif isa(callback,'function_handle'), callback(src,event);
+            elseif ischar(callback) || (isstring(callback) && isscalar(callback))
+                evalin('base',char(callback));
+            else, delete(src);
+            end
+        end
     end
     methods
         function obj = ReferenceWorkflow(app, info)
             obj.App = app; obj.Source = info;
-            obj.Origins = containers.Map('KeyType','char','ValueType','char');
-            obj.CloseCallback = app.CELL_ID.CloseRequestFcn;
-            app.CELL_ID.CloseRequestFcn = @(src,event) obj.closeSession(src,event);
-            obj.OutputRoot = fullfile(prefdir,'NeuroPAL','reference-jobs');
-            app.VideoGridLayout.Visible = 'off';
-            obj.Reader = Tracking.FrameReader(info);
-            obj.View = Tracking.ReferenceView(obj);
-            app.VideoTrackingTab.Tag = 'rendered'; app.TabGroup.SelectedTab = app.VideoTrackingTab;
-            obj.render();
-            if info.nt==1, obj.Frame.Enable = 'off'; end
-            if info.nz==1, obj.Slice.Enable = 'off'; end
+            previousVisible=[]; previousTag=[]; previousTab=[];
+            try
+                obj.Origins = containers.Map('KeyType','char','ValueType','char');
+                obj.CloseWindow = app.CELL_ID;
+                obj.CloseCallback = obj.CloseWindow.CloseRequestFcn;
+                previous = obj.CloseCallback;
+                obj.InstalledCloseCallback = @(src,event) Tracking.ReferenceWorkflow.dispatchClose(obj,previous,src,event);
+                obj.CloseWindow.CloseRequestFcn = obj.InstalledCloseCallback;
+                obj.OutputRoot = fullfile(prefdir,'NeuroPAL','reference-jobs');
+                previousVisible=app.VideoGridLayout.Visible;
+                previousTag=app.VideoTrackingTab.Tag; previousTab=app.TabGroup.SelectedTab;
+                app.VideoGridLayout.Visible = 'off';
+                obj.Reader = Tracking.FrameReader(info);
+                obj.View = Tracking.ReferenceView(obj);
+                app.VideoTrackingTab.Tag = 'rendered'; app.TabGroup.SelectedTab = app.VideoTrackingTab;
+                obj.render();
+                if info.nt==1, obj.Frame.Enable = 'off'; end
+                if info.nz==1, obj.Slice.Enable = 'off'; end
+            catch failure
+                ownsClose=false;
+                try
+                    ownsClose=isvalid(obj.CloseWindow) && ...
+                        isequal(obj.CloseWindow.CloseRequestFcn,obj.InstalledCloseCallback);
+                catch
+                end
+                try, delete(obj); catch, end
+                if ownsClose && ~isempty(previousVisible)
+                    % Roll back this construction's presentation without changing a newer owner.
+                    try, app.VideoGridLayout.Visible=previousVisible; catch, end
+                    try, app.VideoTrackingTab.Tag=previousTag; catch, end
+                    try, if ~isempty(previousTab), app.TabGroup.SelectedTab=previousTab; end, catch, end
+                end
+                rethrow(failure);
+            end
         end
         function delete(obj)
-            if ~isempty(obj.Reader) && isvalid(obj.Reader), delete(obj.Reader); end
-            if ~isempty(obj.Analysis) && isvalid(obj.Analysis), delete(obj.Analysis); end
-            if ~isempty(obj.View) && isvalid(obj.View), delete(obj.View); end
-            if ~isempty(obj.App) && isvalid(obj.App) && isvalid(obj.App.CELL_ID)
-                obj.App.CELL_ID.CloseRequestFcn = obj.CloseCallback;
+            if obj.Disposing, return; end
+            obj.Disposing=true;
+            try
+                if ~isempty(obj.CloseWindow) && isvalid(obj.CloseWindow) && ...
+                        isequal(obj.CloseWindow.CloseRequestFcn,obj.InstalledCloseCallback)
+                    obj.CloseWindow.CloseRequestFcn = obj.CloseCallback;
+                end
+            catch
+                % A parent window may already be disposing its graphics callbacks.
             end
-            if ~isempty(obj.Grid) && isvalid(obj.Grid), delete(obj.Grid); end
+            obj.stopPlayback();
+            % Dispose UI before the reader, including playback installed by a
+            % view whose constructor failed before returning its handle.
+            resources={obj.View,obj.Analysis,obj.Grid,obj.Reader};
+            for i=1:numel(resources)
+                try
+                    if ~isempty(resources{i}) && isvalid(resources{i}), delete(resources{i}); end
+                catch
+                    % Continue releasing resources while a failed constructor unwinds.
+                end
+            end
         end
         function closeSession(obj,src,event)
-            obj.View.Playback.stop();
+            obj.stopPlayback();
             if obj.Busy
                 obj.Cancelled = true;
-                obj.Status.Text = 'Canceling the active job. Close again when it has stopped.';
+                if ~isempty(obj.Status) && isvalid(obj.Status)
+                    obj.Status.Text = 'Canceling the active job. Close again when it has stopped.';
+                end
                 return;
             end
-            if ~isempty(obj.Rows)
-                answer = uiconfirm(obj.App.CELL_ID,'Close the reference session? Save seeds first to retain edits.', ...
+            if ~isempty(obj.Rows) || ~isempty(obj.Candidates)
+                answer = uiconfirm(obj.App.CELL_ID,'Close the reference session? Unsaved neurons and pending detection candidates will be lost.', ...
                     'Close session','Options',{'Cancel','Close without saving'},'DefaultOption','Cancel','CancelOption','Cancel');
                 if strcmp(answer,'Cancel'), return; end
             end
-            callback = obj.CloseCallback;
-            if iscell(callback), feval(callback{1},src,event,callback{2:end});
-            elseif isa(callback,'function_handle'), callback(src,event);
-            else, delete(obj.App);
-            end
+            Tracking.ReferenceWorkflow.invokeClose(obj.CloseCallback,src,event);
         end
         function safe(obj, action)
             if obj.Busy, return; end
@@ -239,6 +295,7 @@ classdef ReferenceWorkflow < handle
                 channel=mapping(1);
             end
             selected=channel; merge_radius=0;
+            score_threshold=Tracking.DetectionSettings.threshold(obj);
             if strcmp(obj.DetectionMode.Value,'Multi-channel')
                 settings=Tracking.DetectionChannels.get(obj); selected=settings.channels; merge_radius=settings.merge_radius_um;
                 if numel(selected)<2, error('Tracking:Channels','Select at least two channels, or choose Single channel.'); end
@@ -257,16 +314,15 @@ classdef ReferenceWorkflow < handle
             if strcmp(mode,'multi_channel')
                 response=Wrapper.runMultiChannelCentroids(obj.Cache,selected,scale,'MergeRadiusUm',merge_radius, ...
                     'SourceMetadata',snapshot,'Backend',lower(string(obj.Detector.Value)), ...
-                    'ProgressFcn',@(message) obj.progress(message),'CancelFcn',@() obj.Cancelled || ~isvalid(obj.App),'OutputDir',obj.OutputRoot);
+                    'ScoreThreshold',score_threshold,'ProgressFcn',@(message) obj.progress(message),'CancelFcn',@() obj.Cancelled || ~isvalid(obj.App),'OutputDir',obj.OutputRoot);
             elseif ~any(volume(:)>0)
                 response = struct('centroids_yxz',zeros(0,3),'scores',zeros(0,1),'num_centroids',0,'source_metadata',snapshot);
             else
                 response = Wrapper.runMoECentroids(volume,scale,'InputMode',string(mode),'SourceMetadata',snapshot, ...
-                    'Backend',lower(string(obj.Detector.Value)),'ProgressFcn',@(message) obj.progress(message),'CancelFcn',@() obj.Cancelled || ~isvalid(obj.App),'OutputDir',obj.OutputRoot);
+                    'Backend',lower(string(obj.Detector.Value)),'ScoreThreshold',score_threshold, ...
+                    'ProgressFcn',@(message) obj.progress(message),'CancelFcn',@() obj.Cancelled || ~isvalid(obj.App),'OutputDir',obj.OutputRoot);
             end
-            if obj.Frame.Value~=frame || obj.Channel.Value~=channel
-                error('Tracking:StaleDetection','Frame or channel changed; run detection again.');
-            end
+            obj.checkDetectionContext(frame,channel);
             xyz = response.centroids_yxz(:,[2 1 3]);
             if any(xyz<1,'all') || any(xyz>[obj.Source.nx obj.Source.ny obj.Source.nz],'all')
                 error('Tracking:Bounds','Detector returned a center outside pixel-center bounds.');
@@ -275,6 +331,14 @@ classdef ReferenceWorkflow < handle
             if n==0
                 obj.render(); obj.Status.Text='No neurons detected. Existing candidates, tracks and reference frame were kept.'; return;
             end
+            if ~isempty(obj.Candidates)
+                answer=uiconfirm(obj.App.CELL_ID,'Replace the pending detection candidates and their edits? Accepted neurons and tracks will be kept.', ...
+                    'Replace candidates?','Options',{'Keep existing','Replace candidates'},'DefaultOption',1,'CancelOption',1);
+                if ~strcmp(answer,'Replace candidates')
+                    obj.Status.Text='Existing detection candidates were kept.'; return;
+                end
+            end
+            obj.checkDetectionContext(frame,channel);
             obj.View.Review.clear();
             source_channels=repmat(channel,n,1);
             if isfield(response,'source_channels'), source_channels=response.source_channels(:); end
@@ -282,11 +346,24 @@ classdef ReferenceWorkflow < handle
             obj.NextID = obj.NextID+n;
             obj.CandidateFrame = frame; obj.Provenance = response;
             obj.History{end+1} = response;
-            obj.Reference.Value = frame; obj.First.Value = 1; obj.Last.Value = obj.Source.nt;
+            if isempty(obj.Rows)
+                obj.Reference.Value = frame; obj.First.Value = 1; obj.Last.Value = obj.Source.nt;
+            end
             obj.render();
+        end
+        function checkDetectionContext(obj,frame,channel)
+            if obj.Cancelled || ~isvalid(obj.App)
+                error('Tracking:Cancelled','Detection was canceled. Existing candidates and tracks were kept.');
+            end
+            if obj.Frame.Value~=frame || obj.Channel.Value~=channel || obj.CacheFrame~=frame
+                error('Tracking:StaleDetection','Frame or channel changed; run detection again.');
+            end
         end
         function accept(obj)
             if isempty(obj.Candidates), return; end
+            if Tracking.ReferenceConstraints.needed(obj)
+                error('Tracking:ReferenceIdentity','Match these proposals to existing neurons using Match neurons. Additional reference frames must keep the original neuron IDs.');
+            end
             channels=unique(obj.Candidates(:,7));
             if isfield(obj.Provenance,'source_metadata') && isfield(obj.Provenance.source_metadata,'selected_channels')
                 channels=obj.Provenance.source_metadata.selected_channels;
@@ -299,7 +376,7 @@ classdef ReferenceWorkflow < handle
             end
             obj.View.Review.checkpoint();
             obj.Rows = [obj.Rows;obj.Candidates]; obj.NextID = max(obj.NextID,max(obj.Rows(:,1))+1);
-            obj.Candidates = zeros(0,7); obj.render();
+            obj.Candidates = zeros(0,7); obj.render(); Tracking.ReferenceFrames.refresh(obj);
         end
         function discard(obj)
             obj.View.Review.checkpoint();
@@ -350,9 +427,26 @@ classdef ReferenceWorkflow < handle
         end
         function add(obj)
             if isempty(obj.Cursor), error('Tracking:Cursor','Click a location in the image first.'); end
-            obj.View.Review.checkpoint();
             point = obj.Cursor;
             xyz = [min(obj.Source.nx,max(1,point(1,1))),min(obj.Source.ny,max(1,point(1,2))),round(obj.Slice.Value)];
+            identity=obj.View.AddIdentity; frame=obj.View.AddFrame; replace=obj.View.AddReplace;
+            obj.View.AddIdentity=[]; obj.View.AddFrame=0; obj.View.AddReplace=false;
+            if ~isempty(identity)
+                if obj.Frame.Value~=frame || ~any(obj.Rows(:,1)==identity & obj.Rows(:,2)==obj.Reference.Value)
+                    error('Tracking:ReferenceIdentity','The reference or current frame changed. Choose Place center again.');
+                end
+                existing=obj.Rows(:,1)==identity & obj.Rows(:,2)==frame;
+                if any(existing) && ~replace
+                    error('Tracking:ExistingObservation','This neuron already has a center in this frame. Confirm replacement first.');
+                end
+                obj.View.Review.checkpoint(identity); obj.Rows(existing,:)=[];
+                obj.Rows(end+1,:)=[identity,frame,xyz,1,obj.Channel.Value];
+                obj.Origins(sprintf('%d:%d',identity,frame))='reviewed';
+                obj.View.PreferredID=identity; obj.View.Selection=[false identity frame];
+                obj.render(); Tracking.ReferenceFrames.refresh(obj); return;
+            end
+            obj.View.Review.checkpoint();
+            if isempty(obj.Rows), obj.Reference.Value=obj.Frame.Value; end
             obj.Rows(end+1,:) = [obj.NextID,obj.Frame.Value,xyz,1,obj.Channel.Value]; obj.NextID = obj.NextID+1; obj.render();
         end
         function remove(obj)
@@ -383,6 +477,7 @@ classdef ReferenceWorkflow < handle
             end
         end
         function response = save(obj,folder)
+            obj.requireAccepted('saving the session');
             response = obj.bridge(struct('action','export','source',obj.Source,'observations',obj.observations(), ...
                 'output_dir',folder,'provenance',struct('jobs',{obj.History},'session',obj.Analysis.session())),@() obj.Cancelled || ~isvalid(obj.App));
             obj.Status.Text = ['Saved seeds: ' response.directory];
@@ -398,8 +493,11 @@ classdef ReferenceWorkflow < handle
             obj.load(fullfile(folder,file));
         end
         function load(obj,file)
-            if ~isempty(obj.Rows), error('Tracking:ExistingSeeds','Open a fresh reference session before importing another seed set.'); end
+            if ~isempty(obj.Rows) || ~isempty(obj.Candidates), error('Tracking:ExistingSeeds','Open a fresh reference session before importing another seed set. Resolve pending candidates or reset the current session first.'); end
             response = obj.bridge(struct('action','import','source',obj.Source,'file',file));
+            if isempty(response.provenance), response.provenance=struct(); end
+            if ~isstruct(response.provenance) || ~isscalar(response.provenance), error('Tracking:SessionSettings','Invalid saved session provenance.'); end
+            if isfield(response.provenance,'session'), Tracking.SessionSettings.validate(obj,response.provenance.session); end
             obj.Candidates=zeros(0,7); obj.CandidateFrame=0;
             Tracking.NeuronNames.set(obj,[]); setappdata(obj.Grid,'paired_reference_provenance',[]);
             obj.History={}; obj.Provenance=struct(); obj.TrackDirectory=''; obj.ActivityDirectory='';
@@ -452,35 +550,56 @@ classdef ReferenceWorkflow < handle
             obj.render(); obj.Status.Text = ['Tracking complete: ' response.directory];
         end
         function mergeTracks(obj,observations)
-            previous=obj.observations(); excluded=obj.Excluded;
-            keys=[[observations.track_id]' [observations.t]'];
+            previous=obj.observations(); excluded=obj.Excluded; names=Tracking.NeuronNames.get(obj);
+            previous_keys=reshape([[previous.track_id]' [previous.t]'],[],2);
+            keys=reshape([[observations.track_id]' [observations.t]'],[],2);
             if ~isempty(previous)
-                retained=~ismember([[previous.track_id]' [previous.t]'],keys,'rows');
+                manual=~strcmp({previous.provenance},'zephir')';
+                % A checkpoint must not erase manual centers made since its last save.
+                observations=observations(~ismember(keys,previous_keys(manual,:),'rows'));
+                keys=reshape([[observations.track_id]' [observations.t]'],[],2);
+                retained=~ismember(previous_keys,keys,'rows');
                 previous=previous(retained);
             end
             obj.setRows(observations);
-            current=obj.observations(); obj.setRows([previous(:);current(:)]);
+            current=obj.observations(); merged=[previous(:);current(:)];
+            if ~isempty(merged)
+                [existing,order]=ismember([[merged.track_id]' [merged.t]'],previous_keys,'rows');
+                order(~existing)=size(previous_keys,1)+(1:nnz(~existing));
+                [~,indices]=sort(order); merged=merged(indices);
+            end
+            obj.setRows(merged);
+            current_names=Tracking.NeuronNames.get(obj);
+            for i=1:numel(names)
+                index=find([current_names.id]==names(i).id,1); if isempty(index), index=numel(current_names)+1; end
+                current_names(index)=names(i);
+            end
+            Tracking.NeuronNames.set(obj,current_names);
             retained=ismember(excluded,obj.Rows(:,[1 2]),'rows'); obj.Excluded=unique([obj.Excluded;excluded(retained,:)],'rows');
         end
         function openTracking(obj)
             [file,folder]=uigetfile('tracking.json','Open a saved tracking run',fullfile(obj.OutputRoot,'tracking.json'));
             if isequal(file,0), return; end
-            if ~isempty(obj.Rows)
-                answer=uiconfirm(obj.App.CELL_ID,'Replace the current neurons with this tracking checkpoint? Save seeds first to retain edits.', ...
+            if ~isempty(obj.Rows) || ~isempty(obj.Candidates)
+                answer=uiconfirm(obj.App.CELL_ID,'Replace the current neurons and pending candidates with this tracking checkpoint? Unsaved edits will be lost.', ...
                     'Open tracking run','Options',{'Cancel','Replace'},'DefaultOption','Cancel','CancelOption','Cancel');
                 if strcmp(answer,'Cancel'), return; end
             end
             response=obj.bridge(struct('action','tracking_checkpoint','source',obj.Source,'directory',folder));
+            Tracking.SessionSettings.tracking(obj,response.manifest.parameters);
             obj.TrackDirectory=folder; obj.Candidates=zeros(0,7); obj.setRows(response.observations);
             obj.Analysis.restoreTracking(response.manifest.parameters); obj.Frame.Value=obj.Reference.Value; obj.render();
         end
         function loadProgress(obj)
+            obj.requireAccepted('loading tracking progress');
             if isempty(obj.TrackDirectory), error('Tracking:Resume','There is no tracking run to load.'); end
             response=obj.bridge(struct('action','tracking_checkpoint','source',obj.Source,'directory',obj.TrackDirectory));
+            Tracking.SessionSettings.tracking(obj,response.manifest.parameters);
             obj.mergeTracks(response.observations); obj.Analysis.restoreTracking(response.manifest.parameters); obj.render();
             obj.Status.Text=sprintf('Loaded %d completed tracking windows.',numel(response.manifest.completed));
         end
         function extractActivity(obj)
+            obj.requireAccepted('extracting activity');
             options=obj.Analysis.options();
             if numel(options.radius_xyz)~=3 || any(~isfinite(options.radius_xyz) | options.radius_xyz<=0)
                 error('Tracking:ActivityRadius','Enter three positive X Y Z sampling radii in pixels.');
@@ -498,6 +617,7 @@ classdef ReferenceWorkflow < handle
                 isequal(obj.Excluded,obj.ActivityExcluded) && isequal(obj.Analysis.options(),obj.ActivitySettings);
         end
         function exportActivity(obj,folder)
+            obj.requireAccepted('exporting activity');
             if ~obj.activityCurrent(), error('Tracking:Activity','Extract activity again after changing tracks or measurement settings.'); end
             if nargin<2, folder=uigetdir(fileparts(obj.Source.file),'Export activity and tracks'); end
             if isequal(folder,0), return; end
@@ -517,7 +637,24 @@ classdef ReferenceWorkflow < handle
             if ~ok, error('Tracking:Export','%s',message); end
             obj.Status.Text=['Exported activity and tracks: ' destination];
         end
+        function requireAccepted(obj,action)
+            if ~isempty(obj.Candidates)
+                error('Tracking:PendingCandidates','Accept or match the pending detection candidates before %s. Unmatched proposals are not saved as neuron tracks.',action);
+            end
+        end
 
+    end
+    methods (Access=private)
+        function stopPlayback(obj)
+            try
+                if ~isempty(obj.View) && isvalid(obj.View) && ...
+                        ~isempty(obj.View.Playback) && isvalid(obj.View.Playback)
+                    obj.View.Playback.stop();
+                end
+            catch
+                % Construction may have failed before the view became available.
+            end
+        end
     end
     methods (Static, Access=private)
         function removeFolder(folder)

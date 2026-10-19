@@ -86,9 +86,12 @@ classdef VideoWorkspace
 
             detection=uigridlayout(v.Panels{2},[10 2]); detection.Padding=[12 10 12 10];
             detection.ColumnWidth={75,'1x'}; detection.RowSpacing=8; detection.Scrollable='on';
-            detection.RowHeight={24,30,30,28,6,34,30,30,0,'1x'};
+            detection.RowHeight={24,30,30,28,30,34,30,30,0,'1x'};
             heading=uilabel(detection,'Text','Detection','FontWeight','bold'); heading.Layout.Column=[1 2];
-            uilabel(detection,'Text','Method'); c.Detector=uidropdown(detection,'Items',{'MoE','Spotiflow'});
+            uilabel(detection,'Text','Method');
+            method=uigridlayout(detection,[1 2]); method.Padding=[0 0 0 0]; method.ColumnWidth={'1x',30}; method.ColumnSpacing=4;
+            c.Detector=uidropdown(method,'Items',{'MoE','Spotiflow'},'ValueChangedFcn',@(~,~) Tracking.DetectionSettings.refresh(c));
+            Tracking.DetectionSettings.build(c,method);
             uilabel(detection,'Text','Input');
             c.DetectionMode=uidropdown(detection,'Items',{'Single channel','Multi-channel'},'Value','Single channel','ValueChangedFcn',@(~,~) v.detectionModeChanged());
             uilabel(detection,'Text','Channels');
@@ -99,11 +102,14 @@ classdef VideoWorkspace
             Tracking.DetectionChannels.build(c,detection);
             v.DetectionSummary=uilabel(detection,'Text','','Visible','off');
             v.DetectionSummary.Layout.Row=5; v.DetectionSummary.Layout.Column=[1 2];
+            c.Buttons.recommend=uibutton(detection,'Text','Reference frames…', ...
+                'ButtonPushedFcn',@(~,~) Tracking.ReferenceFrames.open(c));
+            c.Buttons.recommend.Layout.Row=5; c.Buttons.recommend.Layout.Column=[1 2];
             c.Buttons.detect=uibutton(detection,'Text','Auto Detect','FontWeight','bold','ButtonPushedFcn',@(~,~) c.safe(@() c.detect()));
             c.Buttons.detect.Layout.Row=6; c.Buttons.detect.Layout.Column=[1 2];
             Tracking.VideoWorkspace.primary(c.Buttons.detect,true);
             actions=uigridlayout(detection,[1 2]); actions.Layout.Row=7; actions.Layout.Column=[1 2]; actions.Padding=[0 0 0 0];
-            c.Buttons.accept=uibutton(actions,'Text','Accept candidates','ButtonPushedFcn',@(~,~) c.safe(@() c.accept()));
+            c.Buttons.accept=uibutton(actions,'Text','Accept candidates','ButtonPushedFcn',@(~,~) Tracking.ReferenceConstraints.acceptOrMatch(c));
             c.Buttons.accept.Layout.Column=[1 2];
             c.Buttons.continueTracking=uibutton(detection,'Text','Continue to tracking →', ...
                 'ButtonPushedFcn',@(~,~) c.continueTracking());
@@ -138,6 +144,7 @@ classdef VideoWorkspace
             c.Buttons.rename=uimenu(menu,'Text','Edit neuron name…','MenuSelectedFcn',@(~,~) Tracking.NeuronNames.edit(c));
             c.Buttons.add=uimenu(menu,'Text','Add neuron','Separator','on','MenuSelectedFcn',@(~,~) v.armAdd());
             c.Buttons.remove=uimenu(menu,'Text','Delete track','MenuSelectedFcn',@(~,~) c.safe(@() c.remove()));
+            c.Buttons.match=uimenu(menu,'Text','Match reference neurons…','MenuSelectedFcn',@(~,~) Tracking.ReferenceConstraints.open(c));
             c.Buttons.coordinates=uimenu(menu,'Text','Coordinate table…','Separator','on','MenuSelectedFcn',@(~,~) v.openTable());
             c.Buttons.neuronActions=uibutton(review,'Text','Neuron actions ▾', ...
                 'ButtonPushedFcn',@(src,~) Tracking.VideoWorkspace.neuronMenu(c,src,menu));
@@ -221,7 +228,7 @@ classdef VideoWorkspace
         end
         function refreshActions(c,busy)
             names={'detect','accept','track','resume','progress','openrun','runOptions','advanced', ...
-                'activity','export','add','remove','correct','rename','coordinates','neuronActions','saveSession','activitySettings','paired'};
+                'recommend','detectionSettings','activity','export','add','remove','correct','rename','coordinates','neuronActions','saveSession','activitySettings','paired'};
             for i=1:numel(names)
                 if isfield(c.Buttons,names{i}), c.Buttons.(names{i}).Enable=matlab.lang.OnOffSwitchState(~busy); end
             end
@@ -229,6 +236,13 @@ classdef VideoWorkspace
             for name={'remove','correct'}, c.Buttons.(name{1}).Enable=matlab.lang.OnOffSwitchState(~busy && selected); end
             c.Buttons.rename.Enable=matlab.lang.OnOffSwitchState(~busy && accepted);
             c.Buttons.accept.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(c.Candidates));
+            if Tracking.ReferenceConstraints.needed(c)
+                c.Buttons.accept.Text='Match neurons…';
+                c.Buttons.accept.Tooltip='Assign later-frame proposals to existing neurons before using them as ZephIR constraints.';
+            else
+                c.Buttons.accept.Text='Accept candidates'; c.Buttons.accept.Tooltip='';
+            end
+            c.Buttons.match.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(c.Rows));
             c.Buttons.resume.Enable=matlab.lang.OnOffSwitchState(~busy && ~isempty(c.TrackDirectory));
             c.Buttons.progress.Enable=c.Buttons.resume.Enable;
             c.Buttons.export.Enable=matlab.lang.OnOffSwitchState(~busy && c.activityCurrent());

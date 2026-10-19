@@ -5,21 +5,27 @@ classdef NeuronNames
             records=getappdata(c.Grid,'neuron_names');
             if isempty(records), records=struct('id',{},'name',{},'confidence',{},'source',{}); end
         end
-        function set(c,records)
+        function records = validate(records)
             if isempty(records), records=struct('id',{},'name',{},'confidence',{},'source',{}); end
+            if ~isstruct(records) || ~all(isfield(records,{'id','name','confidence','source'}))
+                error('Tracking:Names','Invalid saved neuron names.');
+            end
             if ~isempty(records)
                 records=reshape(records,1,[]); ids=[records.id];
-                if numel(unique(ids))~=numel(ids) || any(~isfinite(ids) | ids<1 | ids~=round(ids))
+                if ~isnumeric(ids) || ~isreal(ids) || numel(ids)~=numel(records) || numel(unique(ids))~=numel(ids) || any(~isfinite(ids) | ids<1 | ids~=round(ids))
                     error('Tracking:Names','Neuron names must refer to unique positive tracking IDs.');
                 end
             end
             for i=1:numel(records)
-                name=string(records(i).name); confidence=records(i).confidence;
+                name=string(records(i).name); confidence=records(i).confidence; source=string(records(i).source);
                 if ~isscalar(name) || ismissing(name) || strlength(name)>64 || any(char(name)<32) || ...
-                        ~isscalar(confidence) || ~isfinite(confidence) || confidence<0 || confidence>1
+                        ~isscalar(confidence) || ~isfinite(confidence) || confidence<0 || confidence>1 || ~isscalar(source) || ismissing(source)
                     error('Tracking:Names','Invalid neuron name or identity confidence.');
                 end
             end
+        end
+        function set(c,records)
+            records=Tracking.NeuronNames.validate(records);
             setappdata(c.Grid,'neuron_names',records);
             c.View.ListKey={}; c.View.ProjectionKey={}; c.Analysis.PlotKey={};
         end

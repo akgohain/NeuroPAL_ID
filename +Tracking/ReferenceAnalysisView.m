@@ -213,19 +213,25 @@ classdef ReferenceAnalysisView < handle
             value.paired_reference=getappdata(c.Grid,'paired_reference_provenance');
             value.image_settings=Tracking.ImageSettings.get(c);
             value.detection_channels=Tracking.DetectionChannels.get(c);
+            value.detection_settings=Tracking.DetectionSettings.get(c);
+            value.reference_frames=getappdata(c.Grid,'reference_frame_recommendations');
         end
         function restoreTracking(obj,parameters)
+            Tracking.SessionSettings.tracking(obj.Controller,parameters);
             c=obj.Controller; c.First.Value=parameters.frame_range(1)+1; c.Last.Value=parameters.frame_range(2)+1;
             c.Reference.Value=parameters.reference_frame+1; c.TrackingChannel.Value=parameters.channel;
             c.WindowSize.Value=parameters.window_size; c.Epochs.Value=parameters.epochs;
         end
         function restoreSession(obj,value)
             c=obj.Controller;
+            Tracking.SessionSettings.validate(c,value);
             c.First.Value=value.first; c.Last.Value=value.last; c.Reference.Value=value.reference;
             c.TrackingChannel.Value=value.tracking_channel; c.WindowSize.Value=value.window_size; c.Epochs.Value=value.epochs;
             c.TrackDirectory=value.tracking_directory; c.ActivityDirectory=value.activity_directory;
             if isfield(value,'next_id'), c.NextID=max(c.NextID,value.next_id); end
             if isfield(value,'detector'), c.Detector.Value=value.detector; end
+            if isfield(value,'detection_settings'), Tracking.DetectionSettings.restore(c,value.detection_settings);
+            else, Tracking.DetectionSettings.restore(c,[]); end
             if isfield(value,'spacing_text'), c.Spacing.Value=value.spacing_text; end
             if isfield(value,'calibration_confirmed'), c.Calibration.Value=value.calibration_confirmed; end
             if isfield(value,'detection_channel'), c.DetectionChannel.Value=value.detection_channel; end
@@ -242,6 +248,9 @@ classdef ReferenceAnalysisView < handle
             if isfield(value,'neuron_names'), Tracking.NeuronNames.set(c,value.neuron_names); end
             if isfield(value,'paired_reference'), setappdata(c.Grid,'paired_reference_provenance',value.paired_reference); end
             if isfield(value,'image_settings'), Tracking.ImageSettings.restore(c,value.image_settings); end
+            if isfield(value,'reference_frames')
+                Tracking.ReferenceFrames.restore(c,value.reference_frames);
+            end
             options=value.activity_options;
             obj.Controls.signal.Value=options.signal_channel; obj.Controls.reference.Value=options.reference_channel;
             obj.Controls.radius.Value=num2str(options.radius_xyz(:)'); obj.Controls.background.Value=options.background;

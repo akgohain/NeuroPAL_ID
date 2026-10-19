@@ -22,7 +22,7 @@ classdef SessionReset
             c.ActivityRows=[]; c.ActivityExcluded=[]; c.ActivitySettings=struct();
             c.Reference.Value=c.Frame.Value; c.First.Value=1; c.Last.Value=c.Source.nt;
             v=c.View; v.Review.clear(); v.Selection=[]; v.PreferredID=1;
-            v.CorrectMode=false; v.AddMode=false; c.Buttons.add.Text='Add neuron';
+            v.CorrectMode=false; v.AddMode=false; v.AddIdentity=[]; v.AddFrame=0; v.AddReplace=false; c.Buttons.add.Text='Add neuron';
             v.ListKey={}; v.TableRows=[]; v.IndexedRows=[]; v.FrameIndices={}; v.ProjectionKey={};
             if ~isempty(v.TableWindow) && isvalid(v.TableWindow), delete(v.TableWindow); v.TableWindow=[]; end
             a=c.Analysis; a.ResultKey=''; a.Frames=[]; a.IDs=[]; a.PlotKey={}; a.ResultOptions=struct();

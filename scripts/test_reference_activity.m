@@ -8,7 +8,7 @@ view.LabelMode.Value='Selected'; w.render();
 assert(numel(findobj(w.Axes,'Tag','reference_label'))<=1);
 view.NeuronList.Value=2; view.chooseList();
 identity=view.PreferredID;
-assert(contains(analysis.Axes.Title.String,sprintf('Neuron %d',identity)));
+assert(contains(analysis.Axes.Title.String,Tracking.NeuronNames.label(w,identity,true)));
 w.Frame.Value=min(w.Source.nt,frame+1); w.render();
 assert(view.PreferredID==identity);
 analysis.population();
