@@ -47,6 +47,17 @@ def main():
         a = replay.sort_values(cols[:3])[cols].to_numpy()
         b = expected.sort_values(cols[:3])[cols].to_numpy()
         assert a.shape==b.shape and np.allclose(a,b,rtol=0,atol=1e-9), (animal,'routing parity')
+        audit=pd.read_csv(output/'candidate_scores.csv')
+        diagnostics=json.loads((output/'routing_diagnostics.json').read_text())
+        assert int(audit.selected.sum())==len(replay)==diagnostics['accepted_count']
+        assert diagnostics['score_threshold']==diagnostics['default_score_threshold']
+        assert not diagnostics['threshold_overridden']
+        permissive=moe.route(args.bundle,volume,proposals,animal,ex['dataset_id'],output,threshold_override=0)
+        assert len(permissive)==len(audit) and len(permissive)>=len(replay)
+        permissive_audit=pd.read_csv(output/'candidate_scores.csv')
+        assert np.array_equal(audit.router_score,permissive_audit.router_score)
+        # Restore the frozen-policy audit before full inference comparison.
+        moe.route(args.bundle,volume,proposals,animal,ex['dataset_id'],output)
         empty = {method:rows.iloc[:0] for method,rows in proposals.items()}
         assert moe.route(args.bundle,volume,empty,animal,'unknown',output).empty
         report = dict(animal=animal,preprocessing='exact',replay_count=len(a),replay_max_error=float(np.max(abs(a-b))))

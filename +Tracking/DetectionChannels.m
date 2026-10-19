@@ -17,14 +17,21 @@ classdef DetectionChannels
             controls=getappdata(c.Grid,'detection_channels');
             value=struct('channels',find(cell2mat(controls.table.Data(:,1)))'-1,'merge_radius_um',controls.radius.Value);
         end
-        function restore(c,value)
-            controls=getappdata(c.Grid,'detection_channels'); indices=double(value.channels(:)');
+        function validate(c,value)
+            if ~isstruct(value) || ~isscalar(value) || ~isfield(value,'channels') || ~isfield(value,'merge_radius_um') || ~isnumeric(value.channels) || ~isreal(value.channels)
+                error('Tracking:Channels','Invalid saved detection channel settings.');
+            end
+            indices=double(value.channels(:)');
             if any(~isfinite(indices) | indices<0 | indices>=c.Source.nc | indices~=round(indices)) || numel(unique(indices))~=numel(indices)
                 error('Tracking:Channels','Saved detection channels are outside this recording.');
             end
-            if ~isscalar(value.merge_radius_um) || ~isfinite(value.merge_radius_um) || value.merge_radius_um<0
+            if ~isnumeric(value.merge_radius_um) || ~isreal(value.merge_radius_um) || ~isscalar(value.merge_radius_um) || ~isfinite(value.merge_radius_um) || value.merge_radius_um<0
                 error('Tracking:Channels','Invalid saved merge distance.');
             end
+        end
+        function restore(c,value)
+            Tracking.DetectionChannels.validate(c,value);
+            controls=getappdata(c.Grid,'detection_channels'); indices=double(value.channels(:)');
             controls.table.Data(:,1)=num2cell(ismember((0:c.Source.nc-1)',indices)); controls.radius.Value=value.merge_radius_um;
         end
         function labels(c,names)

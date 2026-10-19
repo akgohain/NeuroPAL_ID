@@ -101,6 +101,20 @@ def preprocess(volume_xyzc, spacing, source, dataset_id='unknown'):
     return np.ascontiguousarray(volume.transpose(3, 2, 1, 0), dtype=np.float32)
 
 
+def channel_summary(volume):
+    """Record signal surviving the frozen preprocessing without altering it."""
+    return [dict(channel=i, minimum=float(volume[...,i].min()), maximum=float(volume[...,i].max()),
+                 positive_voxels=int(np.count_nonzero(volume[...,i] > 0)), total_voxels=int(np.prod(volume.shape[:3])))
+            for i in range(volume.shape[-1])]
+
+
+def score_threshold(default, override=None):
+    if override is None: return float(default)
+    if isinstance(override, bool) or not isinstance(override, (int, float)) or not math.isfinite(override) or not 0 <= override <= 1:
+        raise ValueError('Router score threshold must be a finite number from 0 to 1')
+    return float(override)
+
+
 def stamp(frame, animal, method):
     frame = frame.copy()
     frame['animal_id'] = animal
@@ -192,13 +206,24 @@ def yolo(bundle, volume_path, animal, device, output):
     return pd.read_csv(output/'yolo.csv')
 
 
-def route(bundle, volume, proposals, animal, dataset, output):
+def route(bundle, volume, proposals, animal, dataset, output, threshold_override=None):
     import joblib
     from scripts.run_detection_moe_image_gate import normalize_volume, sample_features, feature_names
     from scripts.experiment_detection_moe_nonlinear import _base_design, add_volume_context
     from scripts.experiment_detection_moe_calibrated_stack import build_candidates, CandidateConfig
-    count = sum(len(frame) for frame in proposals.values())
-    if not count: return pd.DataFrame(columns=COLUMNS)
+    router_config = json.loads((bundle/'provenance/router.json').read_text())
+    policy = router_config['nonlinear_moe']
+    threshold = score_threshold(policy['threshold'], threshold_override)
+    diagnostics = dict(expert_proposals={method:len(rows) for method,rows in proposals.items()},
+                       default_score_threshold=policy['threshold'], score_threshold=threshold,
+                       threshold_overridden=threshold_override is not None,
+                       proposal_limits='Threshold changes only filter existing expert proposals; they cannot recover a neuron absent from every expert.')
+    count = sum(diagnostics['expert_proposals'].values())
+    if not count:
+        pd.DataFrame(columns=COLUMNS+['router_score','selected']).to_csv(output/'candidate_scores.csv',index=False)
+        diagnostics.update(candidate_count=0, accepted_count=0, rejected_count=0)
+        (output/'routing_diagnostics.json').write_text(json.dumps(diagnostics,indent=2)+'\n')
+        return pd.DataFrame(columns=COLUMNS)
     limit = float(os.environ.get('NEUROPAL_ROUTER_MIB', '512')) * 2**20
     estimated = count*count*32 + count*4096
     if not math.isfinite(limit) or limit <= 0 or estimated > limit:
@@ -223,7 +248,6 @@ def route(bundle, volume, proposals, animal, dataset, output):
         # Preserve the historical CSV float roundtrip before tree routing.
         scored[method] = pd.read_csv(output/f'{method}_scored.csv')
         scored[method]['source_method'] = method
-    router_config = json.loads((bundle/'provenance/router.json').read_text())
     association = router_config['association']
     candidates = build_candidates(scored,{animal:dataset},CandidateConfig(association['mode'],association['radius_um'],association['coordinate']))
     context = output/'context.csv'
@@ -234,19 +258,40 @@ def route(bundle, volume, proposals, animal, dataset, output):
         raise ValueError('Router feature order does not match the bundle')
     design.to_csv(output/'router_features.csv',index=False)
     candidates.to_csv(output/'candidates.csv',index=False)
-    policy = router_config['nonlinear_moe']
     p3 = estimators[3].predict_proba(design)[:,1]
     p6 = np.maximum(p3,estimators[6].predict_proba(design)[:,1])
     score = policy['alpha']*p3+(1-policy['alpha'])*p6
-    result = candidates.loc[score >= policy['threshold']].copy()
-    result['score'] = score[score >= policy['threshold']]
+    keep = score >= threshold
+    audit = candidates.copy()
+    audit['router_score'] = score
+    audit['selected'] = keep
+    audit.to_csv(output/'candidate_scores.csv',index=False)
+    diagnostics.update(candidate_count=len(candidates),accepted_count=int(np.count_nonzero(keep)),
+                       rejected_count=int(np.count_nonzero(~keep)))
+    (output/'routing_diagnostics.json').write_text(json.dumps(diagnostics,indent=2)+'\n')
+    result = candidates.loc[keep].copy()
+    result['score'] = score[keep]
     return result
+
+
+def original_centers(result, shape_yxzc, spacing):
+    """Keep centers within the original pixel centers after resampling."""
+    points = result[['x_um','y_um','z_um']].to_numpy(float)/spacing
+    if not np.isfinite(points).all(): raise ValueError('Detector returned nonfinite centers')
+    upper = np.array([shape_yxzc[1],shape_yxzc[0],shape_yxzc[2]],dtype=float)-1
+    tolerance = 1e-7
+    keep = np.all((points >= -tolerance) & (points <= upper+tolerance),axis=1)
+    points = np.clip(points[keep],0,upper)
+    return result.loc[keep].copy(), points[:,[1,0,2]]+1, int(np.count_nonzero(~keep))
 
 
 def preflight_request(request):
     mode = request.get('input_mode', 'rgbw')
     if mode not in ('rgbw', 'single_channel'): raise ValueError('Unsupported input mode')
     channels = 1 if mode == 'single_channel' else 4
+    score_threshold(0.5,request.get('score_threshold'))
+    if request.get('score_threshold') is not None and request.get('backend','moe') != 'moe':
+        raise ValueError('A router score threshold applies only to the MoE backend')
     supplied = request['volume_shape_yxzc']
     if len(supplied) != 4 or any(isinstance(x, bool) or int(x) != x or x < 1 for x in supplied) or supplied[3] != channels:
         raise ValueError('Expected positive integer YXZC dimensions matching the selected input mode')
@@ -279,6 +324,12 @@ def prepare(request):
     adapted = prepare_input(raw.transpose(1,0,2,3), spacing, request.get('input_mode','rgbw'))
     volume = preprocess(adapted, spacing, source, request.get('dataset_id','unknown'))
     np.save(Path(request['output_dir'])/'volume.npy', volume)
+    original = channel_summary(adapted)
+    processed = channel_summary(volume)
+    removed = [a['channel'] for a,b in zip(original,processed) if a['positive_voxels'] and not b['positive_voxels']]
+    summary = dict(input=original,processed=processed,channels_losing_all_signal=removed,
+                   preprocessing='frozen_fold00_image_only')
+    (Path(request['output_dir'])/'preprocessing_summary.json').write_text(json.dumps(summary,indent=2)+'\n')
 
 
 def run(request, response_path):
@@ -303,7 +354,8 @@ def _run(request, response_path, lease):
     if request.get('input_mode') == 'single_channel' and dataset != 'unknown':
         raise ValueError('Single-channel detection requires dataset=unknown')
     animal = str(request.get('animal_id','app_volume'))
-    progress(f'Preprocessing RGBW volume; estimated workspace {estimated/2**20:.0f} MiB')
+    input_label = 'selected channel' if request.get('input_mode')=='single_channel' else 'RGBW volume'
+    progress(f'Preprocessing {input_label}; estimated workspace {estimated/2**20:.0f} MiB')
     volume_path = output/'volume.npy'
     prepared_request = output/'preprocessing_request.json'
     prepared_request.write_text(json.dumps(request))
@@ -327,22 +379,37 @@ def _run(request, response_path, lease):
         proposals[method] = pd.read_csv(output/f'{method}.csv')
     progress('Applying appearance gate and nonlinear routers')
     volume = np.load(volume_path, mmap_mode='r')
-    result = route(bundle,volume,proposals,animal,dataset,output) if backend == 'moe' else proposals['spotiflow']
+    result = route(bundle,volume,proposals,animal,dataset,output,request.get('score_threshold')) if backend == 'moe' else proposals['spotiflow']
     del volume
+    result, centroids, outside = original_centers(result,shape,spacing)
     result.to_csv(output/'predictions_processed.csv',index=False)
-    points = result[['x_um','y_um','z_um']].to_numpy(float)/spacing
-    if len(points) and (not np.isfinite(points).all() or np.any(points < 0) or np.any(points >= np.array([shape[1],shape[0],shape[2]]))):
-        raise ValueError('Detector returned centers outside the original image')
-    centroids = points[:,[1,0,2]]+1
+    preprocessing = json.loads((output/'preprocessing_summary.json').read_text())
+    diagnostics = json.loads((output/'routing_diagnostics.json').read_text()) if backend == 'moe' else dict(expert_proposals={'spotiflow':len(proposals['spotiflow'])})
+    diagnostics.update(outside_pixel_center_bounds=outside,exported_count=len(result))
+    if outside: progress(f'Excluded {outside} proposals outside original pixel-center bounds')
+    if preprocessing['channels_losing_all_signal']:
+        progress('Frozen preprocessing removed all signal from adapted channels ' + str(preprocessing['channels_losing_all_signal']))
+    if backend=='moe':
+        audit = pd.read_csv(output/'candidate_scores.csv')
+        points = audit[['x_um','y_um','z_um']].to_numpy(float)/spacing
+        upper = np.array([shape[1],shape[0],shape[2]],dtype=float)-1
+        audit['within_original_image'] = np.all((points >= -1e-7) & (points <= upper+1e-7),axis=1)
+        audit['exported'] = audit['selected'] & audit['within_original_image']
+        audit.to_csv(output/'candidate_scores.csv',index=False)
+        (output/'routing_diagnostics.json').write_text(json.dumps(diagnostics,indent=2)+'\n')
     response = dict(method_id='detection_moe' if backend == 'moe' else 'detection_spotiflow',num_centroids=len(result),centroids_yxz=centroids.tolist(),
                     scores=result.score.to_list(),predictions_csv=str(output/'predictions_processed.csv'),
                     source_revision='2276e61dedf9671740c1a36fab7d6d976b86de37',fold=0,
-                    policy='nonlinear_moe_fold00' if backend == 'moe' else 'spotiflow_fold00',backend=backend,dataset_id=dataset,
+                    policy=('nonlinear_moe_fold00_custom_threshold' if request.get('score_threshold') is not None else 'nonlinear_moe_fold00') if backend == 'moe' else 'spotiflow_fold00',backend=backend,dataset_id=dataset,
                     input_mode=request.get('input_mode','rgbw'),
                     single_channel_unvalidated=request.get('input_mode')=='single_channel',
                     input_adaptation='repeat_selected_channel_four_times' if request.get('input_mode')=='single_channel' else 'none',
                     source_metadata=request.get('source_metadata', {}),
                     unknown_dataset_unvalidated=dataset=='unknown',
+                    diagnostics=diagnostics,preprocessing_summary=preprocessing,
+                    candidate_scores_csv=str(output/'candidate_scores.csv') if backend=='moe' else None,
+                    score_threshold=diagnostics.get('score_threshold'),default_score_threshold=diagnostics.get('default_score_threshold'),
+                    custom_threshold_unvalidated=diagnostics.get('threshold_overridden',False),
                     transform=dict(original_spacing_um_xyz=spacing.tolist(),processed_spacing_um_xyz=SPACING.tolist(),
                                    zoom_xyz=(spacing/SPACING).tolist(),crop_start_xyz=[0,0,0],matlab_axis_order='YXZ',index_base=1),
                     runtime_versions={name:importlib.metadata.version(name) for name in ('numpy','pandas','scipy','torch','spotiflow','ultralytics','scikit-learn','joblib')},
@@ -350,7 +417,7 @@ def _run(request, response_path, lease):
     temporary = response_path.with_suffix('.tmp')
     temporary.write_text(json.dumps(response,indent=2,allow_nan=False)+'\n')
     temporary.replace(response_path)
-    progress(f'MoE finished: {len(result)} centers')
+    progress(f'{"MoE" if backend=="moe" else "Spotiflow"} finished: {len(result)} centers')
 
 
 def main():

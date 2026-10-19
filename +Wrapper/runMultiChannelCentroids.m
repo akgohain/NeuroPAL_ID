@@ -4,8 +4,10 @@ arguments
     volume
     channel_indices double
     scale_um_xyz double
+    options.JobToken (1,1) string = ""
     options.Backend (1,1) string = "moe"
     options.MergeRadiusUm (1,1) double = 2
+    options.ScoreThreshold (1,1) double = NaN
     options.SourceMetadata (1,1) struct = struct()
     options.OutputDir (1,1) string = ""
     options.ProgressFcn = []
@@ -20,7 +22,10 @@ if isempty(volume) || ndims(volume)>4 || numel(scale)~=3 || any(~isfinite(scale)
         ~isfinite(options.MergeRadiusUm) || options.MergeRadiusUm<0 || ~any(options.Backend==["moe","spotiflow"])
     error('Wrapper:MultiChannelInput','Supply a valid recording, detector, spacing and merge distance.');
 end
-channels=sort(channels); job=Program.HeavyJob.acquire('Multi-channel detection'); cleanup=onCleanup(@() delete(job));
+if ~isnan(options.ScoreThreshold) && (~isfinite(options.ScoreThreshold) || options.ScoreThreshold<0 || options.ScoreThreshold>1 || options.Backend~="moe")
+    error('Wrapper:MoEInvalidThreshold','Use the MoE model threshold or supply a finite router score threshold from 0 to 1.');
+end
+channels=sort(channels); job=Program.HeavyJob.acquire('Multi-channel detection', options.JobToken); cleanup=onCleanup(@() delete(job));
 centers=zeros(0,3); scores=zeros(0,1); origins=zeros(0,1); runs=cell(1,numel(channels)); blank=[];
 for i=1:numel(channels)
     check_cancel(options.CancelFcn);
@@ -32,12 +37,13 @@ for i=1:numel(channels)
     end
     metadata=options.SourceMetadata; metadata.channel_index=channel; metadata.selected_channels=channels;
     result=options.DetectFcn(plane,scale,'Backend',options.Backend,'InputMode',"single_channel", ...
+        'ScoreThreshold',options.ScoreThreshold, ...
         'SourceMetadata',metadata,'OutputDir',options.OutputDir,'ProgressFcn',options.ProgressFcn,'CancelFcn',options.CancelFcn,'JobToken',job.Token);
     bounds=[size(volume,1),size(volume,2),size(volume,3)];
     if isempty(result.centroids_yxz), result.centroids_yxz=zeros(0,3); end
     if size(result.centroids_yxz,2)~=3 || size(result.centroids_yxz,1)~=numel(result.scores) || ...
             result.num_centroids~=numel(result.scores) || any(~isfinite(result.centroids_yxz),'all') || ...
-            any(result.centroids_yxz<1 | result.centroids_yxz>=bounds+1,'all') || ...
+            any(result.centroids_yxz<1 | result.centroids_yxz>bounds,'all') || ...
             any(~isfinite(result.scores) | result.scores<0 | result.scores>1,'all')
         error('Wrapper:MultiChannelResponse','C%d returned invalid detections.',channel);
     end
@@ -51,6 +57,16 @@ response.merge_radius_um=options.MergeRadiusUm; response.merge_policy='strongest
 response.score_policy='score_of_retained_detection'; response.skipped_channels=blank;
 response.source_metadata=options.SourceMetadata; response.channel_runs=runs;
 response.input_adaptation='independent_single_channel_inference'; response.multi_channel_unvalidated=true;
+response.score_threshold_override=options.ScoreThreshold;
+response.score_threshold=options.ScoreThreshold; response.default_score_threshold=NaN;
+response.custom_threshold_unvalidated=~isnan(options.ScoreThreshold);
+for i=1:numel(runs)
+    if isfield(runs{i},'score_threshold') && ~isempty(runs{i}.score_threshold)
+        response.score_threshold=runs{i}.score_threshold;
+        response.default_score_threshold=runs{i}.default_score_threshold;
+        break;
+    end
+end
 response.raw_centroids_yxz=centers; response.raw_scores=scores; response.raw_channels=origins;
 if strlength(options.OutputDir)>0
     output=char(options.OutputDir); if ~isfolder(output), mkdir(output); end

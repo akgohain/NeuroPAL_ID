@@ -5,6 +5,7 @@ arguments
     scale_um_xyz double
     options.Backend (1,1) string = "moe"
     options.InputMode (1,1) string = "rgbw"
+    options.ScoreThreshold (1,1) double = NaN
     options.SourceMetadata (1,1) struct = struct()
     options.BundlePath (1,1) string = ""
     options.PythonExecutable (1,1) string = ""
@@ -22,9 +23,19 @@ job_cleanup = onCleanup(@() delete(job));
 if ~isfinite(options.TimeoutSeconds) || options.TimeoutSeconds <= 0
     error('Wrapper:MoEInvalidTimeout', 'TimeoutSeconds must be finite and positive.');
 end
+if ~isnan(options.ScoreThreshold) && (~isfinite(options.ScoreThreshold) || options.ScoreThreshold<0 || options.ScoreThreshold>1)
+    error('Wrapper:MoEInvalidThreshold', 'Use the model threshold or supply a finite score threshold from 0 to 1.');
+end
+if ~isnan(options.ScoreThreshold) && options.Backend~="moe"
+    error('Wrapper:MoEInvalidThreshold', 'A router score threshold applies only to the MoE backend.');
+end
 readiness = Methods.ModelSetup.bundle('detection_moe', options.BundlePath);
 if ~any(options.InputMode == ["rgbw", "single_channel"])
     error('Wrapper:MoEInvalidMode', 'Choose rgbw or single_channel.');
+end
+if options.InputMode=="single_channel" && options.DatasetID~="unknown"
+    error('Wrapper:MoEDatasetMismatch', ...
+        'Single-channel detection requires dataset_id "unknown". Set the dataset to unknown in MoE settings before running this adapted input.');
 end
 expected_channels = 4;
 if options.InputMode == "single_channel", expected_channels = 1; end
@@ -62,6 +73,7 @@ request = struct('bundle', readiness.bundle_path, 'output_dir', output, ...
     'volume_raw', raw_path, 'volume_shape_yxzc', [size(volume,1), size(volume,2), size(volume,3), expected_channels], ...
     'volume_dtype', 'float32', 'scale_um_xyz', scale, ...
     'dataset_id', char(options.DatasetID), 'device', char(options.Device));
+if ~isnan(options.ScoreThreshold), request.score_threshold=options.ScoreThreshold; end
 request_path = fullfile(output, 'request.json');
 response_path = fullfile(output, 'response.json');
 fid = fopen(request_path, 'w');
@@ -96,7 +108,7 @@ bounds = [size(volume,1),size(volume,2),size(volume,3)];
 if size(centers,2) ~= 3 || size(centers,1) ~= numel(scores) || ...
         size(centers,1) ~= response.num_centroids || ...
         any(~isfinite(centers),'all') || any(centers < 1,'all') || ...
-        any(centers >= bounds+1,'all') || any(~isfinite(scores) | scores < 0 | scores > 1)
+        any(centers > bounds,'all') || any(~isfinite(scores) | scores < 0 | scores > 1)
     error('Wrapper:MoEInvalidResponse', 'Detector returned invalid centers or scores.');
 end
 response.centroids_yxz = centers;

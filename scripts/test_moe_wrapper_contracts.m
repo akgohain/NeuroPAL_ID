@@ -4,8 +4,13 @@ arguments
     bundle (1,1) string
 end
 volume = ones(8,9,5,4,'single');
+local_error(@() Wrapper.runMoECentroids(volume, [1 1 1], 'ScoreThreshold', -0.1), 'Wrapper:MoEInvalidThreshold');
+local_error(@() Wrapper.runMoECentroids(volume, [1 1 1], 'ScoreThreshold', Inf), 'Wrapper:MoEInvalidThreshold');
+local_error(@() Wrapper.runMoECentroids(volume, [1 1 1], 'ScoreThreshold', 0.2, 'Backend', 'spotiflow'), 'Wrapper:MoEInvalidThreshold');
 local_error(@() Wrapper.runMoECentroids(volume, [0 1 1], 'BundlePath', bundle), 'Wrapper:MoEInvalidSpacing');
 local_error(@() Wrapper.runMoECentroids(volume(:,:,:,1:3), [1 1 1], 'BundlePath', bundle), 'Wrapper:MoEInvalidVolume');
+local_error(@() Wrapper.runMoECentroids(volume(:,:,:,1), [1 1 1], 'BundlePath', bundle, ...
+    'InputMode', 'single_channel', 'DatasetID', '000715'), 'Wrapper:MoEDatasetMismatch');
 local_error(@() Wrapper.runMoECentroids(volume, [1 1 1], 'BundlePath', bundle, ...
     'PythonExecutable', '/definitely/missing/python'), 'Wrapper:MoEPythonUnavailable');
 local_error(@() Wrapper.runMoECentroids(volume, [1 1 1], 'BundlePath', bundle, ...
