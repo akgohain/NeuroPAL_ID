@@ -2,79 +2,109 @@
 
 For an Apple silicon Mac (M1 or newer), macOS 14+, with MATLAB installed.
 Tested with MATLAB R2024a. Setup needs an internet connection and at least
-12 GB free. The model weights are included; Python and its libraries are
-downloaded during setup. No NVIDIA GPU or training is needed.
+12 GB free. Model weights are included; Python and its libraries are downloaded
+during setup. No NVIDIA GPU or training is needed.
 
-## Install
+## Install and launch
 
 1. Unzip the package and keep its files together.
-2. Double-click **Setup-Mac.command** to install detection, GAT Auto-ID and
-   the ZephIR tracking runtime. Setup-with-Auto-ID.command is an equivalent alias.
-3. Wait for **SETUP COMPLETE**. Then start a fresh MATLAB session, open
+2. Double-click **Setup-Mac.command**. It installs MoE detection, GAT Auto-ID
+   and ZephIR tracking. **Setup-with-Auto-ID.command** is an equivalent alias.
+3. Wait for **SETUP COMPLETE**. Start a fresh MATLAB session, open
    **Start_NeuroPAL.m** from the extracted folder, and click **Run**.
 
 Use that same MATLAB file to launch this installation in future. It selects
-the included app and configures the installed models automatically.
+this package's app and configures the included models automatically. No model
+path editing is required. This is MATLAB source software; it requires MATLAB,
+not just MATLAB Runtime.
 
 If macOS won't open a command file, open Terminal, type `/bin/bash ` (with a
-space), drag the desired command file onto the Terminal window, and press
-Return. No Homebrew, preinstalled Python, or administrator password is needed.
-If setup fails, keep `setup.log` from the extracted folder for your bug report.
-Running setup again resumes by reusing verified installed components.
+space), drag the command file onto the Terminal window, and press Return.
+No Homebrew, preinstalled Python or administrator password is needed. If setup
+fails, keep `setup.log`. Running setup again reuses verified installed components.
 
-The app needs its usual MATLAB toolboxes: Image Processing, Statistics and
-Machine Learning, and Optimization. Deep Learning Toolbox is required for the legacy neural detector. Parallel Computing is optional.
-This is MATLAB source software, not a standalone MATLAB Runtime application.
+The app requires its usual MATLAB toolboxes: Image Processing, Statistics and
+Machine Learning, and Optimization. Deep Learning Toolbox is required for the
+legacy neural detector. Parallel Computing is optional.
 
 ## Identify an animal
 
-1. **File → Open** your CZI, MAT, NWB or other supported NeuroPAL image.
-2. Check **Body**, **Sex**, the channel assignments and image spacing. Select
-   Tail for a tail image. A filename does not set these correctly by itself.
-3. Select **MoE** under Auto-detect, then **Run detection**. MoE uses all four
-   distinct RGBW assignments, including W even when its display is unchecked.
-4. Inspect and edit the centers. For automatic identities, choose **GAT** and
-   **Run auto-ID**. Confirm or correct those suggestions manually.
-5. Detection and manual edits save automatically to the companion `_ID.mat`
-   file beside the image; keep both files together. **Save: IDs** exports a
-   separate CSV containing identities, positions and colors. To export the
-   current results, choose **No** when asked whether to rerun Auto-ID.
-   Manual identification also works without running either model.
+1. Choose **File → Open** and select a supported NeuroPAL image, such as CZI,
+   MAT or NWB. Check **Body**, **Sex**, channel assignments and image spacing.
+   Select Tail for a tail image; the filename does not set these automatically.
+2. For detection, use the gear beside **Auto-detect** to choose **MoE** and its
+   input channels, then click **Auto-detect**. The default RGBW input uses the
+   assigned channels even if a channel is hidden in the display. Single-channel
+   and selected-channel inputs are also available. Inspect and edit the centers.
+3. Select a neuron and type in **ID**. Matching names appear as you type.
+   Select an individual name with its exact L/R or other suffix. A family such
+   as IL1 can remain explicitly unresolved; the app does not invent a side.
+   Click **Assign** or press **Command-Enter** / **Control-Enter** to save.
+   Typing or leaving the field does not assign an identity.
+4. Use **Neurons → Undo ID edit** to undo an annotation change. If an individual
+   is already assigned elsewhere, review the conflict dialog before moving or
+   swapping it. **Prefill prediction** only fills a provisional suggestion in
+   the editor; it does not accept a prediction or assign an identity by itself.
+5. For automatic suggestions, use the gear beside **Auto-ID** to choose **GAT**,
+   then click **Auto-ID**. Review its predictions manually. Manual identification
+   works without running either model and does not rewrite model probabilities.
 
-The app includes the App Designer method repair and the keyboard/slider fix.
-Missing-model checks preserve existing annotations and explain setup failures.
-The original repository README has not been changed.
+Edits save to the companion `_ID.mat` beside the image. Keep the image and its
+companion files together. Keep a backup before opening an original experiment
+with a new software version. Use this launcher consistently; older app versions
+do not understand the full structured annotation history.
+
+Choose **Analysis → Export neuron IDs…** for a separate export. The default
+**MAT** export preserves identities, unresolved candidates, certainty, stable
+neuron IDs, evidence and edit history. Use **File → Import annotations…** to
+restore it onto the same source/owners. A CSV is a summary, requires explicit
+acknowledgement and includes a structured MAT companion; do not use CSV alone
+as an annotation backup. **File → Review ID recovery…** handles preserved
+previous-save choices when recovery is needed.
+
+## Calcium videos
+
+Open the recording through **File → Open** and use **Video Tracking**. Confirm
+channel selection and spacing in **Image settings**, choose a reference frame,
+detect and accept centers, then run ZephIR. Extra reference frames must be matched
+to the existing neuron IDs. In **Review**, inspect/correct tracks, extract activity
+and export the activity and tracks. A biological review of tracking and activity
+is still necessary. Missing or assumed acquisition metadata is not measured
+calibration. This desktop package does not include cluster or cloud submission.
 
 ## Included models and limits
 
 - **MoE:** the verified fold-00 bundle from source
   `2276e61dedf9671740c1a36fab7d6d976b86de37`. Final production model selection
-  remains unresolved. This package preserves the current model and provenance.
+  remains unresolved. The package preserves its checkpoints and provenance.
 - **GAT:** checkpoint `20260601-v1` with matching source and configuration.
-- **Standalone Spotiflow:** not included. It requires a different frozen
-  checkpoint; select MoE to use the detector included in this package.
 - **YOLO:** the vendored YOLO INF 2 checkpoint and its inference scripts.
-- **Matching pursuit, neural network and Atlas:** the app’s existing MATLAB
-  implementations and model assets, pinned with the app source.
+- **Matching pursuit, neural network and Atlas:** the app's existing MATLAB
+  implementations and model assets, pinned with the app source. The legacy
+  neural detector requires Deep Learning Toolbox; check `ACCEPTANCE.md` for
+  whether that inference was exercised on the tested installation.
 - **ZephIR:** a separate CPU runtime, version 1.0.4.
-- **Cellpose and CRF:** trained assets are unavailable and are not included.
-  See `MISSING_MODELS.md` for the exact handoff needed.
+- **Standalone Spotiflow, custom Cellpose and CRF:** their separate trained
+  assets are unavailable and are not included. The Spotiflow expert inside MoE
+  is a different checkpoint. See `MISSING_MODELS.md` for exact requirements.
+- **Ultrack and Higher-Order Transformer:** backend placeholders; not working
+  tracking methods in this package. WormND Atlas is not an enabled portable method.
 
 `METHODS.json` records every registered method, including unavailable ones.
+Execution checks do not establish detector recall or correct biological IDs on
+an unfamiliar animal. Missing-model errors must not prevent manual annotation.
 
-Installation and test details are in `VALIDATION.md`; exact versions and hashes
-are in `catalog.json` and `SHA256SUMS`. Passing the execution checks does not
-establish detection or identity accuracy on a new animal.
+## Version, validation and support
 
-Files install under
-`~/Library/Application Support/NeuroPAL_ID/Methods-20260928/`.
-Existing MATLAB/Python installations and older NeuroPAL setups stay separate.
-No recordings are included or uploaded. Setup downloads software only.
-Once installed, detection and identification run locally.
+The release identifier is in `PACKAGE_VERSION`; `catalog.json` pins the source
+commit and model packs, and `SHA256SUMS` records the packaged file hashes.
+Installation files live under
+`~/Library/Application Support/NeuroPAL_ID/Methods-<PACKAGE_VERSION>/`.
+Existing MATLAB/Python installations and older NeuroPAL packages stay separate.
+No recordings are included or uploaded. Setup downloads software only; inference
+runs locally after installation.
 
-For a bug report, include `setup.log`, the installed `installation.json`,
-the app's error message, and the steps that triggered it.
-
-The legacy neural detector requires Deep Learning Toolbox; it was not available
-on the packaging machine, so that detector's inference was not revalidated.
-Ultrack and Higher-Order Transformer are unimplemented backend placeholders.
+Read `VALIDATION.md` for the test policy and `ACCEPTANCE.md`, when included, for
+the actual checks completed on this exact release. For a bug report, include the
+release identifier, `setup.log`, installed `installation.json`, the app's error
+message and steps that triggered it. The original repository README is unchanged.

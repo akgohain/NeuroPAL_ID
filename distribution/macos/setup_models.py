@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -14,7 +15,6 @@ import tempfile
 import zipfile
 
 HERE = Path(__file__).resolve().parent
-VERSION = 'methods-20260928'
 
 
 def digest(path):
@@ -153,17 +153,33 @@ def launcher_text(app, root, config):
     return text
 
 
+def package_version(catalog):
+    version = catalog.get('package_version', 'commit-' + catalog['app_commit'][:12])
+    if not isinstance(version, str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}', version):
+        raise ValueError('Invalid package version in catalog.json.')
+    marker = HERE / 'PACKAGE_VERSION'
+    if marker.exists() and marker.read_text().strip() != version:
+        raise ValueError('PACKAGE_VERSION does not match catalog.json. Re-extract the original package.')
+    return version
+
+
+def default_root():
+    catalog = json.loads((HERE / 'catalog.json').read_text())
+    return Path.home() / 'Library/Application Support/NeuroPAL_ID' / ('Methods-' + package_version(catalog))
+
+
 def install(args):
     if sys.platform != 'darwin' or platform.machine() != 'arm64':
         raise RuntimeError('This package requires an Apple silicon Mac.')
     if int(platform.mac_ver()[0].split('.')[0]) < 14:
         raise RuntimeError('This package requires macOS 14 or later.')
-    root = args.root.expanduser().resolve()
+    verify(HERE)
+    catalog = json.loads((HERE / 'catalog.json').read_text())
+    version = package_version(catalog)
+    root = (args.root or default_root()).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
     if shutil.disk_usage(root).free < 2 * 1024**3:
         raise RuntimeError('Less than 2 GiB is free. Allow at least 8 GB for a new installation.')
-    verify(HERE)
-    catalog = json.loads((HERE / 'catalog.json').read_text())
     with install_lock(root):
         app = unpack(catalog['app_archive'], root / 'app' / catalog['app_commit'][:12], 'NeuroPAL_ID')
         moe_info = catalog['packs']['moe']
@@ -195,7 +211,7 @@ def install(args):
         text = launcher_text(app, root, config)
         atomic_text(root / 'start_neuropal.m', text)
         atomic_text(HERE / 'installed_launcher.m', 'run(' + quote_matlab(root / 'start_neuropal.m') + ');\n')
-        installation = dict(app=str(app), app_commit=catalog['app_commit'], version=VERSION,
+        installation = dict(app=str(app), app_commit=catalog['app_commit'], version='methods-' + version,
                             platform=platform.platform(), configuration=config, with_gat=with_gat,
                             scope='CPU model loading and preprocessing checks. See VALIDATION.md for inference tests.')
         atomic_text(previous, json.dumps(installation, indent=2) + '\n')
@@ -205,7 +221,7 @@ def install(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root', type=Path, default=Path.home() / 'Library/Application Support/NeuroPAL_ID/Methods-20260928')
+    parser.add_argument('--root', type=Path, help='Installation folder; defaults to this package version under Application Support')
     parser.add_argument('--with-gat', action='store_true', default=True, help='Install GAT Auto-ID (included by default)')
     install(parser.parse_args())
 

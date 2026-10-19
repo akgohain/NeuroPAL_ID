@@ -83,6 +83,23 @@ class InstallerTests(unittest.TestCase):
                     self.fail('Concurrent setup entered the lock')
         self.assertFalse((self.target / '.setup-lock').exists())
 
+    def test_package_version_and_install_root(self):
+        catalog = dict(app_commit='a' * 40, package_version='20261019-abc123')
+        (self.here / 'catalog.json').write_text(json.dumps(catalog))
+        (self.here / 'PACKAGE_VERSION').write_text('20261019-abc123\n')
+        self.assertEqual(setup.package_version(catalog), '20261019-abc123')
+        with patch.object(setup.Path, 'home', return_value=self.folder):
+            self.assertEqual(setup.default_root(), self.folder / 'Library/Application Support/NeuroPAL_ID/Methods-20261019-abc123')
+        (self.here / 'PACKAGE_VERSION').write_text('different-build\n')
+        with self.assertRaisesRegex(ValueError, 'does not match'):
+            setup.package_version(catalog)
+
+    def test_unsafe_package_version(self):
+        for version in ['../outside', '/absolute', 'spaces not allowed', '-bad', 'x' * 81]:
+            with self.assertRaisesRegex(ValueError, 'Invalid package version'):
+                setup.package_version(dict(app_commit='a' * 40, package_version=version))
+        self.assertEqual(setup.package_version(dict(app_commit='a' * 40)), 'commit-' + 'a' * 12)
+
     def test_failed_validation_keeps_previous_launcher(self):
         catalog = dict(app_commit='a' * 40, app_archive=self.pack('app.zip', 'NeuroPAL_ID/'),
                        packs={'moe': self.pack('moe.zip')})

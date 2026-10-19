@@ -21,7 +21,17 @@ if [ "$(uname -m)" != arm64 ] || [ "$(sw_vers -productVersion | cut -d. -f1)" -l
 fi
 
 # Keep the setup tool and Python separate from the user's other installations.
-setup_root="${NEUROPAL_SETUP_ROOT:-$HOME/Library/Application Support/NeuroPAL_ID/Methods-20260928}"
+if [ ! -f PACKAGE_VERSION ]; then
+    printf '%s\n' 'PACKAGE_VERSION is missing. Re-extract the complete package before running setup.'
+    exit 1
+fi
+IFS= read -r package_version < PACKAGE_VERSION
+case "$package_version" in
+    ''|*[!a-zA-Z0-9._-]*|[!a-zA-Z0-9]*)
+        printf '%s\n' 'Invalid package version. Re-extract the complete package.'
+        exit 1 ;;
+esac
+setup_root="${NEUROPAL_SETUP_ROOT:-$HOME/Library/Application Support/NeuroPAL_ID/Methods-$package_version}"
 tool_dir="$setup_root/tools/uv-0.12.19"
 if [ ! -x "$tool_dir/uv" ]; then
     mkdir -p "$setup_root/tools"
