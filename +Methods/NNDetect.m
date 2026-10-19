@@ -33,6 +33,7 @@ classdef NNDetect < handle
             catch ME
                 error('Methods:NNDetect:InvalidModel', 'Cannot load %s: %s', model_path, ME.message);
             end
+            Methods.NNDetect.validateModel(NN.model);
             obj.model_version = NN.version;
             obj.model = NN.model;
         end
@@ -61,11 +62,33 @@ classdef NNDetect < handle
         
         function obj = instance()
             persistent instance
-            if isempty(instance)
+            if isempty(instance) || ~isvalid(instance)
                 obj = Methods.NNDetect();
                 instance = obj;
             else
+                Methods.NNDetect.validateModel(instance.model);
                 obj = instance;
+            end
+        end
+
+        function validateModel(model)
+            % A partially restored network must not enter the detector cache.
+            if ~isa(model,'DAGNetwork') && ~isa(model,'SeriesNetwork')
+                error('Methods:NNDetect:InvalidModel','Expected a restored DAGNetwork or SeriesNetwork model.');
+            end
+            try
+                layers=model.Layers;
+                if isempty(layers)
+                    error('Methods:NNDetect:InvalidModel','The network has no restored layers.');
+                end
+            catch ME
+                if strcmp(ME.identifier,'Methods:NNDetect:InvalidModel'), rethrow(ME); end
+                if exist('nnet.keras.layer.BinaryCrossEntropyRegressionLayer','class')~=8
+                    error('Methods:NNDetect:MissingDependency', ...
+                        ['The legacy network could not restore its layers. The required Keras class ' ...
+                        'nnet.keras.layer.BinaryCrossEntropyRegressionLayer is unavailable.']);
+                end
+                error('Methods:NNDetect:InvalidModel','Cannot restore the network layers: %s',ME.message);
             end
         end
         

@@ -114,6 +114,12 @@ write('NN_model.mat','invalid');
 expect(@() Methods.NNDetect(),'Methods:NNDetect:InvalidModel');
 version = 1; save('NN_model.mat','version');
 expect(@() Methods.NNDetect(),'Methods:NNDetect:InvalidModel');
+model=struct('Layers',1); save('NN_model.mat','version','model');
+expect(@() Methods.NNDetect(),'Methods:NNDetect:InvalidModel');
+expect(@() Methods.NNDetect.validateModel(model),'Methods:NNDetect:InvalidModel');
+message=Program.GUIHandling.method_error_message(MException( ...
+    'Methods:NNDetect:MissingDependency','The Keras output layer is unavailable.'));
+assert(contains(message,'Converter for TensorFlow Models') && contains(message,'MATLAB path') && contains(message,'Matching Pursuit'));
 clear path_cleanup
 Program.HeavyJob.assertIdle();
 fprintf('MODEL_SETUP_FAILURES=PASS\n');

@@ -6,7 +6,7 @@ classdef ModelSetup
             if nargin < 2, params = struct(); end
             switch char(string(method))
                 case 'nn'
-                    Methods.ModelSetup.neuralNetwork();
+                    Methods.NNDetect.instance();
                 case 'cellpose'
                     if ~strcmpi(Methods.ModelSetup.value(params, 'mode', 'cellpose'), 'stub')
                         Methods.ModelSetup.cellpose(Methods.ModelSetup.value(params, 'model_path', ''));
@@ -99,6 +99,10 @@ classdef ModelSetup
             path_value = which(Methods.NNDetect.NN_model);
             if isempty(path_value), path_value = Methods.NNDetect.NN_model; end
             path_value = Methods.ModelSetup.requireFile(path_value, 'Methods:NNDetect:MissingModel', 'Neural-network weights');
+            if exist('DAGNetwork','class')~=8 || (~isdeployed && ~license('test','Neural_Network_Toolbox'))
+                error('Methods:NNDetect:MissingToolbox', ...
+                    'DAGNetwork support or its Deep Learning Toolbox license is unavailable.');
+            end
         end
 
         function path_value = requireFile(path_value, identifier, description)

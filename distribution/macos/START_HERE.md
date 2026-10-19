@@ -24,8 +24,11 @@ No Homebrew, preinstalled Python or administrator password is needed. If setup
 fails, keep `setup.log`. Running setup again reuses verified installed components.
 
 The app requires its usual MATLAB toolboxes: Image Processing, Statistics and
-Machine Learning, and Optimization. Deep Learning Toolbox is required for the
-legacy neural detector. Parallel Computing is optional.
+Machine Learning, and Optimization. The legacy neural detector additionally
+requires Deep Learning Toolbox and a compatible **Deep Learning Toolbox
+Converter for TensorFlow Models** providing
+`nnet.keras.layer.BinaryCrossEntropyRegressionLayer`. That converter is not
+shipped or verified by this package. Parallel Computing is optional.
 
 ## Identify an animal
 
@@ -81,8 +84,12 @@ calibration. This desktop package does not include cluster or cloud submission.
 - **YOLO:** the vendored YOLO INF 2 checkpoint and its inference scripts.
 - **Matching pursuit, neural network and Atlas:** the app's existing MATLAB
   implementations and model assets, pinned with the app source. The legacy
-  neural detector requires Deep Learning Toolbox; check `ACCEPTANCE.md` for
-  whether that inference was exercised on the tested installation.
+  neural weights are included, but Deep Learning Toolbox alone is insufficient:
+  compatible TensorFlow converter support must provide
+  `nnet.keras.layer.BinaryCrossEntropyRegressionLayer`. That support is not
+  bundled or verified. The R2024a test safely blocks this method when the class
+  is missing; legacy neural inference is not certified. Use MoE or matching
+  pursuit instead on an installation without that dependency.
 - **ZephIR:** a separate CPU runtime, version 1.0.4.
 - **Standalone Spotiflow, custom Cellpose and CRF:** their separate trained
   assets are unavailable and are not included. The Spotiflow expert inside MoE

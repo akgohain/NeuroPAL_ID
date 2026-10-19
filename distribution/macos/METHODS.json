@@ -6,7 +6,10 @@
   "nn": {
     "status": "included",
     "assets": "Data/Models/NN_model.mat",
-    "requires": "MATLAB Deep Learning Toolbox"
+    "requires": "MATLAB Deep Learning Toolbox and compatible Deep Learning Toolbox Converter for TensorFlow Models",
+    "required_class": "nnet.keras.layer.BinaryCrossEntropyRegressionLayer",
+    "converter_included": false,
+    "runtime_validation": "R2024a test lacked the required converter class; safe dependency rejection passed. Neural inference was not validated."
   },
   "yolo": {
     "status": "included",
