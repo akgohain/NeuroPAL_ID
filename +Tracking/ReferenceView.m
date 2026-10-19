@@ -543,6 +543,10 @@ classdef ReferenceView < handle
         end
         function markerClick(obj,ax,~,~)
             c=obj.Controller; if c.Busy, return; end
+            if obj.CorrectMode || obj.AddMode
+                if isequal(ax,c.Axes), obj.imageClick(ax); end
+                return;
+            end
             rows=obj.ListRows;
             if isequal(ax,c.Axes), rows=rows(abs(rows(:,5)-obj.SliceValue.Value)<obj.sliceRadius(),:); end
             if isempty(rows), return; end
@@ -569,7 +573,7 @@ classdef ReferenceView < handle
         end
         function imageClick(obj,ax)
             c = obj.Controller; if c.Busy, return; end
-            if obj.AddMode && ~isequal(ax,c.Axes), return; end
+            if (obj.AddMode || obj.CorrectMode) && ~isequal(ax,c.Axes), return; end
             obj.Playback.stop(); c.Cursor = ax.CurrentPoint;
             if obj.CorrectMode && isequal(ax,c.Axes) && ~isempty(obj.Selection)
                 obj.correctAt([c.Cursor(1,1:2),round(c.Slice.Value)]);
