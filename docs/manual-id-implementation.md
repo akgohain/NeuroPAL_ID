@@ -7,11 +7,13 @@ The NeuroPAL ID toolbar keeps one ID field and one assignment button. Suggestion
 1. Open an image and select a detected or manually added neuron.
 2. Type an individual name or a family such as `IL1`. The applicable catalog is searchable even when models are unavailable. Unknown specimen sex searches the catalog union.
 3. Choose an individual, or explicitly choose **Keep IL1 unresolved**. Choosing a suggestion stages a draft; it does not save.
-4. Use **Assign** / **Update ID**, or Ctrl+Enter (Cmd+Enter on macOS), to save. Enter in the input only accepts or validates the draft. Whitespace, blur, Z movement and tab changes never assign.
+4. Use **Assign** / **Update ID** to save. Tab moves from the input to that button without saving; press Enter or Space there to confirm. Enter in the input only accepts or validates the draft. Whitespace, blur, Z movement and tab changes never assign.
 5. Use the popup or Neurons menu for Undo. Clear ID asks before withdrawing an annotation. A confirmed occupied identity offers an explicit Move or Swap with both resulting associations shown.
 6. Save normally to the companion `_ID.mat`. Export neuron IDs defaults to a full structured MAT exchange. The legacy analysis CSV requires acknowledgement and has a full annotation MAT companion.
 
 Drafts stay with stable neuron owners when selection changes. `?` marks a tentative claim; `!` marks emphasis. `AWCL-ON` / `AWCR-OFF` carry a separate functional attribute. A bare family is never resolved by choosing its first member. Prefill prediction only proposes exact individual names; it neither commits nor replaces a retained draft or saved annotation.
+
+MATLAB R2024a can deliver pasted text only when the native field commits on Enter or focus loss. Suggestions then refresh from that final value. Standard Tab navigation finalizes the text before the researcher activates Assign. Modified Enter has no annotation or focus action; the app does not depend on its missing native key-release events. A pending focus intent can absorb final text for the same owner/context, while captured mouse and keyboard commands keep their original draft generations. Native button event duplicates reuse the same operation.
 
 ## Components and authority
 

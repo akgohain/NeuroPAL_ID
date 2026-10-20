@@ -135,8 +135,7 @@ All assignment gestures invoke the same command with one captured draft and targ
 | Enter on an active individual row | Accept that individual into the draft and close the popup; do not save |
 | Enter on an active group | Reveal its members; do not choose the first member |
 | Enter with no active suggestion | Resolve/validate the draft locally; do not save |
-| Ctrl+Enter | Invoke the explicit assignment command once for a valid captured draft |
-| Cmd+Enter on macOS | Alias for the same explicit assignment command |
+| Ctrl/Cmd+Enter in the input/popup | No annotation or focus action; native text finalization may still occur |
 | Tab or Shift+Tab from the input | Close popup, retain draft, move focus; do not choose or save |
 | Ctrl+Down with popup open | Focus the popup actions; Tab traverses All atlas names, Clear ID, and Undo |
 | Enter/Space on a focused popup action | Activate that explicitly focused action using its confirmation rules |
@@ -149,7 +148,9 @@ All assignment gestures invoke the same command with one captured draft and targ
 | Click Assign | Validate and commit the captured draft exactly once |
 | Enter/Space on the focused assignment button | Activate that explicit command once, with the same validation as a click |
 
-No implicit active first row is allowed on a family query. Opening suggestions, scrolling them, or changing their ordering cannot change the committed annotation. The modified assignment shortcut may commit valid exact individual text or an explicitly staged unresolved set, whether the popup is open or closed. A merely highlighted but unaccepted row is never substituted for the text/draft. An unstaged ambiguous family, stale draft generation, or active conflict modal blocks the shortcut with specific guidance; it cannot commit an arbitrary first suggestion. Applicable shortcuts cannot activate controls behind a modal.
+No implicit active first row is allowed on a family query. Opening suggestions, scrolling them, or changing their ordering cannot change the committed annotation. Standard Tab navigation moves to the assignment button; activating that focused button captures and validates the finalized draft. Modified Enter does not assign or move focus. A merely highlighted but unaccepted row is never substituted for the text/draft. An unstaged ambiguous family, stale draft generation, or active conflict modal blocks assignment with specific guidance; it cannot commit an arbitrary first suggestion. Applicable shortcuts cannot activate controls behind a modal.
+
+Native controls may deliver pasted text only on Enter or focus loss rather than through a live ValueChanging event. Final text must update the retained draft and any already-open suggestions without reopening a closed popup or changing its owner. Only a still-pending focus intent for the same owner and full context may absorb that finalized draft generation. Actual mouse/keyboard command tokens never rebase. A native button event with no new key callback reuses its captured focus operation, including duplicate events after selection advances. This text-finalization boundary is never an annotation save.
 
 The assignment button reads the visible editor's current draft directly. It MUST NOT depend on a blur callback reaching a hidden field before the button event. Repeated/double-clicked assignment gestures share an operation token and cannot assign the next neuron accidentally.
 
@@ -279,7 +280,7 @@ Each test must check saved state and original model evidence where applicable, n
 | A08 Two specimens and repeated frames of one track | Valid repeated names in different scopes and one owner across time |
 | A09 Type, paste, highlight, select, Space, Tab, blur, Escape in input/popup | Draft behavior only; no save or advancement |
 | A10 Type trailing space then click Assign | Exactly one captured-target commit; never a second assignment to the next neuron |
-| A11 Enter and modified Enter paths with popup open/closed | Input Enter only accepts/validates; explicit shortcut commits valid text/staged sets once, never highlighted substitutes or stale drafts; focused Assign has native Enter/Space activation |
+| A11 Enter, modified Enter and Tab paths with popup open/closed | Input Enter only accepts/validates; modified Enter has no annotation/focus action; Tab finalizes paste before focused Assign activation; native Return-only events commit one owned draft and replay safely |
 | A12 Double-click or delayed duplicate Assign | One operation token, one revision, one advancement |
 | A13 Switch neuron/tab and return | Restore correct owner's draft; model prefill does not replace it |
 | A14 Replace source, reorder/replace detections, or complete a stale popup event | No reassignment through reused numeric indices |
@@ -309,6 +310,6 @@ Implement the contract in this dependency order: validated catalog/owner/schema;
 
 Do not expose unresolved annotation as a shipping UI feature until save/reload/export and consumers preserve its meaning or explicitly declare loss. Do not represent a partial implementation as full contract compliance.
 
-The main product choices to review are the modified-Enter confirmation shortcut, explicit unresolved membership, confirmed-only occupancy, opt-in solver constraints, per-owner retained drafts, and persisted annotation history. The defaults above are concrete proposals, not claims that these departures from current behavior have been approved or implemented.
+The main product choices to review are explicit unresolved membership, confirmed-only occupancy, opt-in solver constraints, per-owner retained drafts, and persisted annotation history. The defaults above are concrete proposals, not claims that these departures from current behavior have been approved or implemented.
 
 Current integration points are [ManualIDInput](../+Program/+GUI/ManualIDInput.m), [NeuronIDChooser](../+Program/+GUI/NeuronIDChooser.m), [GUIHandling](../+Program/GUIHandling.m), the SelectNeuron/SaveUserID/SaveIDToFile callbacks in visualize_light.mlapp, [Neuron](../+Neurons/Neuron.m), [AutoId](../+Methods/AutoId.m), [ImageAnalysis export](../+Output/ImageAnalysis.m), and [tracking neuron names](../+Tracking/NeuronNames.m). Current native checks and code audit artifacts are under `/Users/adamg/neuroPAL/artifacts/manual-id-ui-20261015`; they establish the starting behavior rather than compliance with this proposed contract.

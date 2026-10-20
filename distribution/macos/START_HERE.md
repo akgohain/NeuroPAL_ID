@@ -42,7 +42,8 @@ shipped or verified by this package. Parallel Computing is optional.
 3. Select a neuron and type in **ID**. Matching names appear as you type.
    Select an individual name with its exact L/R or other suffix. A family such
    as IL1 can remain explicitly unresolved; the app does not invent a side.
-   Click **Assign** or press **Command-Enter** / **Control-Enter** to save.
+   Click **Assign** to save. **Tab** focuses Assign without saving;
+   press **Enter** or **Space** there to confirm.
    Typing or leaving the field does not assign an identity.
 4. Use **Neurons → Undo ID edit** to undo an annotation change. If an individual
    is already assigned elsewhere, review the conflict dialog before moving or

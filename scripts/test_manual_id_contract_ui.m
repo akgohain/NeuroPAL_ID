@@ -269,6 +269,94 @@ assert(strcmp(current.text,'AVAR') && copy.annotation_store.revision==before);
 Program.GUI.ManualIDController.release(app);
 assert(strcmp(ui.input.Enable,'on') && ~app.is_saving_ID);
 
+% Modified Enter has no annotation action; standard Tab finalizes native paste.
+modifiers={'control','command'}; pasted={'AVAR?','IL2L?'};
+for shortcut=1:numel(modifiers)
+    Program.GUI.ManualIDController.stopFocusTimer(app.CELL_ID);
+    Program.GUI.ManualIDController.select(app,2);
+    Program.GUI.ManualIDController.renderText(app,'AVAL');
+    Program.GUI.ManualIDController.edited(app,'AVAL');
+    Program.GUI.ManualIDController.noteFocus(app,'input');
+    state=Program.GUI.ManualIDController.state(app);
+    state.pendingGesture=[]; state.keyGesture=[]; state.heldAssignmentKey='';
+    Program.GUI.ManualIDController.put(app,state);
+    Program.GUI.ManualIDController.highlight(app,find(strcmp({state.rows.token},'AVAL'),1));
+    if shortcut==2, Program.GUI.ManualIDController.close(app); end
+    before=Annotations.Store.fingerprint(app.id_file); revision=copy.annotation_store.revision;
+    state=Program.GUI.ManualIDController.state(app);
+    owner=state.key; selected=app.selected_neuron; z=app.ZSlider.Value;
+    event=struct('Key','return','Modifier',{{modifiers{shortcut}}});
+    Program.GUI.ManualIDController.windowKey(app,app.CELL_ID,event);
+    current=Program.GUI.ManualIDController.state(app);
+    assert(strcmp(current.focusRole,'input') && current.open==state.open && current.active==state.active);
+    assert(strcmp(current.text,state.text) && current.generation==state.generation);
+    assert(isempty(current.pendingGesture) && isempty(current.keyGesture) && isempty(current.heldAssignmentKey));
+    assert(isequaln(before,Annotations.Store.fingerprint(app.id_file)));
+    % No key release is needed to recover from the ignored input chord.
+    event.Key='tab'; event.Modifier={};
+    Program.GUI.ManualIDController.windowKey(app,app.CELL_ID,event);
+    state=Program.GUI.ManualIDController.state(app); focusIntent=state.pendingGesture;
+    assert(strcmp(state.focusRole,'assign') && strcmp(state.focusOwner,owner) && ~state.open);
+    assert(strcmp(focusIntent.origin,'keyboard-focus') && isempty(state.heldAssignmentKey));
+    ui.input.Value=pasted{shortcut}; ui.input.ValueChangedFcn(ui.input,[]);
+    state=Program.GUI.ManualIDController.state(app);
+    assert(strcmp(state.text,pasted{shortcut}) && strcmp(state.focusRole,'assign') && ~state.open);
+    assert(state.pendingGesture.generation==state.generation && state.keyGesture.generation==state.generation);
+    assert(strcmp(state.pendingGesture.operation_id,focusIntent.operation_id));
+    assert(strcmp(state.key,owner) && copy.annotation_store.revision==revision);
+    assert(isequaln(before,Annotations.Store.fingerprint(app.id_file)));
+    % Native Return can supply only ButtonPushedData, without a WindowKeyPress.
+    result=Program.GUI.ManualIDInput.commit(app,[],selected,matlab.ui.eventdata.ButtonPushedData());
+    record=Program.GUI.ManualIDService.record(app,selected);
+    assert(result.changed && copy.annotation_store.revision==revision+1 && strcmp(record.certainty,'tentative'));
+    assert(isequal(record.candidates,{pasted{shortcut}(1:end-1)}));
+    assert(app.selected_neuron==selected && app.ZSlider.Value==z);
+    assert(isequaln(evidence,copy.annotation_store.evidence));
+    % A duplicate native event stays with that operation after auto-advance.
+    app.selected_neuron=1; Program.GUI.ManualIDController.select(app,1);
+    Program.GUI.ManualIDController.edited(app,'IL2R?',false);
+    Program.GUI.ManualIDController.noteFocus(app,'assign');
+    after=Annotations.Store.fingerprint(app.id_file); next=Program.GUI.ManualIDService.record(app,1);
+    result=Program.GUI.ManualIDInput.commit(app,[],1,matlab.ui.eventdata.ButtonPushedData());
+    assert(~result.changed && result.replayed && copy.annotation_store.revision==revision+1);
+    assert(app.selected_neuron==1 && isequaln(next,Program.GUI.ManualIDService.record(app,1)));
+    assert(isequaln(after,Annotations.Store.fingerprint(app.id_file)));
+end
+
+% Only a pending same-context focus intent can absorb a final native value.
+for origin={'mouse','keyboard','stale-focus'}
+    Program.GUI.ManualIDController.select(app,2);
+    Program.GUI.ManualIDController.edited(app,'AVAL?');
+    if strcmp(origin{1},'mouse'), Program.GUI.ManualIDController.beginMouseGesture(app,'normal');
+    elseif strcmp(origin{1},'keyboard'), Program.GUI.ManualIDController.beginKeyGesture(app,'space');
+    else
+        Program.GUI.ManualIDController.deferFocus(app,app.UserIDButton,'assign');
+        state=Program.GUI.ManualIDController.state(app);
+        state.pendingGesture.context.geometry_revision='stale';
+        Program.GUI.ManualIDController.put(app,state);
+    end
+    state=Program.GUI.ManualIDController.state(app); command=state.pendingGesture;
+    before=Annotations.Store.fingerprint(app.id_file);
+    ui.input.Value='IL2R?'; ui.input.ValueChangedFcn(ui.input,[]);
+    state=Program.GUI.ManualIDController.state(app);
+    assert(state.pendingGesture.generation==command.generation && state.generation>command.generation);
+    result=Program.GUI.ManualIDInput.commit(app,[],2,matlab.ui.eventdata.ButtonPushedData());
+    assert(~result.changed && isequaln(before,Annotations.Store.fingerprint(app.id_file)));
+    Program.GUI.ManualIDController.windowRelease(app,app.CELL_ID,struct('Key','space'));
+end
+
+% A repeated final value retains an explicitly staged unresolved family.
+Program.GUI.ManualIDController.select(app,2);
+Program.GUI.ManualIDController.edited(app,'IL1?');
+state=Program.GUI.ManualIDController.state(app);
+Program.GUI.ManualIDController.accept(app,find(strcmp({state.rows.kind},'keep'),1));
+state=Program.GUI.ManualIDController.state(app); staged=state.staged;
+Program.GUI.ManualIDController.deferFocus(app,app.UserIDButton,'assign');
+ui.input.Value=state.text; ui.input.ValueChangedFcn(ui.input,[]);
+state=Program.GUI.ManualIDController.state(app);
+assert(isequaln(state.staged,staged) && strcmp(state.focusRole,'assign') && ~state.open);
+Program.GUI.ManualIDController.stopFocusTimer(app.CELL_ID);
+
 % The search path reads the small catalog and annotations, never the volume.
 app.selected_neuron=1;
 Program.GUI.ManualIDController.select(app,1);

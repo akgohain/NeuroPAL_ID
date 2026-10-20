@@ -123,6 +123,16 @@ classdef ManualIDController
                 state.dirty=~strcmp(text,state.baseline);
             end
             state.parsed=Annotations.Catalog.parse(text,context.sex,state.allNames);
+            % A focus intent can absorb final native text; captured commands cannot.
+            if ~show && ~isempty(state.pendingGesture) && ...
+                    strcmp(state.pendingGesture.origin,'keyboard-focus') && ...
+                    strcmp(state.pendingGesture.owner_key,state.key) && isequaln(state.pendingGesture.context,context)
+                state.pendingGesture.generation=state.generation;
+                if ~isempty(state.keyGesture) && strcmp(state.keyGesture.origin,'keyboard-focus') && ...
+                        strcmp(state.keyGesture.operation_id,state.pendingGesture.operation_id)
+                    state.keyGesture=state.pendingGesture;
+                end
+            end
             Program.GUI.ManualIDController.put(app,Program.GUI.ManualIDController.stash(state));
             app.IDEditField.Value=text;
             ui=Program.GUI.ManualIDController.ui(app);
@@ -337,7 +347,7 @@ classdef ManualIDController
                 elseif isempty(rows), status='No matching atlas names';
                 elseif ~isempty(state.parsed) && state.parsed.requires_staging
                     status='Choose an individual or keep the family unresolved.';
-                else, status='Enter selects · Ctrl+Enter assigns'; end
+                else, status='Enter selects · Tab to Assign'; end
             end
             ui.status.Text=status; ui.status.Tooltip=status;
             if state.allNames, ui.all.Text='Applicable names'; else, ui.all.Text='All atlas names'; end
@@ -544,15 +554,13 @@ classdef ManualIDController
             switch key
                 case {'return','enter'}
                     handled=true;
-                    if modified
-                        Program.GUI.ManualIDController.beginKeyGesture(app,key);
-                        Program.GUI.ManualIDController.invoke(app.UserIDButton.ButtonPushedFcn,app.UserIDButton,[]);
+                    if modified, return;
                     elseif state.open && state.active>0
                         Program.GUI.ManualIDController.accept(app,state.active);
                     else
                         draft=Program.GUI.ManualIDController.capture(app);
                         if ~draft.valid, Program.GUI.ManualIDController.message(app,draft.message);
-                        else, Program.GUI.ManualIDController.message(app,'Draft ready · Assign or Ctrl+Enter to save.'); end
+                        else, Program.GUI.ManualIDController.message(app,'Draft ready · Assign to save.'); end
                     end
                 case {'uparrow','downarrow'}
                     handled=true;
@@ -595,13 +603,12 @@ classdef ManualIDController
         end
         function windowKey(app,src,event)
             Program.GUI.ManualIDController.installRelease(app);
-            if isequal(app.TabGroup.SelectedTab,app.NeuroPALIDTab) && ...
-                    any(strcmpi(event.Key,{'return','enter','space'}))
-                % The native button callback proves which command was activated.
-                % Capture its owner even after Tab entered from outside this editor.
-                Program.GUI.ManualIDController.beginKeyGesture(app,lower(event.Key));
-            end
             if ~Program.GUI.ManualIDController.handleKey(app,event)
+                if isequal(app.TabGroup.SelectedTab,app.NeuroPALIDTab) && ...
+                        any(strcmpi(event.Key,{'return','enter','space'}))
+                    % Native button activation can arrive without tracked editor focus.
+                    Program.GUI.ManualIDController.beginKeyGesture(app,lower(event.Key));
+                end
                 state=Program.GUI.ManualIDController.state(app);
                 Program.GUI.ManualIDController.invoke(state.previousKey,src,event);
             end
@@ -782,6 +789,7 @@ classdef ManualIDController
             owner=state.focusOwner; generation=state.generation;
             if strcmp(role,'assign')
                 state.pendingGesture=Program.GUI.ManualIDController.captureGesture(app,'keyboard-focus');
+                if isempty(state.heldAssignmentKey), state.keyGesture=state.pendingGesture; end
                 Program.GUI.ManualIDController.put(app,state);
             elseif ~isempty(state.pendingGesture) && strcmp(state.pendingGesture.origin,'keyboard-focus')
                 state.pendingGesture=[]; Program.GUI.ManualIDController.put(app,state);
@@ -852,7 +860,7 @@ classdef ManualIDController
         end
         function describe(app,state)
             ui=Program.GUI.ManualIDController.ui(app); if isempty(ui), return; end
-            label='Type an ID. Enter selects; Assign or Ctrl+Enter saves. Down opens suggestions; Ctrl+Down focuses popup actions.';
+            label='Type an ID. Enter selects; Tab focuses Assign. Click Assign or press Enter/Space there to save. Down opens suggestions; Ctrl+Down focuses popup actions.';
             if state.dirty, label=['Unassigned draft. ' label];
             elseif ~isempty(state.staged) && strcmp(state.staged.kind,'unresolved_set')
                 label=['Saved family membership (' state.staged.certainty '); individual member unresolved. ' label];
@@ -930,7 +938,8 @@ classdef ManualIDController
                 state.pendingGesture=[]; Program.GUI.ManualIDController.put(app,state); return;
             end
             if isa(event,'matlab.ui.eventdata.ButtonPushedData')
-                if ~isempty(state.heldAssignmentKey) && ~isempty(state.keyGesture), gesture=state.keyGesture;
+                if ~isempty(state.keyGesture) && (~isempty(state.heldAssignmentKey) || ...
+                        strcmp(state.keyGesture.origin,'keyboard-focus')), gesture=state.keyGesture;
                 elseif ~isempty(state.mouseGesture)
                     gesture=state.mouseGesture;
                 else
