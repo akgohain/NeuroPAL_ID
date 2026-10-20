@@ -43,7 +43,8 @@ if ismember('engine',groups)
         @test_tracking_job_io,@test_tracking_result_adapter,@test_tracking_roi, ...
         @test_trackmate_export,@test_reference_identity_results,@test_h5_video_axes, ...
         @test_video_views,@test_video_slider,@test_video_playback_lifecycle, ...
-        @test_reference_workflow_lifecycle,@test_mlapp_code_sync,@test_open_callback_contract};
+        @test_reference_workflow_lifecycle,@test_mlapp_code_sync,@test_open_callback_contract, ...
+        @test_open_source_routing,@test_artifact_removal,@test_processing_defaults_source};
     for i=1:numel(tests), run_case('engine',func2str(tests{i}),tests{i}); end
 end
 
@@ -57,10 +58,12 @@ if ismember('main',groups)
             @()test_manual_id_input(app),@()test_manual_id_contract_ui(app), ...
             @()test_neuron_id_chooser(app),@test_manual_id_data, ...
             @()test_manual_id_selection(app),@()test_manual_id_view(app), ...
+            @()test_manual_id_source_transition(app), ...
             @()test_main_keyboard_guard(app),@()test_main_keyboard_scope(app), ...
             @()test_main_keyboard_navigation(app),@()test_main_slider(app), ...
             @()test_neuron_click_sequence(app),@()test_main_detection_inputs(app), ...
             @()test_main_method_settings(app),@()test_main_geometry_actions(app), ...
+            @()test_main_artifact_removal(app), ...
             @test_nwb_annotation_roundtrip};
         for i=1:numel(tests), run_case('main',func2str(tests{i}),tests{i}); end
         Program.GUI.ManualIDController.close(app);
@@ -231,17 +234,19 @@ metadata=fullfile(fileparts(source),'metadata.json');
 if any(strcmpi(extension,{'.h5','.hdf5'})) && isfile(metadata)
     copyfile(metadata,fullfile(folder,'metadata.json'));
 end
-Program.ProcessingSession.clear(app); app.flags=struct();
+Program.ProcessingSession.clear(app); app.flags=struct('previous_source_pending',true);
 if Tracking.ReferenceWorkflow.supports(file)
-    % Paired NWBs open their movie by default; this matrix tests the static image.
-    prepared=DataHandling.NeuroPALImage.prepare(file);
-    Program.Routines.open(prepared);
+    % Exercise the static route without opening the paired movie's dialog.
+    Program.Routines.open(file,'image');
+    prepared=fullfile(folder,[name '.mat']);
 else
     Program.Routines.open(file);
     prepared=file;
     if ~strcmpi(extension,'.mat'), prepared=fullfile(folder,[name '.mat']); end
 end
 assert_image_file(app,prepared);
+assert(isempty(fieldnames(app.flags)) && strcmp(app.ImageProcessingTab.Tag,'raw'), ...
+    'Opening a static image must discard stale source flags and invalidate the processing view.');
 load_processing(app,file);
 baseline=DataHandling.Helpers.npal_mat.open_source(app.image_file);
 assert(numel(baseline.dims)>=4 && all(baseline.dims>0));
