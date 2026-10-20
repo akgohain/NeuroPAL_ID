@@ -22,6 +22,10 @@ Program.GUI.ManualIDController.invalidate(app);
 app.selected_neuron=1; Program.GUI.ManualIDController.select(app,1);
 ui=Program.GUI.ManualIDController.ui(app);
 assert(isa(ui.input,'matlab.ui.control.EditField'));
+editor=ui.input.Parent;
+assert(strcmp(editor.Tag,'ManualIDEditor') && isequal(app.UserIDButton.Parent,editor));
+assert(numel(editor.Children)==2 && isequal(editor.Children,[ui.input;app.UserIDButton]));
+assert(ui.input.Layout.Column==1 && app.UserIDButton.Layout.Column==2);
 assert(contains(Program.GUI.ManualIDController.reviewMessage(struct('issue','','conflicts',{{'IL1L'}})),'IL1L'));
 assert(contains(Program.GUI.ManualIDController.reviewMessage(struct('issue','Context conflict.','conflicts',{{}})),'Context conflict'));
 evidence=copy.annotation_store.evidence;
@@ -106,6 +110,7 @@ event.Modifier={};
 event.Key='tab'; assert(Program.GUI.ManualIDController.handleKey(app,event));
 state=Program.GUI.ManualIDController.state(app);
 assert(strcmp(state.focusRole,'assign') && strcmp(state.pendingGesture.owner_key,state.key));
+assert(isempty(getappdata(app.CELL_ID,'manual_id_focus_timer')));
 assert(~Program.GUI.ManualIDController.handleKey(app,event));
 state=Program.GUI.ManualIDController.state(app);
 assert(strcmp(state.focusRole,'other') && strcmp(state.focusBoundary,'assign') && state.focusOffset==1);
@@ -357,6 +362,8 @@ state=Program.GUI.ManualIDController.state(app);
 assert(isequaln(state.staged,staged) && strcmp(state.focusRole,'assign') && ~state.open);
 Program.GUI.ManualIDController.stopFocusTimer(app.CELL_ID);
 
+test_transaction_focus(app,ui);
+
 % The search path reads the small catalog and annotations, never the volume.
 app.selected_neuron=1;
 Program.GUI.ManualIDController.select(app,1);
@@ -373,6 +380,52 @@ report=struct('queries',100,'first_seconds',first,'p95_seconds',ordered(95), ...
     'max_seconds',max(elapsed),'catalog_version',Annotations.Catalog.version());
 fprintf('MANUAL_ID_OWNED_DRAFT_EXPLICIT_ASSIGN_UNRESOLVED_UNDO=PASS\n');
 fprintf('MANUAL_ID_SEARCH_P95_SECONDS=%.6f\n',report.p95_seconds);
+end
+
+function test_transaction_focus(app,ui)
+% Saving must not evict native focus to a neighboring run button.
+key='manual_id_transaction_focus_test';
+saved=struct('callback',getappdata(app.CELL_ID,'manual_id_after_commit'), ...
+    'present',isappdata(app.CELL_ID,key),'counter',getappdata(app.CELL_ID,key));
+cleanup=onCleanup(@() restore_transaction_probe(app,saved));
+setappdata(app.CELL_ID,key,0);
+setappdata(app.CELL_ID,'manual_id_after_commit',@(~,~,~) observe_transaction_focus(app));
+app.selected_neuron=2; Program.GUI.ManualIDController.select(app,2);
+Program.GUI.ManualIDController.edited(app,'AIBL?');
+Program.GUI.ManualIDController.noteFocus(app,'assign');
+result=Program.GUI.ManualIDController.assign(app,2);
+assert(result.changed && ~isfield(result,'display_error') && getappdata(app.CELL_ID,key)==1);
+assert(strcmp(app.UserIDButton.Enable,'on') && strcmp(ui.input.Enable,'on'));
+Program.GUI.ManualIDController.undo(app);
+assert(getappdata(app.CELL_ID,key)==2 && strcmp(app.UserIDButton.Enable,'on') && strcmp(ui.input.Enable,'on'));
+
+% Finishing after the selection closes cannot enable an ownerless editor.
+app.selected_neuron=[]; Program.GUI.ManualIDController.release(app);
+assert(strcmp(app.UserIDButton.Enable,'off') && strcmp(ui.input.Enable,'off'));
+app.selected_neuron=2; Program.GUI.ManualIDController.select(app,2);
+Program.GUI.ManualIDController.release(app);
+assert(strcmp(app.UserIDButton.Enable,'on') && strcmp(ui.input.Enable,'on'));
+end
+
+function observe_transaction_focus(app)
+state=Program.GUI.ManualIDController.state(app); ui=Program.GUI.ManualIDController.ui(app);
+assert(state.busy && app.is_saving_ID);
+assert(strcmp(app.UserIDButton.Enable,'on') && strcmp(ui.input.Enable,'off'));
+before=Annotations.Store.fingerprint(app.id_file);
+repeated=Program.GUI.ManualIDController.assign(app,app.selected_neuron);
+Program.GUI.ManualIDController.undo(app);
+assert(~repeated.changed && isequaln(before,Annotations.Store.fingerprint(app.id_file)));
+state=Program.GUI.ManualIDController.state(app); assert(state.busy);
+key='manual_id_transaction_focus_test';
+setappdata(app.CELL_ID,key,getappdata(app.CELL_ID,key)+1);
+end
+
+function restore_transaction_probe(app,saved)
+if ~isvalid(app) || ~isvalid(app.CELL_ID), return; end
+setappdata(app.CELL_ID,'manual_id_after_commit',saved.callback);
+key='manual_id_transaction_focus_test';
+if saved.present, setappdata(app.CELL_ID,key,saved.counter);
+elseif isappdata(app.CELL_ID,key), rmappdata(app.CELL_ID,key); end
 end
 
 function reset_latch(app)

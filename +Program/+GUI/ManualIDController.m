@@ -194,7 +194,8 @@ classdef ManualIDController
             state.busy=true; Program.GUI.ManualIDController.put(app,state);
             app.is_saving_ID=true;
             Program.GUI.ManualIDInput.setEnabled(app,'off');
-            app.UserIDButton.Text='Saving…'; app.UserIDButton.Enable='off';
+            % Keep native button focus while the busy guard rejects repeats.
+            app.UserIDButton.Text='Saving…';
             guard=onCleanup(@() Program.GUI.ManualIDController.release(app));
             options=struct('operation_id',state.operation,'context',state.context, ...
                 'expected_revision',state.context.annotation_revision,'draft_generation',state.generation);
@@ -254,7 +255,6 @@ classdef ManualIDController
             state.busy=true; Program.GUI.ManualIDController.put(app,state);
             app.is_saving_ID=true;
             Program.GUI.ManualIDInput.setEnabled(app,'off');
-            app.UserIDButton.Enable='off';
             guard=onCleanup(@() Program.GUI.ManualIDController.release(app));
             try
                 result=Program.GUI.ManualIDService.undo(app);
@@ -275,7 +275,8 @@ classdef ManualIDController
             if ~isempty(callback), callback(index,result,advance); end
         end
         function release(app)
-            if ~isvalid(app), return; end
+            if ~isvalid(app) || ~isvalid(app.CELL_ID) || ...
+                    ~isvalid(app.UserIDButton) || ~isvalid(app.IDEditField), return; end
             state=Program.GUI.ManualIDController.state(app); state.busy=false;
             Program.GUI.ManualIDController.put(app,state);
             app.is_saving_ID=false;
@@ -743,14 +744,8 @@ classdef ManualIDController
             ui=Program.GUI.ManualIDController.ui(app);
             parent=ui.input.Parent;
             if ~isequal(parent,app.UserIDButton.Parent), return; end
-            children=parent.Children(:); children(children==app.UserIDButton)=[];
-            index=find(children==ui.input,1);
-            % Native tab navigation follows the reverse child stack order.
-            try
-                parent.Children=[children(1:index-1);app.UserIDButton;children(index:end)];
-            catch
-                % Explicit native focus also supports containers with a fixed stack.
-            end
+            % Native Tab follows the editor's forward child order.
+            parent.Children=[ui.input;app.UserIDButton];
         end
         function noteFocus(app,role,target)
             state=Program.GUI.ManualIDController.state(app);
@@ -786,15 +781,17 @@ classdef ManualIDController
             Program.GUI.ManualIDController.readVisible(app);
             Program.GUI.ManualIDController.noteFocus(app,role,target);
             state=Program.GUI.ManualIDController.state(app);
-            owner=state.focusOwner; generation=state.generation;
             if strcmp(role,'assign')
                 state.pendingGesture=Program.GUI.ManualIDController.captureGesture(app,'keyboard-focus');
                 if isempty(state.heldAssignmentKey), state.keyGesture=state.pendingGesture; end
                 Program.GUI.ManualIDController.put(app,state);
+                % Native Tab reaches Assign in the editor's own child order.
+                return;
             elseif ~isempty(state.pendingGesture) && strcmp(state.pendingGesture.origin,'keyboard-focus')
                 state.pendingGesture=[]; Program.GUI.ManualIDController.put(app,state);
             end
-            if strcmp(target.Enable,'on'), focus(target); end
+            owner=state.focusOwner; generation=state.generation;
+            % Popup routes restore owned focus after native key handling finishes.
             clock=timer('ExecutionMode','singleShot','StartDelay',.01, ...
                 'Tag','ManualIDDeferredFocus','BusyMode','drop', ...
                 'TimerFcn',@(src,~) Program.GUI.ManualIDController.finishFocus(app,target,owner,generation,role,src), ...
@@ -812,7 +809,7 @@ classdef ManualIDController
             end
             setappdata(app.CELL_ID,'manual_id_focus_timer',[]);
             state=Program.GUI.ManualIDController.state(app);
-            if strcmp(state.key,owner) && state.generation==generation && strcmp(state.focusRole,role) && ...
+            if strcmp(state.key,owner) && strcmp(state.focusOwner,owner) && state.generation==generation && strcmp(state.focusRole,role) && ...
                     isequal(app.TabGroup.SelectedTab,app.NeuroPALIDTab) && strcmp(target.Enable,'on')
                 focus(target);
             end

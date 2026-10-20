@@ -4,13 +4,21 @@ classdef ManualIDInput
         function build(app)
             input=getappdata(app.IDEditField,'manual_id_input');
             if ~isempty(input) && isvalid(input), return; end
-            input=uieditfield(app.IDEditField.Parent,'text', ...
+            editor=uigridlayout(app.IDEditField.Parent,[1 2]);
+            editor.Tag='ManualIDEditor'; editor.Padding=[0 0 0 0];
+            editor.RowHeight={'1x'}; editor.ColumnWidth={'1x',70};
+            editor.ColumnSpacing=3; editor.RowSpacing=0;
+            editor.Layout.Row=app.IDEditField.Layout.Row;
+            editor.Layout.Column=[app.IDEditField.Layout.Column app.UserIDButton.Layout.Column];
+            % Native traversal stays inside the editor before reaching run actions.
+            input=uieditfield(editor,'text', ...
                 'Value',app.IDEditField.Value,'Placeholder','Neuron ID', ...
                 'Tag','ManualNeuronIDInput','Enable',app.IDEditField.Enable, ...
                 'FontSize',app.IDEditField.FontSize, ...
                 'Tooltip','Type an ID. Enter accepts a suggestion; Tab focuses Assign. Activate Assign to save.');
-            input.Layout.Row=app.IDEditField.Layout.Row;
-            input.Layout.Column=app.IDEditField.Layout.Column;
+            input.Layout.Row=1; input.Layout.Column=1;
+            app.UserIDButton.Parent=editor;
+            app.UserIDButton.Layout.Row=1; app.UserIDButton.Layout.Column=2;
             app.IDEditField.Visible='off';
             setappdata(app.IDEditField,'manual_id_input',input);
             setappdata(app.IDEditField,'manual_id_owner',app);
