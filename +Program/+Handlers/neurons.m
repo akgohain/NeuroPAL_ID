@@ -17,7 +17,8 @@ classdef neurons
             neuron_index = sscanf(char(string(target)), 'neuron:%d');
             target = [char(string(app.image_file)), '|', char(string(target))];
             [double_click, state] = Program.Handlers.neurons.advance_click( ...
-                previous, point, z, target, hit.Button, toc(clock), app.mouse_clicked.double_click_delay);
+                previous, point, z, target, hit.Button, toc(clock), ...
+                app.mouse_clicked.double_click_delay, strcmp(app.CELL_ID.SelectionType,'open'));
             state.file = app.image_file; state.tab = app.TabGroup.SelectedTab;
             state.revision = Program.Helpers.main_display_source_revision(app);
             state.neuron_index = []; state.neuron = [];
@@ -54,13 +55,15 @@ classdef neurons
             end
         end
 
-        function [double_click, state] = advance_click(previous, point, z, target, button, time, delay)
+        function [double_click, state] = advance_click(previous, point, z, target, button, time, delay, native_open)
             % A double-click must stay on the same target and slice, nearby in XY.
+            if nargin < 8, native_open = false; end
             serial = 1; double_click = button == 2;
             if ~isempty(previous)
                 serial = previous.serial + 1;
                 if button == 1 && previous.pending && previous.button == 1
-                    double_click = time >= previous.time && time - previous.time <= delay && ...
+                    % Respect the user's native double-click interval, not only our fallback.
+                    double_click = time >= previous.time && (native_open || time - previous.time <= delay) && ...
                         previous.z == z && strcmp(previous.target, target) && ...
                         sum((previous.point(:) - point(:)).^2) <= 4^2;
                 end
