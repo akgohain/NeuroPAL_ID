@@ -1,29 +1,19 @@
-function open(path)
+function open(path, source_kind)
     Program.HeavyJob.assertIdle();
     app = Program.app;
     Program.GUIHandling.install_main_processing_sync_callbacks(app);
+    if nargin < 2, source_kind = 'auto'; end
+    choose_file = nargin == 0;
 
     % Are we already opening a file?
     if app.is_opening_file
         return;
     end
-    if ~Program.GUI.ManualIDService.prepareClose(app), return; end
-    if ~Program.ProcessingSession.prepareOpen(app), return; end
     app.is_opening_file = true;
     opening_guard = onCleanup(@() local_finish_open(app));
-    
-    % Unselect any neurons.
-    Program.Handlers.neurons.unselect_neuron();
-    if ~isempty(app.id_file) && exist(app.id_file, 'file') && ...
-            (isempty(app.image_neurons) || isempty(app.image_neurons.annotation_read_only_reason))
-        source = dbstack();
-        if numel(source) < 2 || ~contains(source(2).name, 'pass_to_main')
-            Program.Handlers.neurons.save_id_file();
-        end
-    end
 
     GUI_prefs = Program.GUIPreferences.instance();
-    if nargin == 0
+    if choose_file
         % Setup the file chooser's path.
         %path = '../';
         path = GUI_prefs.image_dir;
@@ -34,11 +24,42 @@ function open(path)
         app.CELL_ID.Visible = 'off'; % Hack On! * Matlab can't seem to put the modal dialogue in the foreground
         [name, path, ~] = uigetfile(file_info, 'Select Worm Image', path);
         app.CELL_ID.Visible = 'on'; % Hack Off! * Matlab can't seem to put the modal dialogue in the foreground
-        if name == 0
-            app.is_opening_file = false;
+        if isequal(name, 0)
             return; % user cancelled
         end
+        filename = fullfile(path, name);
+    else
+        filename = path;
+        [path, name] = fileparts(filename);
+    end
 
+    % Choose the source before changing the current annotation session.
+    try
+        route = DataHandling.OpenSource.resolve(filename,source_kind, ...
+            @() local_choose_source(app));
+    catch ME
+        uialert(app.CELL_ID,ME.message,'Cannot Open File');
+        return;
+    end
+    if strcmp(route,'cancel'), return; end
+    if ~Program.GUI.ManualIDService.prepareClose(app), return; end
+    if ~Program.ProcessingSession.prepareOpen(app), return; end
+
+    % Unselect any neurons.
+    Program.Handlers.neurons.unselect_neuron();
+    if ~isempty(app.id_file) && exist(app.id_file, 'file') && ...
+            (isempty(app.image_neurons) || isempty(app.image_neurons.annotation_read_only_reason))
+        source = dbstack();
+        if numel(source) < 2 || ~contains(source(2).name, 'pass_to_main')
+            Program.Handlers.neurons.save_id_file();
+        end
+    end
+    if strcmp(route,'recording')
+        local_open_reference(app, filename);
+        return;
+    end
+
+    if choose_file
         % Load the file.
         d = uiprogressdlg(app.CELL_ID,'Title','Loading file...',...
     'Indeterminate','on');
@@ -48,12 +69,7 @@ function open(path)
             app.TabGroup4.SelectedTab = app.MaximumIntensityProjectionTab;
         end
 
-        filename = [path, name];
         close(d)
-        if Tracking.ReferenceWorkflow.supports(filename)
-            local_open_reference(app, filename);
-            return;
-        end
         try
             proc_code = app.proc_check("image", filename);
         catch ME
@@ -75,9 +91,6 @@ function open(path)
             return
         end
     else
-        filename = path;
-        [path, name] = fileparts(filename);
-
         % Load the file.
         d = uiprogressdlg(app.CELL_ID,'Title','Reloading processed file...', 'Indeterminate','on');
 
@@ -85,12 +98,6 @@ function open(path)
             app.DisplayNeuronActivityMenu.Checked = ~app.DisplayNeuronActivityMenu.Checked;
             app.TabGroup4.SelectedTab = app.MaximumIntensityProjectionTab;
         end
-    end
-
-    if Tracking.ReferenceWorkflow.supports(filename)
-        close(d);
-        local_open_reference(app, filename);
-        return;
     end
 
     progress_cleanup = onCleanup(@() local_close_progress(d));
@@ -365,6 +372,13 @@ function open(path)
     Program.GUIHandling.update_main_id_workflow_state(app);
     app.TabGroup.SelectedTab = app.NeuroPALIDTab;
     drawnow;
+end
+
+function answer = local_choose_source(app)
+answer = uiconfirm(app.CELL_ID, ...
+    'This NWB contains a NeuroPAL volume and a calcium recording. Which would you like to open?', ...
+    'Open NWB','Options',{'NeuroPAL volume','Calcium recording','Cancel'}, ...
+    'DefaultOption','NeuroPAL volume','CancelOption','Cancel');
 end
 
 function local_close_progress(d)

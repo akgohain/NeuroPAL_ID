@@ -52,34 +52,8 @@ classdef ReferenceWorkflow < handle
     end
     methods (Static)
         function yes = supports(path)
-            [~,~,ext] = fileparts(path);
-            yes = false;
-            if strcmpi(ext,'.nwb')
-                try
-                    file=H5F.open(path,'H5F_ACC_RDONLY','H5P_DEFAULT'); file_cleanup=onCleanup(@() H5F.close(file));
-                    acquisition=H5G.open(file,'/acquisition'); group_cleanup=onCleanup(@() H5G.close(acquisition));
-                    info=H5G.get_info(acquisition);
-                    % Enumerate acquisition names without walking image chunk indexes.
-                    for i=0:double(info.nlinks)-1
-                        name=H5L.get_name_by_idx(acquisition,'.','H5_INDEX_NAME','H5_ITER_INC',i,'H5P_DEFAULT');
-                        try
-                            type=h5readatt(path,['/acquisition/' name],'neurodata_type');
-                            if strcmp(string(type),'MultiChannelVolumeSeries'), yes=true; return; end
-                        catch
-                        end
-                    end
-                catch
-                end
-                return;
-            end
-            if ~any(strcmpi(ext, {'.h5','.hdf5'})), return; end
-            try
-                file=H5F.open(path,'H5F_ACC_RDONLY','H5P_DEFAULT'); file_cleanup=onCleanup(@() H5F.close(file));
-                dataset=H5D.open(file,'/data'); dataset_cleanup=onCleanup(@() H5D.close(dataset));
-                space=H5D.get_space(dataset); space_cleanup=onCleanup(@() H5S.close(space));
-                yes=H5S.get_simple_extent_ndims(space)==5;
-            catch
-            end
+            sources = DataHandling.OpenSource.inspect(path);
+            yes = sources.recording;
         end
         function workflow = open(app, path)
             Program.HeavyJob.assertIdle();
