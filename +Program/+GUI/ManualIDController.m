@@ -54,6 +54,13 @@ classdef ManualIDController
         function ui=ui(app)
             ui=getappdata(app.IDEditField,'manual_id_ui');
         end
+        function enabled=canEdit(app,index)
+            if nargin<2, index=app.selected_neuron; end
+            enabled=~isempty(app.image_neurons) && isnumeric(index) && isscalar(index) && ...
+                isfinite(index) && index==round(index) && index>=1 && ...
+                index<=numel(app.image_neurons.neurons) && ...
+                isempty(app.image_neurons.annotation_read_only_reason);
+        end
         function select(app,index)
             if nargin<2, index=app.selected_neuron; end
             if isempty(index), Program.GUI.ManualIDController.unselect(app); return; end
@@ -92,8 +99,10 @@ classdef ManualIDController
             if strcmp(record.kind,'unassigned'), state.buttonText='Assign'; else, state.buttonText='Update ID'; end
             Program.GUI.ManualIDController.put(app,state);
             Program.GUI.ManualIDController.renderText(app,state.text);
-            Program.GUI.ManualIDInput.setEnabled(app,'on');
+            enabled=matlab.lang.OnOffSwitchState(Program.GUI.ManualIDController.canEdit(app,index));
+            Program.GUI.ManualIDInput.setEnabled(app,enabled);
             app.UserIDButton.Text=state.buttonText;
+            app.UserIDButton.Enable=enabled;
             Program.GUI.ManualIDController.describe(app,state);
             Program.GUI.ManualIDController.close(app);
         end
@@ -285,7 +294,8 @@ classdef ManualIDController
             if ~isempty(app.selected_neuron)
                 try
                     context=Program.GUI.ManualIDService.context(app,app.selected_neuron);
-                    enabled=strcmp(state.key,Program.GUI.ManualIDController.ownerKey(context));
+                    enabled=Program.GUI.ManualIDController.canEdit(app) && ...
+                        strcmp(state.key,Program.GUI.ManualIDController.ownerKey(context));
                 catch
                     % A source closed during a modal must remain disabled.
                 end
@@ -892,6 +902,7 @@ classdef ManualIDController
             state=Program.GUI.ManualIDController.state(app);
             state.drafts=containers.Map('KeyType','char','ValueType','any');
             state.key=''; state.context=struct(); state.dirty=false; state.text='';
+            state.baseline=''; state.status=''; state.operation=''; state.buttonText='Assign';
             state.staged=[]; state.parsed=[]; state.cacheKey=''; state.generation=state.generation+1;
             state.pendingGesture=[]; state.mouseGesture=[]; state.keyGesture=[];
             state.heldAssignmentKey=''; state.lastCommittedGesture='';
@@ -899,6 +910,14 @@ classdef ManualIDController
             state.focusBoundary=''; state.focusOffset=0;
             Program.GUI.ManualIDController.stopFocusTimer(app.CELL_ID);
             Program.GUI.ManualIDController.put(app,state); Program.GUI.ManualIDController.close(app);
+            % Replacing a source must also clear the native editor when no neuron is selected.
+            if ~isempty(app.IDEditField) && isvalid(app.IDEditField)
+                Program.GUI.ManualIDInput.setValue(app,'');
+                Program.GUI.ManualIDInput.setEnabled(app,'off');
+            end
+            if ~isempty(app.UserIDButton) && isvalid(app.UserIDButton)
+                app.UserIDButton.Text='Assign'; app.UserIDButton.Enable='off';
+            end
         end
         function key=ownerKey(context)
             key=[char(string(context.source_id)) ':' char(string(context.owner_id))];

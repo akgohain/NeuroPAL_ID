@@ -753,11 +753,12 @@ classdef GUIHandling
             if isfield(controls, 'id_settings_button') && isvalid(controls.id_settings_button)
                 controls.id_settings_button.Enable = Program.GUIHandling.on_off(neuron_count > 0);
             end
+            can_annotate = Program.GUI.ManualIDController.canEdit(app);
             if isprop(app, 'IDEditField') && isvalid(app.IDEditField)
-                Program.GUI.ManualIDInput.setEnabled(app, Program.GUIHandling.on_off(neuron_count > 0));
+                Program.GUI.ManualIDInput.setEnabled(app, Program.GUIHandling.on_off(can_annotate));
             end
             if isprop(app, 'UserIDButton') && isvalid(app.UserIDButton)
-                app.UserIDButton.Enable = Program.GUIHandling.on_off(neuron_count > 0);
+                app.UserIDButton.Enable = Program.GUIHandling.on_off(can_annotate);
             end
         end
 
