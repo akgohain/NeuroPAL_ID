@@ -222,13 +222,15 @@ classdef Preprocess < handle
             
             % connected components
             CC = bwconncomp(BW); 
-            L = labelmatrix(CC);
+            if CC.NumObjects==0
+                mask=false(size(data_color));
+                return;
+            end
  
             stats = regionprops3(BW, 'Volume', 'Centroid', 'BoundingBox', 'ConvexVolume'); 
             stats = table2array(stats); 
             % filter by size
             idx = find(stats(:,1)<130);
-            select = stats(idx,:); 
             % generate the filtering mask 
             CC1 = CC;
             CC1.PixelIdxList = CC.PixelIdxList(idx); 
@@ -266,7 +268,11 @@ classdef Preprocess < handle
             BW = logical(BW.*(blue1<thre));  
 
             CC = bwconncomp(BW); 
-            L = labelmatrix(CC);
+            if CC.NumObjects==0
+                green_mask=false(size(green));
+                green_square=false(size(green));
+                return;
+            end
             % filter by size and convex hall size  
             stats = regionprops3(BW, 'Volume', 'Centroid', 'BoundingBox', 'ConvexVolume'); 
             ConvexImage = regionprops3(BW, 'ConvexImage');
@@ -278,8 +284,8 @@ classdef Preprocess < handle
             idx1 = union(idx, idx_end);
             select = stats(idx1,:); 
 
-            green_mask = zeros(size(green)); 
-            green_square = zeros(size(green)); 
+            green_mask = false(size(green));
+            green_square = false(size(green));
             for i = 1:size(select,1)
                  tmp = table2array(ConvexImage(idx1(i),1));
                  xrange = round(select(i,5):select(i,5)+select(i,8)-1);
@@ -291,7 +297,7 @@ classdef Preprocess < handle
        end
         
                 
-        function [data_filter, mask] = filter_gut_lysosomes(data)
+        function [data_filter, mask] = filter_gut_lysosomes(data, mask_only)
         % filtering gut cells (big green artifacts) and lysosomes (small blue artifacts)
         % Input: 
         %        data: data to filter (z scored)
@@ -300,14 +306,22 @@ classdef Preprocess < handle
         %        mask: 2D matrix showing pixels filtered
         % Ruoxi Sun
 
+            if nargin < 2, mask_only = false; end
+            if isempty(data) || ~isnumeric(data) || ~isreal(data) || ...
+                    ndims(data)>4 || size(data,4)<3
+                error('NeuroPAL:ArtifactRGB', 'Automatic artifact removal requires a red, green and blue image volume.');
+            end
+
             % generate masks to filter out
             % lysosomes        
             mask_g  =  Methods.Preprocess.filter_small_artifacts(data, 'green');  
             mask_b  =  Methods.Preprocess.filter_small_artifacts(data, 'blue'); 
             % gut
             [green_mask, green_square] =  Methods.Preprocess.filter_gut(data);   
-            square_cat = repmat(green_square,[1,1,1,4]); 
-            mask = (green_square + mask_g + mask_b)>0; 
+            mask = logical(green_square) | mask_g | mask_b;
+            data_filter = [];
+            if mask_only, return; end
+            square_cat = repmat(green_square,[1,1,1,size(data,4)]);
             
             % filter
             g = data(:,:,:,2);
@@ -321,31 +335,114 @@ classdef Preprocess < handle
 
         end
         
-        function mask = manual_artifact_removal(data)
+        function mask = automatic_artifact_mask(data, rgb)
+            % Use the current source pixels, without an all-channel z-score cache.
+            if isempty(data) || ~(isnumeric(data) || islogical(data)) || ~isreal(data) || ndims(data)>4
+                error('NeuroPAL:ArtifactImage', 'Open a NeuroPAL image volume before removing artifacts.');
+            end
+            if nargin<2, rgb=1:3; end
+            if ~isnumeric(rgb) || numel(rgb)~=3 || numel(unique(rgb))~=3 || ...
+                    any(~isfinite(rgb) | rgb<1 | rgb~=round(rgb) | rgb>size(data,4))
+                error('NeuroPAL:ArtifactRGB', 'Automatic removal needs three distinct red, green and blue source channels. Use manual removal for one or two channels.');
+            end
+            if size(data,3)<2
+                error('NeuroPAL:ArtifactDepth', 'Automatic removal requires a volume with at least two Z slices. Use manual removal for a single image plane.');
+            end
+            count=double(size(data,1))*size(data,2)*size(data,3);
+            if count*3*4>512*2^20
+                error('NeuroPAL:ArtifactMemory', 'This volume is too large for automatic artifact removal. Crop or downsample the image, or use manual removal.');
+            end
+            readout=Methods.ColorReadout(data,rgb); readout=readout.prepare();
+            normalized=zeros(size(data,1),size(data,2),size(data,3),3,'single');
+            chunk=2^20;
+            for channel=1:3
+                offset=(rgb(channel)-1)*count;
+                for first=1:chunk:count
+                    indices=first:min(first+chunk-1,count);
+                    values=single(data(offset+indices));
+                    if any(~isfinite(values))
+                        error('NeuroPAL:ArtifactIntensity', 'The selected image channels contain nonfinite values. Clean the image before automatic removal.');
+                    end
+                    if isfinite(readout.Deviation(channel)) && readout.Deviation(channel)>0
+                        normalized((channel-1)*count+indices)= ...
+                            (values-single(readout.Average(channel)))/single(readout.Deviation(channel));
+                    end
+                end
+            end
+            [~,mask]=Methods.Preprocess.filter_gut_lysosomes(normalized,true);
+        end
+
+        function projection = manual_artifact_projection(data, layout)
+            % Keep RGB projections distinct from volumes with a channel axis.
+            if nargin<2, layout='YXZC'; end
+            if isempty(data) || ~(isnumeric(data) || islogical(data)) || ~isreal(data)
+                error('NeuroPAL:ArtifactImage', 'Open a NeuroPAL image volume before removing artifacts.');
+            end
+            switch upper(char(layout))
+                case 'YXZC'
+                    if ndims(data)>4
+                        error('NeuroPAL:ArtifactLayout', 'Choose one image volume, not a time series, for manual artifact removal.');
+                    end
+                    channels=size(data,4);
+                    projection=reshape(max(data,[],3),size(data,1),size(data,2),channels);
+                case 'YXC'
+                    if ndims(data)>3
+                        error('NeuroPAL:ArtifactLayout', 'The manual preview must be a two-dimensional grayscale or RGB image.');
+                    end
+                    channels=size(data,3); projection=data;
+                otherwise
+                    error('NeuroPAL:ArtifactLayout', 'Use YXZC for an image volume or YXC for its display projection.');
+            end
+            if channels>4
+                error('NeuroPAL:ArtifactChannels', 'Select at most four display channels for the manual artifact preview.');
+            end
+            if channels==1
+                projection=repmat(projection,1,1,3);
+            elseif channels==2
+                projection=cat(3,projection,zeros(size(data,1),size(data,2),'like',data));
+            else
+                projection=projection(:,:,1:3);
+            end
+        end
+
+        function mask = manual_artifact_removal(data, layout)
             %MANUAL_ARTIFACT_REMOVAL manually remove image artifacts.
-            
+            if nargin<2, layout='YXZC'; end
+            projection=Methods.Preprocess.manual_artifact_projection(data,layout);
+
             % Draw the max projection.
-            im = image(squeeze(max(data(:,:,:,[1,2,3]), [], 3)));
-            
-            % Setup the figure info.
-            ax = im.Parent;
-            fig = ax.Parent;
+            fig=uifigure('Name','Manually Remove Artifacts','Tag','ManualArtifactRemoval');
+            cleanup=onCleanup(@() Methods.Preprocess.close_artifact_figure(fig));
+            grid=uigridlayout(fig,[1 1]); grid.Padding=[0 0 0 0];
+            ax=uiaxes(grid); image(ax,projection);
             
             % Correct the aspect ratio.
-            set(fig, 'units', 'normalized', 'outerposition', [0 0 1 1]);
-            daspect([1,1,1]);
+            fig.WindowState='maximized';
+            axis(ax,'image');
+            daspect(ax,[1,1,1]);
+            ax.YDir='reverse';
             ax.Visible = 'off';
+            ax.Toolbar.Visible='off';
+            drawnow;
             
             % Get the artifact polygon.
-            h = drawpolygon(ax, 'FaceAlpha',0);
+            try
+                h = drawpolygon(ax, 'FaceAlpha',0);
+            catch ME
+                if ~isgraphics(fig), mask=[]; return; end
+                rethrow(ME);
+            end
             
             % Generate the polygon mask.
             mask = [];
-            if ~isempty(h)
+            if ~isempty(h) && isvalid(h) && size(h.Position,1)>=3
                 mask = poly2mask(h.Position(:,1), h.Position(:,2), ...
                     size(data,1), size(data,2));
             end
-            close(fig);
+        end
+
+        function close_artifact_figure(fig)
+            if isgraphics(fig), delete(fig); end
         end
 
     end
