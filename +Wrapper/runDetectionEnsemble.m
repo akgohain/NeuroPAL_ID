@@ -87,7 +87,8 @@ fwrite(fid, jsonencode(value, PrettyPrint=true), 'char');
 end
 
 function python = local_pick_python(explicit)
-candidates = {char(explicit), getenv('NEUROPAL_ENSEMBLE_PYTHON'), 'python3', 'python'};
+candidates = {char(explicit), getenv('NEUROPAL_ENSEMBLE_PYTHON'), ...
+    getenv('NEUROPAL_MOE_PYTHON'), 'python3', 'python'};
 python = '';
 for i = 1:numel(candidates)
     candidate = strtrim(candidates{i});
