@@ -153,6 +153,9 @@ function open(path)
     app.image_name = name; %strrep(name, '_', '\_');
     app.image_data = data;
     Program.ProcessingSession.clear(app);
+    % Initialize processing controls lazily for this image, not the previous source.
+    app.flags = struct();
+    app.ImageProcessingTab.Tag = 'raw';
     if isappdata(app.CELL_ID, 'proc_runtime_dirty')
         rmappdata(app.CELL_ID, 'proc_runtime_dirty');
     end

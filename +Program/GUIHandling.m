@@ -7080,9 +7080,24 @@ classdef GUIHandling
                 defaults = struct();
             end
 
-            if ~force && isfield(defaults, matlab.lang.makeValidName(key))
+            previous = struct();
+            if isfield(defaults,matlab.lang.makeValidName(key))
+                previous = defaults.(matlab.lang.makeValidName(key));
+            end
+            source_key = Program.GUIHandling.processing_defaults_source_key(app,mode_key);
+            dims3 = Program.GUIHandling.processing_source_dims(app);
+            geometry = Program.Helpers.processing_default_geometry(previous,source_key,dims3);
+            if ~force && geometry.source_matches
                 return
             end
+            if geometry.source_matches
+                previous.xy_factor = app.ProcXYFactorEditField.Value;
+                previous.z_slices = app.ProcZSlicesEditField.Value;
+                geometry = Program.Helpers.processing_default_geometry(previous,source_key,dims3);
+            end
+            Program.GUIHandling.update_processing_downsample_field_limits(app,dims3);
+            app.ProcXYFactorEditField.Value = geometry.xy_factor;
+            app.ProcZSlicesEditField.Value = geometry.z_slices;
 
             prefixes = Program.GUIHandling.pos_prefixes;
             gamma_values = zeros(1, numel(prefixes));
@@ -7116,6 +7131,7 @@ classdef GUIHandling
 
             snapshot = struct( ...
                 'mode', string(app.VolumeDropDown.Value), ...
+                'source_key', source_key, ...
                 'threshold', 0, ...
                 'show_mip', logical(app.ProcShowMIPCheckBox.Value), ...
                 'preview_zslow', logical(app.ProcPreviewZslowCheckBox.Value), ...
@@ -7156,6 +7172,17 @@ classdef GUIHandling
                 return
             end
 
+            source_key = Program.GUIHandling.processing_defaults_source_key(app);
+            dims3 = Program.GUIHandling.processing_source_dims(app);
+            geometry = Program.Helpers.processing_default_geometry(snapshot,source_key,dims3);
+            Program.GUIHandling.update_processing_downsample_field_limits(app,dims3);
+            app.ProcXYFactorEditField.Value = geometry.xy_factor;
+            app.ProcZSlicesEditField.Value = geometry.z_slices;
+            if ~geometry.source_matches
+                % Defaults from another image must not change this source's channels.
+                return
+            end
+
             prefixes = Program.GUIHandling.pos_prefixes;
             fixed_channel_roles = {'Red', 'Green', 'Blue'};
             for c = 1:min(6, numel(snapshot.channel_values))
@@ -7189,12 +7216,22 @@ classdef GUIHandling
             app.HidezerointensitypixelsCheckBox.Value = logical(snapshot.hide_zero);
             app.ProcShowMIPCheckBox.Value = logical(snapshot.show_mip);
             app.ProcPreviewZslowCheckBox.Value = logical(snapshot.preview_zslow);
-            app.ProcXYFactorEditField.Value = snapshot.xy_factor;
-            app.ProcZSlicesEditField.Value = snapshot.z_slices;
             Program.GUIHandling.sanitize_processing_downsample_fields(app);
             Program.GUIHandling.update_processing_histogram_interactivity(app);
             Program.GUIHandling.update_processing_threshold_target_options(app);
             Program.GUIHandling.update_processing_zslider_visibility(app);
+        end
+
+        function key = processing_defaults_source_key(app, mode)
+            if nargin < 2, mode = app.VolumeDropDown.Value; end
+            mode = lower(string(mode));
+            source = '';
+            if mode == "colormap"
+                source = char(string(app.image_file));
+            elseif mode == "video" && isstruct(app.video_info) && isfield(app.video_info,'file')
+                source = char(string(app.video_info.file));
+            end
+            key = [char(mode) '|' source];
         end
 
         function tf = processing_channel_windows_active(app)
