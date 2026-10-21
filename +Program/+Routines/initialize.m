@@ -123,13 +123,8 @@ function initialize()
 
         % Show the instructions.
         try
-            if isdeployed
-                DataHandling.PNGViewer.show('Instructions.png', ...
-                    'Software Instructions');
-            else
-                DataHandling.PNGViewer.show('./Data/Documents/Instructions.png', ...
-                    'Software Instructions');
-            end
+            uialert(app.CELL_ID, Program.ProgramInfo.getInstructionsMsg(), ...
+                'NeuroPAL ID instructions', 'Icon', 'info');
         catch ME
             msg = getReport(ME, 'extended', 'hyperlinks', 'off');
             uialert(app.CELL_ID, ...
