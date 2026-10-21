@@ -1514,7 +1514,7 @@ classdef GUIHandling
                     return
                 end
 
-                Program.GUIHandling.invoke_gui_callback(callbacks.auto, src, event);
+                Program.GUIHandling.invoke_gui_callback(callbacks.auto_all, src, event);
                 Program.GUIHandling.update_main_id_workflow_state(app);
             catch ME
                 Program.GUIHandling.log_gui_callback_error(app, 'Auto-ID', ME);
