@@ -75,7 +75,6 @@ octave-core
 
 # omit bash scripts
 *.sh
-!scripts/launch_visualize_light_debug.sh
 
 # pictures
 *.jpg
@@ -211,3 +210,44 @@ rotation_debug.mat
 
 # Local App Designer recovery copies
 /visualize_light.mlapp.bak_before_*
+
+# Local development notes and generated evidence
+# Keep application code, reusable tests and user documentation in Git.
+/dev-local/
+/artifacts/
+/reports/
+/logs/
+/test-results/
+/coverage/
+/.ui_artifacts/
+/docs/local/
+/scripts/local/
+
+# Local planning, handoff and validation notes
+/AUTO_ID_INTEGRATION.md
+/CELL_TRACKING_BACKENDS_BACKLOG.md
+/DETECTOR_AUTOID_BACKLOG.md
+/LARGE_FILE_IO.md
+/MEMORY_HANDOFF.md
+/PERFORMANCE.md
+/UI_DEVELOPMENT.md
+/docs/manual-id-entry-contract.md
+/docs/manual-id-implementation.md
+/docs/feedback-validation-*.md
+
+# Local audit runners and recording-specific trials
+/scripts/launch_visualize_light_debug.sh
+/scripts/run_dev_cycle
+/scripts/run_ui_audit
+/scripts/run_ui_audit.m
+/scripts/run_large_file_audit
+/scripts/run_large_file_audit.m
+/scripts/compare_ui_snapshots.py
+/scripts/test_manual_individual_id.m
+/scripts/test_reference_ood.py
+/scripts/test_reference_workflow.m
+/+Program/+Dev/UIHarness.m
+/+Program/+Dev/LargeFileHarness.m
+
+# Separate cluster prototype, outside the desktop application
+/cluster/

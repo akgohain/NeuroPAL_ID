@@ -102,23 +102,3 @@ Set `NEUROPAL_VIDEO_PYTHON` to a Python environment with NumPy, h5py and the app
 The viewer keeps an LRU cache of up to five frames (about 32 MiB for Bedant's recording), targeting a 64 MiB cache budget with at least one frame. MATLAB reads supported H5 filters directly; LZF recordings use a persistent h5py reader that closes with the session and exits if MATLAB disappears. Scrubbing coalesces pending requests so the final requested frame wins. Images, marker groups and activity cursors reuse their graphics handles. The trace is rebuilt only when the selected neuron, plot mode or analysis changes. Frame/chunk reads are limited to 256 MiB; each staged tracking window must fit 1 GiB plus disk reserve. Window sizes are 2–100 frames, with CPU ZephIR and 40 epochs by default. The full recording is processed as multiple windows rather than one large image allocation.
 
 Fluorescence arrays, ROI neighborhoods, worker memory, logs and process lifetimes have explicit bounds. The existing supervisor enforces cancellation and prevents simultaneous heavy jobs. Default workspaces are under MATLAB's `prefdir/NeuroPAL/reference-jobs`. A failed or canceled tracking run preserves its last completed checkpoint and logs.
-
-## Validation entry points
-
-- `scripts/test_reference_frame_server.py`: persistent transport parity, axis order, singleton dimensions, invalid requests, changed-source rejection and shutdown. With `--fixtures OUTPUT_DIR RECORDING`, prepares fixtures for `test_frame_navigation(w, OUTPUT_DIR)` in MATLAB; the navigation test uses Bedant’s full session.
-- `scripts/test_frame_navigation.m`: real-frame pixel parity, bounded LRU eviction, graphics reuse and latest-frame coalescing.
-- `scripts/test_reference_video.py`: native/legacy layout, exact coordinate round-trip, identity preservation and invalid/source-change inputs.
-- `scripts/test_multichannel_detection.m`: arbitrary noncontiguous channel selection, physical merging, same-channel separation, blank inputs, cancellation and partial-failure contracts. Run `test_multichannel_detection` after adding `scripts` to the MATLAB path.
-- `scripts/test_multichannel_workflow.m`: UI selection, legacy-mode restoration, empty-result preservation, acceptance, save and reload. Run `test_multichannel_workflow(w)` with a completed multi-channel candidate set in the live workflow; the test restores the session afterward.
-- `scripts/test_reference_recommendation.py`: deterministic bounded appearance recommendations, thin-neuron pooling, channel isolation, temporal tie handling and source changes during a run.
-- `scripts/test_reference_constraints.m`: explicit cross-frame ID matching, duplicate/replacement guards, Undo, recommendation validation and named session round-trip. Run `test_reference_constraints(w)` on a live recording; the test restores the session afterward.
-- `scripts/test_video_detection_settings.m`: model-default/custom score settings, Spotiflow isolation, busy controls and session round-trip. Run `test_video_detection_settings(w)` on a live recording.
-- `scripts/test_reference_safety.m`: pending-save/import guards, stale recommendation controls, reviewed checkpoint merges and validation before session mutation. Run `test_reference_safety(w)` on a live recording.
-- `scripts/test_single_channel_moe.py`: selected-channel isolation and model input adaptation.
-- `scripts/test_reference_analysis.py`: known fluorescence/background/baselines, ratios, missing/excluded samples, overlap ownership, saturation, clipping, interrupted/resumed tracking and multiple reference constraints through named activity export.
-- `scripts/test_reference_workflow.m`: real detection, review, export and short ZephIR run.
-- `scripts/test_reference_view.m`: image/cache reuse, marker selection, editing and seed round-trip.
-- `scripts/test_reference_activity.m`: trace/heatmap linkage, exclusions, stale-result detection and session settings.
-- `scripts/run_dev_cycle fast`: existing app and performance regressions.
-
-Actual full-recording output remains a software-validation example until its detections, tracks and fluorescence choices have been reviewed for biological analysis.
