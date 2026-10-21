@@ -74,8 +74,10 @@ function get_slice(~, view, ~, reset_limits, requested_z)
     local_draw_yolo_box_overlay(app, ax, z);
 
     % Add the AddNeuron function as mouse click listener.
-    if isempty(gui_image.ButtonDownFcn)
-        gui_image.ButtonDownFcn = {@app.ImageClicked};
+    if ~isappdata(gui_image, 'neuron_click_guarded')
+        gui_image.ButtonDownFcn = @(src, event) ...
+            Program.GUIHandling.handle_neuron_click(app, @app.ImageClicked, src, event);
+        setappdata(gui_image, 'neuron_click_guarded', true);
     end
 
     % Redraw the neurons in this z slice.
@@ -120,7 +122,8 @@ function get_slice(~, view, ~, reset_limits, requested_z)
         end
 
         % Setup the mouse-click callback.
-        neuron_marker_plot.ButtonDownFcn = {@app.NeuronClicked};
+        neuron_marker_plot.ButtonDownFcn = @(src, event) ...
+            Program.GUIHandling.handle_neuron_click(app, @app.NeuronClicked, src, event);
     end
 
     % Draw the color atlas.

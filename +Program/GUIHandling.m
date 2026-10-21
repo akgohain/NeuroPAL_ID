@@ -138,6 +138,7 @@ classdef GUIHandling
             Program.GUIHandling.prepare_unloaded_module_views(app);
 
             Program.GUIHandling.install_open_callbacks(app);
+            Program.GUIHandling.install_metadata_callbacks(app);
             Program.GUIHandling.install_processing_resize_callback(app);
             Program.GUIHandling.install_main_processing_sync_callbacks(app);
             Program.GUIHandling.install_cellpose_mask_button(app);
@@ -167,6 +168,43 @@ classdef GUIHandling
             catch ME
                 Program.Helpers.debug_event('Open', '%s: %s', ME.identifier, ME.message);
                 uialert(app.CELL_ID, ME.message, 'Cannot Open File');
+            end
+        end
+
+        function handle_neuron_click(app, callback, src, event)
+            try
+                Program.GUIHandling.invoke_gui_callback(callback, src, event);
+            catch ME
+                Program.Helpers.debug_event('NeuronClick', '%s: %s', ME.identifier, ME.message);
+                uialert(app.CELL_ID, ME.message, 'Neuron editing');
+            end
+        end
+
+        function install_metadata_callbacks(app)
+            targets = {'BodyDropDown','body'; 'SexDropDown','sex'; ...
+                'AgeDropDown','age'; 'StrainEditField','strain'};
+            for i = 1:size(targets,1)
+                component = app.(targets{i,1});
+                if isappdata(component,'metadata_callback'), continue; end
+                callback = component.ValueChangedFcn;
+                setappdata(component,'metadata_callback',callback);
+                field = targets{i,2};
+                component.ValueChangedFcn = @(src,event) ...
+                    Program.GUIHandling.handle_metadata_change(app,callback,field,src,event);
+            end
+        end
+
+        function handle_metadata_change(app, callback, field, src, event)
+            try
+                Program.HeavyJob.assertIdle();
+                Program.GUIHandling.invoke_gui_callback(callback,src,event);
+            catch ME
+                % Keep the displayed value consistent with the unchanged source.
+                if isstruct(app.worm) && isfield(app.worm,field)
+                    src.Value = app.worm.(field);
+                end
+                Program.Helpers.debug_event('ImageMetadata', '%s: %s', ME.identifier, ME.message);
+                uialert(app.CELL_ID,ME.message,'Image metadata');
             end
         end
 

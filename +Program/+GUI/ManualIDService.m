@@ -359,8 +359,8 @@ classdef ManualIDService
         end
 
         function deleteNeuron(app, index)
-            Program.HeavyJob.assertIdle();
             try
+                Program.HeavyJob.assertIdle();
                 captured = Program.GUI.ManualIDService.context(app, index);
                 record = Program.GUI.ManualIDService.record(app, index);
                 state = Program.GUI.ManualIDController.state(app);

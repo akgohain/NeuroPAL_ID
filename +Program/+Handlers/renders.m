@@ -57,7 +57,8 @@ classdef renders
             end
 
             % Add the AddNeuron function as mouse click listener.
-            gui_image.ButtonDownFcn = {@app.ImageClicked};
+            gui_image.ButtonDownFcn = @(src, event) ...
+                Program.GUIHandling.handle_neuron_click(app, @app.ImageClicked, src, event);
 
             % Redraw the neurons in this z slice.
             if ~isempty(app.image_neurons) && ~isempty(app.image_neurons.neurons)
@@ -140,7 +141,8 @@ classdef renders
                 end
 
                 % Setup the mouse-click callback.
-                neuron_marker_plot.ButtonDownFcn = {@app.NeuronClicked};
+                neuron_marker_plot.ButtonDownFcn = @(src, event) ...
+                    Program.GUIHandling.handle_neuron_click(app, @app.NeuronClicked, src, event);
             end
 
             % Draw the color atlas.
