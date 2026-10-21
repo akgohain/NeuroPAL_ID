@@ -419,6 +419,7 @@ classdef NeuroPALImage
                     % Preserve the original legacy file; migration is saved with the next deliberate edit.
                 end
             end
+            mp = Program.Helpers.neuron_edit_params(mp, info.scale);
             % The top-level store is authoritative over the legacy projection.
             if exist('id_data', 'var') && ~isempty(neurons)
                 if isfield(id_data, 'annotation_store')

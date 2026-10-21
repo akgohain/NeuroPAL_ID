@@ -1744,13 +1744,13 @@ classdef GUIHandling
                 Program.GUIHandling.auto_detect_log(app, ...
                     'Constructing Neurons.Image with %s.', ...
                     Program.GUIHandling.supervoxel_positions_summary(sp));
+                detected_params = Program.Helpers.neuron_edit_params(detected_params, app.image_um_scale);
                 if strcmp(backend, 'detection_moe')
                     app.image_neurons = prepared_moe_neurons;
-                    app.mp_params = moe_params;
                 else
                     app.image_neurons = Neurons.Image(sp, app.worm.body, 'scale', app.image_um_scale');
-                    app.mp_params = detected_params;
                 end
+                app.mp_params = detected_params;
                 Program.GUIHandling.auto_detect_log(app, ...
                     'Neurons.Image constructed: count=%d.', app.image_neurons.num_neurons());
 
