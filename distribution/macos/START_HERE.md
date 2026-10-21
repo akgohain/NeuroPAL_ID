@@ -88,13 +88,15 @@ calibration. This desktop package does not include cluster or cloud submission.
   neural weights are included, but Deep Learning Toolbox alone is insufficient:
   compatible TensorFlow converter support must provide
   `nnet.keras.layer.BinaryCrossEntropyRegressionLayer`. That support is not
-  bundled or verified. The R2024a test safely blocks this method when the class
-  is missing; legacy neural inference is not certified. Use MoE or matching
+  bundled or verified. The app blocks this method when the class is missing;
+  legacy neural inference is not certified. Use MoE or matching
   pursuit instead on an installation without that dependency.
 - **ZephIR:** a separate CPU runtime, version 1.0.4.
 - **Standalone Spotiflow, custom Cellpose and CRF:** their separate trained
   assets are unavailable and are not included. The Spotiflow expert inside MoE
-  is a different checkpoint. See `MISSING_MODELS.md` for exact requirements.
+  is a different checkpoint. Spotiflow and CRF bundles must match the corresponding
+  manifests in the app's `method_bundles` directory. Cellpose requires a separately
+  supplied compatible trained checkpoint.
 - **Ultrack and Higher-Order Transformer:** backend placeholders; not working
   tracking methods in this package. WormND Atlas is not an enabled portable method.
 
@@ -112,7 +114,7 @@ Existing MATLAB/Python installations and older NeuroPAL packages stay separate.
 No recordings are included or uploaded. Setup downloads software only; inference
 runs locally after installation.
 
-Read `VALIDATION.md` for the test policy and `ACCEPTANCE.md`, when included, for
-the actual checks completed on this exact release. For a bug report, include the
-release identifier, `setup.log`, installed `installation.json`, the app's error
-message and steps that triggered it. The original repository README is unchanged.
+Read `ACCEPTANCE.md`, when included, for the checks completed on this exact
+release. For a bug report, include the release identifier, `setup.log`, installed
+`installation.json`, the app's error
+message and steps that triggered it.

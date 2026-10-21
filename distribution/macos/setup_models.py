@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the Ev model package and write its MATLAB launcher after validation."""
+"""Install the methods package and write its MATLAB launcher after validation."""
 import argparse
 from contextlib import contextmanager
 import hashlib
@@ -213,7 +213,7 @@ def install(args):
         atomic_text(HERE / 'installed_launcher.m', 'run(' + quote_matlab(root / 'start_neuropal.m') + ');\n')
         installation = dict(app=str(app), app_commit=catalog['app_commit'], version='methods-' + version,
                             platform=platform.platform(), configuration=config, with_gat=with_gat,
-                            scope='CPU model loading and preprocessing checks. See VALIDATION.md for inference tests.')
+                            scope='CPU model loading and preprocessing checks; not scientific accuracy validation.')
         atomic_text(previous, json.dumps(installation, indent=2) + '\n')
         print('\nSETUP COMPLETE\nRun Start_NeuroPAL.m from this folder in a fresh MATLAB session.\n'
               'Installed files: ' + str(root), flush=True)

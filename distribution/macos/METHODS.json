@@ -8,8 +8,7 @@
     "assets": "Data/Models/NN_model.mat",
     "requires": "MATLAB Deep Learning Toolbox and compatible Deep Learning Toolbox Converter for TensorFlow Models",
     "required_class": "nnet.keras.layer.BinaryCrossEntropyRegressionLayer",
-    "converter_included": false,
-    "runtime_validation": "R2024a test lacked the required converter class; safe dependency rejection passed. Neural inference was not validated."
+    "converter_included": false
   },
   "yolo": {
     "status": "included",
@@ -38,15 +37,15 @@
   },
   "spotiflow_supervised": {
     "status": "missing_weights",
-    "request": "MISSING_MODELS.md"
+    "bundle_template": "method_bundles/spotiflow_supervised/method_bundle.example.json"
   },
   "cellpose": {
     "status": "missing_weights",
-    "request": "MISSING_MODELS.md"
+    "note": "Requires a separately supplied compatible trained Cellpose checkpoint"
   },
   "crf_cellid_2": {
     "status": "missing_weights",
-    "request": "MISSING_MODELS.md"
+    "bundle_template": "method_bundles/crf_cellid_2/method_bundle.example.json"
   },
   "wormnd_atlas": {
     "status": "deferred",

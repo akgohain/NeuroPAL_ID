@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a shareable Ev kit from committed app source and verified model ZIPs."""
+"""Build a methods package from committed app source and verified model ZIPs."""
 import argparse
 from datetime import datetime, timezone
 import hashlib
@@ -23,10 +23,10 @@ REQUIRED_APP_FILES = (
 )
 KIT_FILES = (
     'Setup-Mac.command', 'Setup-with-Auto-ID.command', 'Start_NeuroPAL.m',
-    'setup_models.py', 'check_models.py', 'START_HERE.md', 'VALIDATION.md',
+    'setup_models.py', 'check_models.py', 'START_HERE.md',
     'lock-macos-arm64-moe.txt', 'lock-macos-arm64-gat.txt',
     'lock-macos-arm64-tracking.txt', 'zephir-1.0.4-py3-none-any.whl',
-    'zephir-wheel-provenance.json', 'METHODS.json', 'MISSING_MODELS.md',
+    'zephir-wheel-provenance.json', 'METHODS.json',
 )
 
 

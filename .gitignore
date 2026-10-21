@@ -212,7 +212,7 @@ rotation_debug.mat
 /visualize_light.mlapp.bak_before_*
 
 # Local development notes and generated evidence
-# Keep application code, reusable tests and user documentation in Git.
+# Keep application code, build tools and user documentation in Git.
 /dev-local/
 /artifacts/
 /reports/
@@ -243,11 +243,32 @@ rotation_debug.mat
 /scripts/run_large_file_audit
 /scripts/run_large_file_audit.m
 /scripts/compare_ui_snapshots.py
-/scripts/test_manual_individual_id.m
-/scripts/test_reference_ood.py
-/scripts/test_reference_workflow.m
 /+Program/+Dev/UIHarness.m
 /+Program/+Dev/LargeFileHarness.m
+
+# Local agent validation and evaluation tools
+/scripts/test_*.m
+/scripts/test_*.py
+/scripts/fixtures/
+/scripts/cellpose_*_smoketest.m
+/scripts/evaluate_autoid_predictions.py
+/scripts/evaluate_nearest_autoid.m
+/scripts/export_nwb_neuron_truth.py
+/distribution/macos/test_*.py
+/distribution/macos/VALIDATION.md
+/distribution/macos/MISSING_MODELS.md
+
+# Generated release kits and installation state
+/NeuroPAL-Methods-macOS-*/
+/NeuroPAL-Methods-macOS-*.zip.sha256
+/distribution/macos/NeuroPAL-Methods-macOS-*/
+/distribution/macos/*.zip.sha256
+/distribution/macos/installed_launcher.m
+/distribution/macos/installation.json
+/distribution/macos/catalog.json
+/distribution/macos/PACKAGE_VERSION
+/distribution/macos/SHA256SUMS
+/distribution/macos/ACCEPTANCE.md
 
 # Separate cluster prototype, outside the desktop application
 /cluster/
