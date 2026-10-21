@@ -160,7 +160,7 @@ classdef ReferenceAnalysisView < handle
                     pixels.AlphaData=isfinite(data); pixels.ButtonDownFcn=@(~,~) obj.seek(true);
                     obj.Axes.YDir='reverse'; colormap(obj.Axes,parula(256));
                     ticks=unique(round(linspace(1,numel(obj.IDs),min(8,numel(obj.IDs)))));
-                    obj.Axes.YTick=ticks; obj.Axes.YTickLabel=arrayfun(@(id) string(Tracking.NeuronNames.label(c,id)),obj.IDs(ticks)); ylabel(obj.Axes,'Neuron ID');
+                    obj.Axes.YTick=ticks; obj.Axes.YTickLabel=arrayfun(@(id) string(Tracking.NeuronNames.label(c,id)),obj.IDs(ticks)); obj.Axes.TickLabelInterpreter='none'; ylabel(obj.Axes,'Neuron ID');
                     title(obj.Axes,'Population ΔF/F'); obj.Colorbar=colorbar(obj.Axes); obj.Colorbar.Label.String='ΔF/F';
                 otherwise
                     dataset='/dff'; ylabel_text='ΔF/F';
@@ -180,8 +180,8 @@ classdef ReferenceAnalysisView < handle
                     % Review flags live on the shared timeline instead of covering the trace.
 
                     obj.Axes.YDir='normal'; obj.Axes.YTickMode='auto'; obj.Axes.YTickLabelMode='auto';
-                    ylabel(obj.Axes,ylabel_text); title(obj.Axes,Tracking.NeuronNames.label(c,identity,true));
-                    if ~any(isfinite(data)), title(obj.Axes,sprintf('%s · no usable samples',Tracking.NeuronNames.label(c,identity,true))); end
+                    ylabel(obj.Axes,ylabel_text); title(obj.Axes,Tracking.NeuronNames.label(c,identity,true),'Interpreter','none');
+                    if ~any(isfinite(data)), title(obj.Axes,sprintf('%s · no usable samples',Tracking.NeuronNames.label(c,identity,true)),'Interpreter','none'); end
             end
             if ~c.activityCurrent(), title(obj.Axes,'Measurements out of date — extract again'); end
             xlim(obj.Axes,[obj.Frames(1)-.5 obj.Frames(end)+.5]); xlabel(obj.Axes,'Frame');
