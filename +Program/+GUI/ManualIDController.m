@@ -112,6 +112,11 @@ classdef ManualIDController
             state.parsed=[]; state.dirty=false; state.open=false; state.active=0;
             Program.GUI.ManualIDController.put(app,state);
             Program.GUI.ManualIDController.close(app);
+            % Clear the ranked selection so the same row can be selected again.
+            if isprop(app,'UserNeuronIDsListBox') && ~isempty(app.UserNeuronIDsListBox) && ...
+                    isvalid(app.UserNeuronIDsListBox)
+                app.UserNeuronIDsListBox.Value={};
+            end
         end
         function edited(app,text,show)
             if nargin<3, show=true; end
