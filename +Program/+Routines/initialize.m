@@ -52,6 +52,8 @@ function initialize()
     % Initialize the structured properties.
     Program.GUIHandling.init_click_states(app);
     Program.GUIHandling.install_open_callbacks(app);
+    Program.GUIHandling.install_metadata_callbacks(app);
+    Program.GUIHandling.install_help_callbacks(app);
     Program.GUIHandling.hide_main_click_mode_control(app);
     Program.GUIHandling.hide_next_neuron_mode_control(app);
     Program.GUIHandling.configure_main_detect_id_controls(app);
@@ -114,12 +116,6 @@ function initialize()
 
         % This is a new user, give them some help!
     else
-
-        uiconfirm(app.CELL_ID, ...
-            {'Welcome to NeuroPAL ID!', ...
-            'Please read the instructions very carefully.'}, ...
-            'NeuroPAL ID Instructions', 'Options', {'OK'}, ...
-            'DefaultOption', 1, 'CancelOption', 1, 'Icon', 'info');
 
         % Show the instructions.
         try

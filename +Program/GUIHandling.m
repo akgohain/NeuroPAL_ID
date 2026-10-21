@@ -139,12 +139,7 @@ classdef GUIHandling
 
             Program.GUIHandling.install_open_callbacks(app);
             Program.GUIHandling.install_metadata_callbacks(app);
-            app.KeyboardShortcutsMenu.MenuSelectedFcn = @(~,~) ...
-                uialert(app.CELL_ID,Program.ProgramInfo.getKeyboardShortcutsMsg(), ...
-                    'Keyboard shortcuts','Icon','info');
-            app.InstructionsMenu.MenuSelectedFcn = @(~,~) ...
-                uialert(app.CELL_ID,Program.ProgramInfo.getInstructionsMsg(), ...
-                    'NeuroPAL ID instructions','Icon','info');
+            Program.GUIHandling.install_help_callbacks(app);
             Program.GUIHandling.install_processing_resize_callback(app);
             Program.GUIHandling.install_main_processing_sync_callbacks(app);
             Program.GUIHandling.install_cellpose_mask_button(app);
@@ -154,6 +149,15 @@ classdef GUIHandling
             Program.GUIHandling.configure_main_detect_id_controls(app);
             Program.GUIHandling.configure_main_z_controls(app);
             Program.GUIHandling.update_main_id_workflow_state(app);
+        end
+
+        function install_help_callbacks(app)
+            app.KeyboardShortcutsMenu.MenuSelectedFcn = @(~,~) ...
+                uialert(app.CELL_ID,Program.ProgramInfo.getKeyboardShortcutsMsg(), ...
+                    'Keyboard shortcuts','Icon','info');
+            app.InstructionsMenu.MenuSelectedFcn = @(~,~) ...
+                uialert(app.CELL_ID,Program.ProgramInfo.getInstructionsMsg(), ...
+                    'NeuroPAL ID instructions','Icon','info');
         end
 
         function install_open_callbacks(app)
