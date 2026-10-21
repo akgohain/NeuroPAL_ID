@@ -7649,6 +7649,7 @@ classdef GUIHandling
 
         function nwb_init(app)
             allow_save = false;
+            app.SexDropDown.Items = {'XX', 'XO', 'Unknown'};
             Program.GUIHandling.loaded_file_check(app.parent_app, app.Tree);
             worm_properties = {
                 'AgeDropDown', ...
@@ -7709,6 +7710,7 @@ classdef GUIHandling
         
         function device_handler(app, action, device)
             data = app.DeviceUITable.Data;
+            if isempty(data), data = cell(0, 3); end
             if ~strcmp(action, 'add') && isempty(device), return; end
             switch action
                 case 'add'
@@ -7757,6 +7759,7 @@ classdef GUIHandling
 
         function channel_handler(app, action, channel)
             data = app.OpticalUITable.Data;
+            if isempty(data), data = cell(0, 8); end
             if ~strcmp(action, 'add') && isempty(channel), return; end
             switch action
                 case 'add'
