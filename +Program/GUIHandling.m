@@ -150,14 +150,23 @@ classdef GUIHandling
         end
 
         function install_open_callbacks(app)
-            app.OpenMenu.MenuSelectedFcn = @(~, ~) Program.Routines.open();
-            app.OpenButton.ButtonPushedFcn = @(~, ~) Program.Routines.open();
+            app.OpenMenu.MenuSelectedFcn = @(~, ~) Program.GUIHandling.open_source(app);
+            app.OpenButton.ButtonPushedFcn = @(~, ~) Program.GUIHandling.open_source(app);
             key = 'source_tab_callback';
             if ~isappdata(app.CELL_ID, key)
                 callback = app.TabGroup.SelectionChangedFcn;
                 setappdata(app.CELL_ID, key, callback);
                 app.TabGroup.SelectionChangedFcn = @(src, event) ...
                     Program.GUIHandling.handle_source_tab_change(app, callback, src, event);
+            end
+        end
+
+        function open_source(app)
+            try
+                Program.Routines.open();
+            catch ME
+                Program.Helpers.debug_event('Open', '%s: %s', ME.identifier, ME.message);
+                uialert(app.CELL_ID, ME.message, 'Cannot Open File');
             end
         end
 
@@ -169,7 +178,27 @@ classdef GUIHandling
                     ~Program.GUIHandling.processing_tab_rendered(app)
                 return
             end
-            Program.GUIHandling.invoke_gui_callback(callback, src, event);
+            try
+                Program.GUIHandling.invoke_gui_callback(callback, src, event);
+            catch ME
+                % A failed initialization must not expose the previous source's canvas.
+                previous = [];
+                for field = {'OldValue', 'PreviousData'}
+                    if (isstruct(event) && isfield(event, field{1})) || ...
+                            (isobject(event) && isprop(event, field{1}))
+                        previous = event.(field{1});
+                        break
+                    end
+                end
+                if isa(previous, 'matlab.ui.container.Tab') && isscalar(previous) && isvalid(previous) && ...
+                        isequal(previous.Parent, app.TabGroup)
+                    app.TabGroup.SelectedTab = previous;
+                else
+                    app.TabGroup.SelectedTab = app.NeuroPALIDTab;
+                end
+                Program.Helpers.debug_event('SourceTab', '%s: %s', ME.identifier, ME.message);
+                uialert(app.CELL_ID, ME.message, 'Unable to open tab');
+            end
         end
 
         function configure_main_z_controls(app)
