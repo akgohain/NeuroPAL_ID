@@ -5912,6 +5912,14 @@ classdef GUIHandling
                 app.SystemInfoGrid.ColumnWidth = {110, '1x'};
                 app.SystemInfoGrid.Padding = [0 0 0 0];
             end
+            operating_system = char(java.lang.System.getProperty('os.name'));
+            operating_version = char(java.lang.System.getProperty('os.version'));
+            app.OperatingSystemEditField.Value = sprintf('%s %s (%s)', ...
+                operating_system,operating_version,computer('arch'));
+            app.MATLABRuntimeEditFieldLabel.Text = 'MATLAB:';
+            app.PythonExecutableEditFieldLabel.Text = 'MATLAB Python:';
+            app.PythonExecutableEditField.Tooltip = ...
+                'MATLAB''s Python version. Detection, Auto-ID and tracking use their separately configured model runtimes.';
             if isprop(app, 'InterdependentFunctionalityLabel')
                 app.InterdependentFunctionalityLabel.Text = 'Cross-module';
             end
