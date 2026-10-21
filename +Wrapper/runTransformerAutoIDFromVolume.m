@@ -120,7 +120,6 @@ function path_value = local_pick_python(candidate)
 candidate_paths = {
     char(string(candidate))
     getenv('NEUROPAL_TRANSFORMER_PYTHON')
-    '/Users/adamg/neuroPAL/.venv-ai-pipeline/bin/python'
     'python3'
     'python'
     };
