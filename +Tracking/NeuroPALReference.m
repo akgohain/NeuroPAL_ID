@@ -58,15 +58,15 @@ classdef NeuroPALReference < handle
             grid=uigridlayout(obj.Window,[5 1]); grid.RowHeight={32,30,'1x',170,24}; grid.ColumnWidth={'1x'};
             bar=uigridlayout(grid,[1 8]); bar.Layout.Row=1; bar.Padding=[0 0 0 0]; bar.ColumnWidth={90,'1x',60,85,'1x','1x','1x',60};
             obj.Detector=uidropdown(bar,'Items',{'MoE','Spotiflow'});
-            obj.Buttons.detect=uibutton(bar,'Text','Auto Detect','ButtonPushedFcn',@(~,~) c.safe(@() obj.detect()));
+            obj.Buttons.detect=uibutton(bar,'Text','Auto Detect','ButtonPushedFcn',@(~,~) obj.run(@() obj.detect()));
             uilabel(bar,'Text','ID profile');
             profiles={'Choose','000541','000692','000714','000715','000981'};
             obj.IDProfile=uidropdown(bar,'Items',profiles,'Tooltip','DANDI cohort used by the Auto-ID preprocessing adapter.');
             for i=2:numel(profiles)
                 if contains(c.Source.file,[filesep profiles{i} filesep]), obj.IDProfile.Value=profiles{i}; break; end
             end
-            obj.Buttons.identify=uibutton(bar,'Text','Auto ID','ButtonPushedFcn',@(~,~) c.safe(@() obj.identify()));
-            obj.Buttons.align=uibutton(bar,'Text','Align to video','ButtonPushedFcn',@(~,~) c.safe(@() obj.align()));
+            obj.Buttons.identify=uibutton(bar,'Text','Auto ID','ButtonPushedFcn',@(~,~) obj.run(@() obj.identify()));
+            obj.Buttons.align=uibutton(bar,'Text','Align to video','ButtonPushedFcn',@(~,~) obj.run(@() obj.align()));
             obj.Buttons.use=uibutton(bar,'Text','Use aligned seeds','ButtonPushedFcn',@(~,~) obj.use());
             obj.Buttons.cancel=uibutton(bar,'Text','Cancel','Enable','off','ButtonPushedFcn',@(~,~) c.cancel());
             settings=uigridlayout(grid,[1 8]); settings.Layout.Row=2; settings.Padding=[0 0 0 0];
@@ -114,14 +114,21 @@ classdef NeuroPALReference < handle
         end
         function detect(obj)
             c=obj.Controller; ref=c.Source.neuropal;
+            if ~isempty(obj.Positions)
+                answer=uiconfirm(obj.Window,'Replace the reference detections and their neuron names?', ...
+                    'Reference detections','Options',{'Cancel','Replace'},'DefaultOption','Cancel','CancelOption','Cancel');
+                if strcmp(answer,'Cancel'), obj.progress('Existing reference results were kept.'); return; end
+            end
             response=Wrapper.runReferenceCentroids(obj.Volume,double(ref.spacing_um_xyz(:)'), ...
                 'Backend',lower(obj.Detector.Value), ...
                 'OutputDir',fullfile(c.OutputRoot,'neuropal-detection'), ...
                 'CancelFcn',@() c.Cancelled,'ProgressFcn',@(message) obj.progress(message));
+            if c.Cancelled, error('Tracking:ReferenceCancelled','Detection canceled; existing reference results were preserved.'); end
             if response.num_centroids==0, obj.Status.Text='No neurons detected. Previous reference results were kept.'; return; end
             obj.Positions=response.centroids_yxz(:,[2 1 3]); obj.Scores=response.scores(:);
             obj.Names=strings(size(obj.Scores)); obj.Confidence=zeros(size(obj.Scores)); obj.NameSources=repmat("unnamed",size(obj.Scores));
             obj.Detection=response; obj.Predictions=[]; obj.IdentityModel=[]; obj.Selected=1; obj.render();
+            obj.progress(sprintf('%d reference neurons detected.',size(obj.Positions,1)));
         end
         function identify(obj)
             if isempty(obj.Positions), error('Tracking:ReferenceSeeds','Run Auto Detect on the NeuroPAL reference first.'); end
@@ -134,16 +141,20 @@ classdef NeuroPALReference < handle
                 'Labels',strings(0,1),'DatasetID',profile,'Device','cpu','OutputName',[output_name '.csv'], ...
                 'CancelFcn',@() c.Cancelled,'ProgressFcn',@(message) obj.progress(message));
             [predictions,names,confidence,sources]=Tracking.referenceIdentityResults(predictions,size(obj.Positions,1));
+            if c.Cancelled, error('Tracking:ReferenceCancelled','Auto ID canceled; existing reference names were preserved.'); end
+            reviewed=obj.NameSources=="reviewed";
+            names(reviewed)=obj.Names(reviewed); confidence(reviewed)=obj.Confidence(reviewed); sources(reviewed)=obj.NameSources(reviewed);
             obj.Names=names; obj.Confidence=confidence; obj.NameSources=sources;
             obj.Predictions=predictions;
             obj.IdentityModel=struct('repository',repo,'checkpoint',checkpoint,'mc_samples',20,'dataset_id',profile, ...
                 'predictions',table2struct(predictions),'input_positions_xyz',obj.Positions,'labels_supplied',false);
-            obj.render(); obj.Status.Text=sprintf('%d ID suggestions · %d unnamed',nnz(strlength(names)>0),nnz(strlength(names)==0));
+            obj.render(); obj.progress(sprintf('%d ID suggestions · %d reviewed · %d unnamed',nnz(sources=="auto-id"),nnz(reviewed),nnz(strlength(names)==0)));
         end
         function align(obj)
             c=obj.Controller;
             alignment=c.bridge(struct('action','align_neuropal','source',c.Source,'reference_channel',obj.ReferenceChannel.Value, ...
                 'channel',obj.VideoChannel.Value,'frame_index',obj.Frame.Value-1,'scale_mode',obj.ScaleMode.Value),@() c.Cancelled);
+            if c.Cancelled, error('Tracking:ReferenceCancelled','Alignment canceled; existing reference results were preserved.'); end
             obj.Alignment=alignment; obj.render();
             obj.Status.Text=sprintf('Image alignment correlation: %.3f. Inspect the centers on the video before using them.',alignment.correlation);
         end
@@ -156,6 +167,7 @@ classdef NeuroPALReference < handle
             name=strtrim(string(event.NewData));
             if strlength(name)>64, obj.render(); uialert(obj.Window,'Use a neuron name of at most 64 characters.','Neuron name'); return; end
             obj.Names(event.Indices(1))=name; obj.NameSources(event.Indices(1))="reviewed"; obj.Confidence(event.Indices(1))=1;
+            obj.render();
         end
         function select(obj,event)
             if obj.Controller.Busy || isempty(event.Indices), return; end
@@ -170,7 +182,7 @@ classdef NeuroPALReference < handle
         end
         function use(obj)
             c=obj.Controller; if c.Busy, return; end
-            obj.Applied=false; c.safe(@() obj.apply());
+            obj.Applied=false; obj.run(@() obj.apply());
             if obj.Applied, c.View.setStage(3); delete(obj); end
         end
         function apply(obj)
@@ -199,6 +211,17 @@ classdef NeuroPALReference < handle
         end
         function progress(obj,message)
             obj.Status.Text=char(message); obj.Controller.Status.Text=char(message);
+        end
+        function run(obj,action)
+            obj.Controller.safe(@execute);
+            function execute()
+                try
+                    action();
+                catch ME
+                    obj.progress(ME.message);
+                    rethrow(ME);
+                end
+            end
         end
         function render(obj)
             rgb=reshape(single(max(obj.Volume(:,:,:,1:3),[],3)),size(obj.Volume,1),size(obj.Volume,2),3);

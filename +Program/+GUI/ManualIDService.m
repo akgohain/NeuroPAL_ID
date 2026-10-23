@@ -359,8 +359,8 @@ classdef ManualIDService
         end
 
         function deleteNeuron(app, index)
-            Program.HeavyJob.assertIdle();
             try
+                Program.HeavyJob.assertIdle();
                 captured = Program.GUI.ManualIDService.context(app, index);
                 record = Program.GUI.ManualIDService.record(app, index);
                 state = Program.GUI.ManualIDController.state(app);
@@ -508,10 +508,31 @@ classdef ManualIDService
             try
                 store = Program.GUI.ManualIDService.ensure(app);
                 [~, stem] = fileparts(app.image_file);
-                [name, folder, filter] = uiputfile({'*.mat', 'Full annotations and evidence (*.mat)'; '*.csv', 'Legacy analysis CSV + full annotation companion'}, ...
+                [name, folder, filter] = Program.GUI.ManualIDService.selectFile(app, 'uiputfile', ...
+                    {'*.mat', 'Full annotations and evidence (*.mat)'; '*.csv', 'Legacy analysis CSV + full annotation companion'}, ...
                     'Export neuron IDs', [stem '_annotations.mat']);
                 if isequal(name, 0), return; end
-                path = fullfile(folder, name);
+                selected_path = fullfile(folder, name);
+                path = Program.GUI.ManualIDService.exportPath(selected_path, filter);
+                destinations = {path};
+                if filter == 2
+                    [folder, stem] = fileparts(path);
+                    destinations{end+1} = fullfile(folder, [stem '_annotations.mat']);
+                end
+                if any(cellfun(@isfolder, destinations))
+                    error('Annotations:ExchangeFolder', 'An export destination is a folder. Choose another filename.');
+                end
+                % The native picker confirms only its own selected filename.
+                unchecked = destinations;
+                if strcmp(path, selected_path), unchecked(1) = []; end
+                existing = unchecked(cellfun(@isfile, unchecked));
+                if ~isempty(existing)
+                    answer = uiconfirm(app.CELL_ID, ...
+                        sprintf('Replace these existing export files?\n%s', strjoin(existing, '\n')), ...
+                        'Replace exported IDs', 'Options', {'Replace', 'Cancel'}, ...
+                        'DefaultOption', 2, 'CancelOption', 2);
+                    if ~strcmp(answer, 'Replace'), return; end
+                end
                 if filter == 1
                     Annotations.Exchange.export(path, store);
                 else
@@ -527,6 +548,41 @@ classdef ManualIDService
             catch ME
                 uialert(app.CELL_ID, ME.message, 'Neuron IDs could not be exported');
             end
+        end
+
+        function path = exportPath(path, filter)
+            % Keep the extension consistent with the selected export format.
+            extensions = {'.mat', '.csv'};
+            if ~isnumeric(filter) || ~isscalar(filter) || ~ismember(filter, [1 2])
+                error('Annotations:ExchangeFormat', 'Choose a supported annotation export format.');
+            end
+            [folder, stem, extension] = fileparts(char(string(path)));
+            while any(strcmpi(extension, extensions))
+                path = fullfile(folder, stem);
+                [folder, stem, extension] = fileparts(path);
+            end
+            path = [fullfile(folder, [stem extension]) extensions{filter}];
+        end
+
+        function [name, folder, filter] = selectFile(app, picker, varargin)
+            % Keep the native chooser in front of the app and prevent reentry.
+            name = 0; folder = 0; filter = 0;
+            if ~any(strcmp(picker, {'uigetfile', 'uiputfile'}))
+                error('Annotations:FileDialog', 'Choose a supported file dialog.');
+            end
+            if isequal(getappdata(app.CELL_ID, 'manual_id_file_dialog'), true), return; end
+            visible = app.CELL_ID.Visible;
+            setappdata(app.CELL_ID, 'manual_id_file_dialog', true);
+            cleanup = onCleanup(@() Program.GUI.ManualIDService.finishFileDialog(app, visible));
+            Program.GUI.ManualIDController.close(app);
+            app.CELL_ID.Visible = 'off';
+            [name, folder, filter] = feval(picker, varargin{:});
+        end
+
+        function finishFileDialog(app, visible)
+            if ~isvalid(app) || ~isvalid(app.CELL_ID), return; end
+            rmappdata(app.CELL_ID, 'manual_id_file_dialog');
+            app.CELL_ID.Visible = visible;
         end
 
         function recoveryDialog(app)
@@ -588,7 +644,8 @@ classdef ManualIDService
                 store = Program.GUI.ManualIDService.ensure(app);
                 source = struct('image', app.image_neurons, 'source_id', store.source_id, ...
                     'worm', app.worm, 'positions', app.image_neurons.get_positions());
-                [name, folder] = uigetfile('*.mat', 'Import annotations for this image');
+                [name, folder] = Program.GUI.ManualIDService.selectFile(app, ...
+                    'uigetfile', '*.mat', 'Import annotations for this image');
                 if isequal(name, 0), return; end
                 [imported, report] = Annotations.Exchange.read(fullfile(folder, name));
                 if ~report.catalog_compatible

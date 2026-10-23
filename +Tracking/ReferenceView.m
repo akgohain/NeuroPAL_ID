@@ -391,13 +391,13 @@ classdef ReferenceView < handle
                     if pending, label=sprintf('%s?',label); end
                     if ~obj.labelFits(ax,rows(i,3:4),label,selected(i)), continue; end
                     if rows(i,3)<=c.Source.nx/2
-                        label=sprintf('\\leftarrow%s',label); offset=4; alignment='left';
+                        label=['←' label]; offset=4; alignment='left';
                     else
-                        label=sprintf('%s\\rightarrow',label); offset=-4; alignment='right';
+                        label=[label '→']; offset=-4; alignment='right';
                     end
                     text(ax,rows(i,3)+offset,rows(i,4),label,'Color',c.App.label_color, ...
                         'FontSize',c.App.label_fontsize,'FontWeight',c.App.label_fontweight, ...
-                        'HorizontalAlignment',alignment,'HitTest','off','Clipping','on','Tag','reference_label');
+                        'HorizontalAlignment',alignment,'Interpreter','none','HitTest','off','Clipping','on','Tag','reference_label');
                 end
             end
         end

@@ -138,6 +138,8 @@ classdef GUIHandling
             Program.GUIHandling.prepare_unloaded_module_views(app);
 
             Program.GUIHandling.install_open_callbacks(app);
+            Program.GUIHandling.install_metadata_callbacks(app);
+            Program.GUIHandling.install_help_callbacks(app);
             Program.GUIHandling.install_processing_resize_callback(app);
             Program.GUIHandling.install_main_processing_sync_callbacks(app);
             Program.GUIHandling.install_cellpose_mask_button(app);
@@ -149,15 +151,70 @@ classdef GUIHandling
             Program.GUIHandling.update_main_id_workflow_state(app);
         end
 
+        function install_help_callbacks(app)
+            app.KeyboardShortcutsMenu.MenuSelectedFcn = @(~,~) ...
+                uialert(app.CELL_ID,Program.ProgramInfo.getKeyboardShortcutsMsg(), ...
+                    'Keyboard shortcuts','Icon','info');
+            app.InstructionsMenu.MenuSelectedFcn = @(~,~) ...
+                uialert(app.CELL_ID,Program.ProgramInfo.getInstructionsMsg(), ...
+                    'NeuroPAL ID instructions','Icon','info');
+        end
+
         function install_open_callbacks(app)
-            app.OpenMenu.MenuSelectedFcn = @(~, ~) Program.Routines.open();
-            app.OpenButton.ButtonPushedFcn = @(~, ~) Program.Routines.open();
+            app.OpenMenu.MenuSelectedFcn = @(~, ~) Program.GUIHandling.open_source(app);
+            app.OpenButton.ButtonPushedFcn = @(~, ~) Program.GUIHandling.open_source(app);
             key = 'source_tab_callback';
             if ~isappdata(app.CELL_ID, key)
                 callback = app.TabGroup.SelectionChangedFcn;
                 setappdata(app.CELL_ID, key, callback);
                 app.TabGroup.SelectionChangedFcn = @(src, event) ...
                     Program.GUIHandling.handle_source_tab_change(app, callback, src, event);
+            end
+        end
+
+        function open_source(app)
+            try
+                Program.Routines.open();
+            catch ME
+                Program.Helpers.debug_event('Open', '%s: %s', ME.identifier, ME.message);
+                uialert(app.CELL_ID, ME.message, 'Cannot Open File');
+            end
+        end
+
+        function handle_neuron_click(app, callback, src, event)
+            try
+                Program.GUIHandling.invoke_gui_callback(callback, src, event);
+            catch ME
+                Program.Helpers.debug_event('NeuronClick', '%s: %s', ME.identifier, ME.message);
+                uialert(app.CELL_ID, ME.message, 'Neuron editing');
+            end
+        end
+
+        function install_metadata_callbacks(app)
+            targets = {'BodyDropDown','body'; 'SexDropDown','sex'; ...
+                'AgeDropDown','age'; 'StrainEditField','strain'};
+            for i = 1:size(targets,1)
+                component = app.(targets{i,1});
+                if isappdata(component,'metadata_callback'), continue; end
+                callback = component.ValueChangedFcn;
+                setappdata(component,'metadata_callback',callback);
+                field = targets{i,2};
+                component.ValueChangedFcn = @(src,event) ...
+                    Program.GUIHandling.handle_metadata_change(app,callback,field,src,event);
+            end
+        end
+
+        function handle_metadata_change(app, callback, field, src, event)
+            try
+                Program.HeavyJob.assertIdle();
+                Program.GUIHandling.invoke_gui_callback(callback,src,event);
+            catch ME
+                % Keep the displayed value consistent with the unchanged source.
+                if isstruct(app.worm) && isfield(app.worm,field)
+                    src.Value = app.worm.(field);
+                end
+                Program.Helpers.debug_event('ImageMetadata', '%s: %s', ME.identifier, ME.message);
+                uialert(app.CELL_ID,ME.message,'Image metadata');
             end
         end
 
@@ -169,7 +226,27 @@ classdef GUIHandling
                     ~Program.GUIHandling.processing_tab_rendered(app)
                 return
             end
-            Program.GUIHandling.invoke_gui_callback(callback, src, event);
+            try
+                Program.GUIHandling.invoke_gui_callback(callback, src, event);
+            catch ME
+                % A failed initialization must not expose the previous source's canvas.
+                previous = [];
+                for field = {'OldValue', 'PreviousData'}
+                    if (isstruct(event) && isfield(event, field{1})) || ...
+                            (isobject(event) && isprop(event, field{1}))
+                        previous = event.(field{1});
+                        break
+                    end
+                end
+                if isa(previous, 'matlab.ui.container.Tab') && isscalar(previous) && isvalid(previous) && ...
+                        isequal(previous.Parent, app.TabGroup)
+                    app.TabGroup.SelectedTab = previous;
+                else
+                    app.TabGroup.SelectedTab = app.NeuroPALIDTab;
+                end
+                Program.Helpers.debug_event('SourceTab', '%s: %s', ME.identifier, ME.message);
+                uialert(app.CELL_ID, ME.message, 'Unable to open tab');
+            end
         end
 
         function configure_main_z_controls(app)
@@ -1437,7 +1514,7 @@ classdef GUIHandling
                     return
                 end
 
-                Program.GUIHandling.invoke_gui_callback(callbacks.auto, src, event);
+                Program.GUIHandling.invoke_gui_callback(callbacks.auto_all, src, event);
                 Program.GUIHandling.update_main_id_workflow_state(app);
             catch ME
                 Program.GUIHandling.log_gui_callback_error(app, 'Auto-ID', ME);
@@ -1667,13 +1744,13 @@ classdef GUIHandling
                 Program.GUIHandling.auto_detect_log(app, ...
                     'Constructing Neurons.Image with %s.', ...
                     Program.GUIHandling.supervoxel_positions_summary(sp));
+                detected_params = Program.Helpers.neuron_edit_params(detected_params, app.image_um_scale);
                 if strcmp(backend, 'detection_moe')
                     app.image_neurons = prepared_moe_neurons;
-                    app.mp_params = moe_params;
                 else
                     app.image_neurons = Neurons.Image(sp, app.worm.body, 'scale', app.image_um_scale');
-                    app.mp_params = detected_params;
                 end
+                app.mp_params = detected_params;
                 Program.GUIHandling.auto_detect_log(app, ...
                     'Neurons.Image constructed: count=%d.', app.image_neurons.num_neurons());
 
@@ -2180,8 +2257,8 @@ classdef GUIHandling
                     unassigned = stats.unassigned_neurons;
                 end
                 message = sprintf(['Auto-ID completed successfully.\n\n' ...
-                    'Assigned IDs to %d of %d neurons.\n' ...
-                    'Neurons without an auto-ID: %d'], ...
+                    'Generated predictions for %d of %d neurons.\n' ...
+                    'Neurons without a prediction: %d'], ...
                     round(assigned), round(stats.neurons), round(unassigned));
                 if isfield(stats, 'max_distance_um') && isfinite(stats.max_distance_um)
                     message = sprintf('%s\nLargest assignment offset: %.2f um', ...
@@ -5839,6 +5916,14 @@ classdef GUIHandling
                 app.SystemInfoGrid.ColumnWidth = {110, '1x'};
                 app.SystemInfoGrid.Padding = [0 0 0 0];
             end
+            operating_system = char(java.lang.System.getProperty('os.name'));
+            operating_version = char(java.lang.System.getProperty('os.version'));
+            app.OperatingSystemEditField.Value = sprintf('%s %s (%s)', ...
+                operating_system,operating_version,computer('arch'));
+            app.MATLABRuntimeEditFieldLabel.Text = 'MATLAB:';
+            app.PythonExecutableEditFieldLabel.Text = 'MATLAB Python:';
+            app.PythonExecutableEditField.Tooltip = ...
+                'MATLAB''s Python version. Detection, Auto-ID and tracking use their separately configured model runtimes.';
             if isprop(app, 'InterdependentFunctionalityLabel')
                 app.InterdependentFunctionalityLabel.Text = 'Cross-module';
             end
@@ -7564,6 +7649,7 @@ classdef GUIHandling
 
         function nwb_init(app)
             allow_save = false;
+            app.SexDropDown.Items = {'XX', 'XO', 'Unknown'};
             Program.GUIHandling.loaded_file_check(app.parent_app, app.Tree);
             worm_properties = {
                 'AgeDropDown', ...
@@ -7624,6 +7710,7 @@ classdef GUIHandling
         
         function device_handler(app, action, device)
             data = app.DeviceUITable.Data;
+            if isempty(data), data = cell(0, 3); end
             if ~strcmp(action, 'add') && isempty(device), return; end
             switch action
                 case 'add'
@@ -7672,6 +7759,7 @@ classdef GUIHandling
 
         function channel_handler(app, action, channel)
             data = app.OpticalUITable.Data;
+            if isempty(data), data = cell(0, 8); end
             if ~strcmp(action, 'add') && isempty(channel), return; end
             switch action
                 case 'add'

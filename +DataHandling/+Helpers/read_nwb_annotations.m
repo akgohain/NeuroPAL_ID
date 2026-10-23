@@ -61,6 +61,8 @@ for index = 1:count
     neurons.neurons(end+1) = neuron;
 end
 
+DataHandling.Helpers.NWBIdentityExchange.restore(file, neurons);
+
 has_atlas = true;
 try
     h5info(file, '/processing/NeuronAnnotations/AtlasVersion');

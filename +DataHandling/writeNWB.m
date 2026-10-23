@@ -1005,6 +1005,7 @@ classdef writeNWB
                 'description', 'Neuron annotations and properties data');
             annotations_module.dynamictable.set('NeuronAnnotations', annotations_table);
             annotations_module.dynamictable.set('NeuronProperties', properties_table);
+            DataHandling.Helpers.NWBIdentityExchange.attach(annotations_module, annotations_table, neurons);
             
             % Add atlas version if available
             if isprop(neurons, 'atlas_version') && ~isempty(neurons.atlas_version)

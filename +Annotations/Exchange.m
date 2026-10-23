@@ -138,7 +138,9 @@ classdef Exchange
                         pathField = any(strcmpi(key, {'path', 'file', 'uri', 'url', 'reference', 'references'})) || ...
                             endsWith(lower(key), {'_path', '_file', '_uri', '_url', '_reference', '_references'});
                         if pathField && ~isempty(next) && (ischar(next) || isstring(next) || iscellstr(next))
-                            references{end+1, 1} = [label ': ' char(strjoin(string(next(:)), ', '))];
+                            if ischar(next), paths = string(next);
+                            else, paths = string(next(:)); end
+                            references{end+1, 1} = [label ': ' char(strjoin(paths, ', '))];
                         else
                             references = [references; Annotations.Exchange.references(next, label)];
                         end
