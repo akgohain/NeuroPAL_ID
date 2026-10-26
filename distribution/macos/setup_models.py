@@ -104,7 +104,7 @@ def install_lock(root):
         lock.unlink(missing_ok=True)
 
 
-def environment(name, root):
+def environment(name, root, process_env=None):
     uv = shutil.which('uv')
     if not uv:
         raise RuntimeError('Run Setup-Mac.command to prepare the package installer.')
@@ -120,14 +120,14 @@ def environment(name, root):
         # Only unfinished environments owned by this installer are replaced.
         if folder.exists():
             shutil.rmtree(folder)
-        run([uv, 'venv', '--managed-python', '--python', '3.11', folder])
-        run([uv, 'pip', 'install', '--python', python, '-r', spec])
+        run([uv, 'venv', '--managed-python', '--python', '3.11', folder], env=process_env)
+        run([uv, 'pip', 'install', '--python', python, '-r', spec], env=process_env)
         if name == 'tracking':
-            run([uv, 'pip', 'install', '--python', python, '--no-deps', wheel])
+            run([uv, 'pip', 'install', '--python', python, '--no-deps', wheel], env=process_env)
         marker.write_text(json.dumps({'requirements_sha256': revision}) + '\n')
     elif json.loads(marker.read_text())['requirements_sha256'] != revision:
         raise ValueError('The installed runtime does not match this package.')
-    run([uv, 'pip', 'check', '--python', python])
+    run([uv, 'pip', 'check', '--python', python], env=process_env)
     return python
 
 

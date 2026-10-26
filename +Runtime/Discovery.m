@@ -26,6 +26,7 @@ classdef Discovery
             for i=1:min(100,numel(records))
                 try
                     data=jsondecode(fileread(fullfile(records(i).folder,records(i).name)));
+                    if isfield(data,'automatic_discovery') && ~data.automatic_discovery, continue; end
                     if isfield(data,'profiles')
                         found=data.profiles;
                     elseif isfield(data,'configuration')

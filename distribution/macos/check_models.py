@@ -12,7 +12,7 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 os.environ.setdefault('MPLBACKEND', 'Agg')
 os.environ.setdefault('OMP_NUM_THREADS', '4')
 p = argparse.ArgumentParser(description=__doc__)
-p.add_argument('component', choices=['moe', 'gat', 'yolo', 'tracking'])
+p.add_argument('component', choices=['moe', 'gat', 'yolo', 'tracking', 'bridge'])
 p.add_argument('--bundle', type=Path)
 p.add_argument('--app', type=Path, required=True)
 a = p.parse_args()
@@ -57,6 +57,15 @@ elif a.component == 'yolo':
     result = model.predict(np.zeros((128, 128, 3), dtype=np.uint8), device='cpu', verbose=False)
     assert len(result) == 1
     print('PASS: standalone YOLO CPU forward pass', flush=True)
+elif a.component == 'bridge':
+    import reference_video
+    import reference_nwb
+    import reference_recommendation
+    import reference_analysis
+    from scipy.ndimage import zoom
+    from skimage.registration import phase_cross_correlation
+    assert 'zephir' not in sys.modules
+    print('PASS: recording, recommendation, alignment and activity imports without ZephIR', flush=True)
 elif a.component == 'tracking':
     import reference_video
     import main
