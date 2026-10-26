@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -101,6 +102,19 @@ def verify(folder, app=APP):
     return value
 
 
+def release_record(repository, tag):
+    # A draft without a published Git tag cannot be fetched through releases/tags.
+    url = subprocess.check_output(['gh', 'release', 'view', tag, '--repo', repository,
+                                   '--json', 'apiUrl', '--jq', '.apiUrl'], text=True).strip()
+    prefix = f'https://api.github.com/repos/{repository}/releases/'
+    if not url.startswith(prefix) or not re.fullmatch(r'\d+', url[len(prefix):]):
+        raise ValueError('GitHub returned an unexpected release API location.')
+    response = json.loads(subprocess.check_output(['gh', 'api', url], text=True))
+    if response.get('tag_name') != tag:
+        raise ValueError('GitHub returned a different model release.')
+    return response
+
+
 def stage_draft(folder, app=APP):
     value = verify(folder, app)
     repository = value['repository']
@@ -123,8 +137,7 @@ def stage_draft(folder, app=APP):
     command += [str(folder / a['file']) for a in value['models'].values()]
     command += [str(folder / 'model_catalog.json'), str(folder / 'SHA256SUMS')]
     subprocess.run(command, check=True)
-    response = json.loads(subprocess.check_output([
-        'gh', 'api', f'repos/{repository}/releases/tags/{tag}'], text=True))
+    response = release_record(repository, tag)
     remote = {a['name']: a for a in response['assets']}
     for path in [*(folder / a['file'] for a in value['models'].values()), folder / 'model_catalog.json', folder / 'SHA256SUMS']:
         asset = remote.get(path.name, {})
