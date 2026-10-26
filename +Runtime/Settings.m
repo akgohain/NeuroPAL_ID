@@ -33,7 +33,7 @@ classdef Settings
                 forget=uibutton(actions,'Text','Forget selection','ButtonPushedFcn',@(~,~) Runtime.Settings.forget(window));
                 reset=uibutton(actions,'Text','Reset settings…','ButtonPushedFcn',@(~,~) Runtime.Settings.reset(window));
                 details=uibutton(actions,'Text','Details…','ButtonPushedFcn',@(~,~) Runtime.Settings.details(window));
-                install=uibutton(actions,'Text','Install package…','ButtonPushedFcn',@(~,~) Runtime.Installer.run(window));
+                install=uibutton(actions,'Text','Install / update…','ButtonPushedFcn',@(~,~) Runtime.Distribution.open(window));
                 resources=uibutton(actions,'Text','Resources…','ButtonPushedFcn',@(~,~) Runtime.Settings.resources(window));
                 controls=struct('app',app,'choice',choice,'status',status,'table',table,'checking',false, ...
                     'buttons',[browse detected check apply close uim forget reset details install resources]);
