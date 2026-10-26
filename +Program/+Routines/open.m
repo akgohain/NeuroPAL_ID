@@ -42,6 +42,7 @@ function open(path, source_kind)
         return;
     end
     if strcmp(route,'cancel'), return; end
+    if strcmp(route,'recording') && ~Runtime.Settings.ensure(app,'recording_io'), return; end
     if ~Program.GUI.ManualIDService.prepareClose(app), return; end
     if ~Program.ProcessingSession.prepareOpen(app), return; end
 
@@ -115,7 +116,9 @@ function open(path, source_kind)
     catch ME
         Program.Helpers.debug_event('OpenFile', ...
             'Cannot read "%s": %s', filename, getReport(ME, 'extended', 'hyperlinks', 'off'));
-        if strcmp(ME.identifier, 'DataHandling:LargeFile:Cancelled')
+        if startsWith(ME.identifier,'Runtime:')
+            Runtime.Settings.failure(app,ME);
+        elseif strcmp(ME.identifier, 'DataHandling:LargeFile:Cancelled')
             uialert(app.CELL_ID, ...
                 {ME.message, 'Reopen the source file to resume from the saved checkpoint.'}, ...
                 'Conversion Paused', 'Icon', 'info');
@@ -405,6 +408,7 @@ try
     Tracking.ReferenceWorkflow.open(app, filename);
 catch ME
     Program.Helpers.debug_event('OpenFile', '%s', getReport(ME, 'extended', 'hyperlinks', 'off'));
-    uialert(app.CELL_ID, ME.message, 'Cannot Open Recording');
+    if startsWith(ME.identifier,'Runtime:'), Runtime.Settings.failure(app,ME);
+    else, uialert(app.CELL_ID, ME.message, 'Cannot Open Recording'); end
 end
 end

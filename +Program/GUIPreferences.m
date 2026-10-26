@@ -44,19 +44,9 @@ classdef GUIPreferences < handle
                  obj = Program.GUIPreferences();
                  
                  % Setup the preferences file location.
-                 if ~isdeployed
-                     obj.prefs_file = obj.prefs_name;
-                 else
-                     if ismac
-                        prefs_root = '~/Library/Application Support';
-                     else
-                        prefs_root = ctfroot;
-                     end
-
-                     %prefs_root = prefs_root(1:i(end));
-                     obj.prefs_file = ...
-                         [prefs_root filesep obj.prefs_name];
-                 end
+                 root=Runtime.Configuration.userRoot();
+                 if ~isfolder(root), mkdir(root); end
+                 obj.prefs_file = fullfile(root,obj.prefs_name);
                  
                  % Add the image directory.
                  if ispc
@@ -119,7 +109,7 @@ classdef GUIPreferences < handle
             obj = Program.GUIPreferences.instance();
             
             % Read the preferences.
-            obj.prefs_file = prefs.prefs_file;
+            % Keep this machine's preference destination when migrating old files.
             obj.image_dir = prefs.image_dir;
             obj.GFP_color = prefs.GFP_color;
             obj.neuron_dot = prefs.neuron_dot;

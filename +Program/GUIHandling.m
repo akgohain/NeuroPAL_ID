@@ -140,6 +140,7 @@ classdef GUIHandling
             Program.GUIHandling.install_open_callbacks(app);
             Program.GUIHandling.install_metadata_callbacks(app);
             Program.GUIHandling.install_help_callbacks(app);
+            Runtime.Settings.install(app);
             Program.GUIHandling.install_processing_resize_callback(app);
             Program.GUIHandling.install_main_processing_sync_callbacks(app);
             Program.GUIHandling.install_cellpose_mask_button(app);
@@ -960,7 +961,7 @@ classdef GUIHandling
 
             button_grid = uigridlayout(grid, ...
                 'RowHeight', {'1x'}, ...
-                'ColumnWidth', {78, 78, '1x', 78, 78}, ...
+                'ColumnWidth', {70, 70, 135, '1x', 70, 70}, ...
                 'ColumnSpacing', 6, ...
                 'Padding', [0 0 0 0]);
             button_grid.Layout.Row = 2;
@@ -979,19 +980,22 @@ classdef GUIHandling
                     Program.GUIHandling.browse_main_method_param(table, specs));
             browse_button.Layout.Row = 1;
             browse_button.Layout.Column = 2;
+            runtime_button=uibutton(button_grid,'Text','Models & runtimes…', ...
+                'ButtonPushedFcn',@(~,~) Runtime.Settings.open(app,Program.GUIHandling.main_method_identity(app,group)));
+            runtime_button.Layout.Column=3;
 
             apply_button = uibutton(button_grid, 'push', ...
                 'Text', 'Apply', ...
                 'ButtonPushedFcn', @(src, event) ...
                     Program.GUIHandling.apply_main_method_params_table(app, group, specs, table, fig));
             apply_button.Layout.Row = 1;
-            apply_button.Layout.Column = 4;
+            apply_button.Layout.Column = 5;
 
             close_button = uibutton(button_grid, 'push', ...
                 'Text', 'Close', ...
                 'ButtonPushedFcn', @(src, event) close(fig));
             close_button.Layout.Row = 1;
-            close_button.Layout.Column = 5;
+            close_button.Layout.Column = 6;
         end
 
         function fig = create_params_dialog_figure(app, title, num_specs)
@@ -1256,6 +1260,8 @@ classdef GUIHandling
                         struct('key', 'crop_size', 'label', 'Patch', 'value', Methods.NNDetect.crop_size, 'limits', [16 512], 'integer', true, 'enabled', false), ...
                         struct('key', 'max_count', 'label', 'Max N', 'value', Program.GUIHandling.default_neuron_count(app), 'limits', [1 1000], 'integer', true, 'enabled', true)};
             end
+            paths={'bundle_path','python_executable','weights_path','model_path','checkpoint_path'};
+            specs=specs(~cellfun(@(spec) any(strcmp(spec.key,paths)),specs));
         end
 
         function specs = main_id_param_specs(method)
@@ -1277,6 +1283,8 @@ classdef GUIHandling
                         struct('key', 'top_k', 'label', 'Top K', 'value', 5, 'limits', [1 20], 'integer', true, 'enabled', true), ...
                         struct('key', 'max_distance_um', 'label', 'Max um', 'value', 25, 'limits', [0 500], 'integer', false, 'enabled', true)};
             end
+            paths={'bundle_path','python_executable','weights_path','model_path','checkpoint_path'};
+            specs=specs(~cellfun(@(spec) any(strcmp(spec.key,paths)),specs));
         end
 
         function add_sidebar_param_header(grid, row, column, text)
@@ -1506,10 +1514,12 @@ classdef GUIHandling
                 end
 
                 if any(strcmpi(char(id_method), {'GAT/Transformer', 'Transformer', 'Anshita', 'Anshita GAT', 'GAT'}))
+                    if ~Runtime.Settings.ensure(app,'anshita_gat'), return; end
                     Program.GUIHandling.run_transformer_auto_id(app);
                     return
                 end
                 if any(strcmpi(char(id_method), {'CRF', 'CRF Cell-ID 2.0'}))
+                    if ~Runtime.Settings.ensure(app,'crf_cellid_2'), return; end
                     Program.GUIHandling.run_crfid2_auto_id(app);
                     return
                 end
@@ -1539,6 +1549,7 @@ classdef GUIHandling
                 end
 
                 backend = Program.GUIPreferences.get_detection_backend();
+                if ~Runtime.Settings.ensure(app,backend), return; end
                 if any(strcmp(backend, {'cellpose', 'yolo', 'spotiflow_supervised', 'detection_moe'}))
                     Program.GUIHandling.run_modern_auto_detector(app, backend);
                     return
@@ -2125,37 +2136,37 @@ classdef GUIHandling
                         ME.message);
                 case 'Wrapper:CellposeUnavailable'
                     message = sprintf(['Cellpose could not start cleanly.\n\n%s\n\n' ...
-                        'Use YOLO for detection, or configure NEUROPAL_CELLPOSE_PYTHON and NEUROPAL_CELLPOSE_MODEL.'], ...
+                        'Open Tools > Models & runtimes and check the Cellpose installation.'], ...
                         ME.message);
                 case 'Wrapper:MissingYoloWeights'
                     message = sprintf(['YOLO model weights are missing.\n\n%s\n\n' ...
-                        'Open detection Settings and select the YOLO best.pt weights file.'], ME.message);
+                        'Choose the YOLO best.pt weights file in Tools > Models & runtimes.'], ME.message);
                 case 'Wrapper:YoloUnavailable'
                     message = sprintf(['YOLO could not start cleanly.\n\n%s\n\n' ...
-                        'Check NEUROPAL_YOLO_PYTHON and the YOLO weights path.'], ME.message);
+                        'Open Tools > Models & runtimes and check YOLO.'], ME.message);
                 case {'Wrapper:MissingTransformerCheckpoint', 'Wrapper:MissingTransformerWeights'}
                     message = sprintf(['GAT model weights are missing or unreadable.\n\n%s\n\n' ...
-                        'Open auto-ID Settings and select a checkpoint folder containing best_model.pt and train_config.json.'], ...
+                        'Choose a checkpoint folder containing best_model.pt and train_config.json in Tools > Models & runtimes.'], ...
                         ME.message);
                 case {'Wrapper:MissingTransformerConfig', 'Wrapper:InvalidTransformerConfig'}
                     message = sprintf(['GAT training configuration is missing or invalid.\n\n%s\n\n' ...
-                        'Select the complete checkpoint folder in auto-ID Settings. Use the train_config.json supplied with those weights.'], ME.message);
+                        'Choose the complete checkpoint folder in Tools > Models & runtimes. Use the train_config.json supplied with those weights.'], ME.message);
                 case {'Wrapper:MissingTransformerRepo', 'Wrapper:MissingTransformerVolumeScript'}
                     message = sprintf(['GAT inference code is missing.\n\n%s\n\n' ...
-                        'Install GAT-NeuroPAL beside NeuroPAL_ID or set NEUROPAL_GAT_REPO to its folder.'], ME.message);
+                        'Choose the GAT source folder in Tools > Models & runtimes.'], ME.message);
                 case 'Wrapper:TransformerUnavailable'
                     message = sprintf(['Transformer auto-ID could not start cleanly.\n\n%s\n\n' ...
-                        'Check NEUROPAL_TRANSFORMER_PYTHON and the checkpoint path.'], ME.message);
+                        'Open Tools > Models & runtimes and check GAT.'], ME.message);
                 case 'Wrapper:SpotiflowBundleUnavailable'
                     message = sprintf(['Spotiflow is wired but its model bundle is incomplete.\n\n%s\n\n' ...
-                        'Open detection Settings and select a folder containing method_bundle.json and the checkpoint.'], ME.message);
+                        'Choose the complete bundle in Tools > Models & runtimes.'], ME.message);
                 case 'Wrapper:MoEBundleUnavailable'
                     message = sprintf(['MoE model bundle is missing or incomplete.\n\n%s\n\n' ...
-                        'Set NEUROPAL_DETECTION_MOE_BUNDLE to the complete bundle folder containing method_bundle.json and all trained components. ' ...
-                        'For NeuroPAL ID, you can also select it in detection Settings.'], ME.message);
+                        'Choose the complete MoE bundle in Tools > Models & runtimes. ' ...
+                        'Keep all trained components and their manifest together.'], ME.message);
                 case 'Wrapper:MoEPythonUnavailable'
                     message = sprintf(['MoE Python environment is not configured.\n\n%s\n\n' ...
-                        'Set NEUROPAL_MOE_PYTHON to the MoE Python interpreter, or select it in NeuroPAL ID detection Settings.'], ME.message);
+                        'Choose the MoE Python executable in Tools > Models & runtimes.'], ME.message);
                 case 'Methods:NNDetect:MissingToolbox'
                     message = sprintf(['Legacy neural-network detection requires Deep Learning Toolbox.\n\n%s\n\n' ...
                         'Install or enable Deep Learning Toolbox in MATLAB, or choose MoE or Matching Pursuit.'], ME.message);
@@ -2168,7 +2179,7 @@ classdef GUIHandling
                         'Restore NN_model.mat from the NeuroPAL software distribution and add its folder to the MATLAB path, or choose Matching Pursuit.'], ME.message);
                 case 'Wrapper:SpotiflowUnavailable'
                     message = sprintf(['Spotiflow could not start.\n\n%s\n\n' ...
-                        'Set NEUROPAL_SPOTIFLOW_PYTHON to the packaged Spotiflow environment.'], ME.message);
+                        'Choose the Spotiflow Python executable in Tools > Models & runtimes.'], ME.message);
                 case 'Wrapper:SpotiflowCommandFailed'
                     message = sprintf(['Frozen Spotiflow v1 could not complete.\n\n%s\n\n' ...
                         'Verify the Spotiflow 0.6.5 environment and the three checkpoint files. ' ...
@@ -2323,7 +2334,7 @@ classdef GUIHandling
         end
 
         function output_dir = yolo_output_dir(app)
-            root_dir = fullfile(fileparts(fileparts(mfilename('fullpath'))), '..', 'artifacts', 'gui_yolo');
+            root_dir = fullfile(Runtime.Configuration.userRoot(),'jobs','gui_yolo');
             try
                 source_name = string(app.image_file);
                 [~, source_name] = fileparts(source_name);
@@ -2336,8 +2347,7 @@ classdef GUIHandling
         end
 
         function output_dir = method_output_dir(app, method_name)
-            root_dir = fullfile(fileparts(fileparts(mfilename('fullpath'))), '..', ...
-                'artifacts', ['gui_', char(string(method_name))]);
+            root_dir = fullfile(Runtime.Configuration.userRoot(),'jobs',['gui_', char(string(method_name))]);
             try
                 source_name = string(app.image_file);
                 [~, source_name] = fileparts(source_name);
@@ -2373,13 +2383,15 @@ classdef GUIHandling
             if isappdata(app.CELL_ID,key), params=getappdata(app.CELL_ID,key); end
             if isappdata(app.CELL_ID,owner_key), owner=getappdata(app.CELL_ID,owner_key); end
             if isappdata(app.CELL_ID,bank_key), bank=getappdata(app.CELL_ID,bank_key); end
-            % Keep bundle paths and hyperparameters with their selected backend.
+            % Keep scientific parameters with their selected backend; installations are shared.
             if ~isempty(owner) && ~strcmp(owner,method)
                 bank.(owner)=params; params=struct();
                 if isfield(bank,method), params=bank.(method); end
                 setappdata(app.CELL_ID,key,params);
                 setappdata(app.CELL_ID,bank_key,bank);
             end
+            paths=intersect(fieldnames(params),{'bundle_path','python_executable','weights_path','model_path','checkpoint_path'});
+            if ~isempty(paths), params=rmfield(params,paths); setappdata(app.CELL_ID,key,params); end
             setappdata(app.CELL_ID,owner_key,method);
         end
 

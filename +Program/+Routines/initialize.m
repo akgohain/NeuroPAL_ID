@@ -16,8 +16,9 @@ function initialize()
     if ~isdeployed
         % If we're running in dev mode, add Data & External Dependencies to
         % path.
-        addpath(genpath(fullfile(pwd, "Data")));
-        addpath(genpath(fullfile(pwd, "External_Dependencies")));
+        root=Runtime.Configuration.appRoot();
+        addpath(genpath(fullfile(root, "Data")));
+        addpath(genpath(fullfile(root, "External_Dependencies")));
     end
 
     d = uiprogressdlg(window, "Title","NeuroPAL ID","Message","Starting NeuroPAL_ID...",'Indeterminate','on');
@@ -30,12 +31,6 @@ function initialize()
 
     % Load the application preferences.
     is_loaded = Program.GUIPreferences.load();
-
-    % Add the path corresponding to the models.
-    if ~isdeployed
-        [path, ~, ~] = fileparts(mfilename('fullpath'));
-        addpath(genpath([path, filesep, 'Data']));
-    end
 
     % Log the change.
     if exist('TraceHistory', 'class')
@@ -54,6 +49,7 @@ function initialize()
     Program.GUIHandling.install_open_callbacks(app);
     Program.GUIHandling.install_metadata_callbacks(app);
     Program.GUIHandling.install_help_callbacks(app);
+    Runtime.Settings.install(app);
     Program.GUIHandling.hide_main_click_mode_control(app);
     Program.GUIHandling.hide_next_neuron_mode_control(app);
     Program.GUIHandling.configure_main_detect_id_controls(app);

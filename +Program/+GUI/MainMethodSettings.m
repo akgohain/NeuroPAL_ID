@@ -14,6 +14,10 @@ classdef MainMethodSettings
                     'ValueChangedFcn',@(src,~) Program.GUI.ManualIDService.setConstraints(app,src.Value));
                 checkbox.Layout.Row=3;
             end
+            row=numel(grid.RowHeight)+1; grid.RowHeight{row}=32; window.Position(4)=window.Position(4)+40;
+            button=uibutton(grid,'Text','Models & runtimes…', ...
+                'ButtonPushedFcn',@(~,~) Runtime.Settings.open(app,Program.GUIHandling.main_method_identity(app,group)));
+            button.Layout.Row=row;
             setappdata(app.CELL_ID,['main_' group '_settings_window'],window);
             addlistener(app.CELL_ID,'ObjectBeingDestroyed',@(~,~) Program.GUI.MainMethodSettings.close(window));
         end
