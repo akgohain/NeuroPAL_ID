@@ -12,27 +12,7 @@ classdef MethodBundle
                 return
             end
 
-            method_id = char(string(method_id));
-            env_name = ['NEUROPAL_', upper(regexprep(method_id, '[^A-Za-z0-9]', '_')), '_BUNDLE'];
-            project_root = fileparts(fileparts(mfilename('fullpath')));
-            candidates = { ...
-                getenv(env_name), ...
-                fullfile(fileparts(project_root), 'artifacts', 'method_bundles', method_id), ...
-                fullfile(project_root, 'method_bundles', method_id)};
-            path_value = '';
-            for i = 1:numel(candidates)
-                candidate = strtrim(char(string(candidates{i})));
-                if isempty(candidate)
-                    continue
-                end
-                if isempty(path_value)
-                    path_value = candidate;
-                end
-                if exist(candidate, 'dir') == 7
-                    path_value = candidate;
-                    return
-                end
-            end
+            path_value = Runtime.Resolver.bundle(char(string(method_id)));
         end
 
         function readiness = inspect(method_id, explicit_path)

@@ -1,7 +1,7 @@
 function [value, cache_hit] = video_cached_view(app, key, producer)
 %VIDEO_CACHED_VIEW Retain one video view within a byte limit.
 cache_key = 'video_projection_cache';
-budget_mib = str2double(getenv('NEUROPAL_VIDEO_CACHE_MIB'));
+budget_mib = Runtime.Environment.resource('video_cache_mib');
 if ~isfinite(budget_mib), budget_mib = 32; end
 budget_bytes = min(max(budget_mib,0),256)*1024^2;
 cache_hit = false;

@@ -72,31 +72,25 @@ classdef ReferenceWorkflow < handle
             workflow = Tracking.ReferenceWorkflow(app, info);
             setappdata(app.CELL_ID,key,workflow);
         end
-        function python = python()
-            python = getenv('NEUROPAL_VIDEO_PYTHON');
-            if isempty(python), python = getenv('NEUROPAL_YOLO_PYTHON'); end
-            if isempty(python)
-                root = fileparts(fileparts(mfilename('fullpath')));
-                candidate = fullfile(fileparts(root),'.venv-ai-pipeline','bin','python');
-                if isfile(candidate), python = candidate; end
-            end
-            if isempty(python) || ~isfile(python)
-                error('Tracking:PythonMissing','Set NEUROPAL_VIDEO_PYTHON to the ZephIR Python environment.');
-            end
+        function python = python(capability,cancel)
+            if nargin<1, capability='recording_io'; end
+            if nargin<2, cancel=[]; end
+            python = Runtime.Resolver.python(capability,'',cancel);
         end
         function response = bridge(request, cancel, progress)
             if nargin < 2, cancel = @() false; end
             if nargin < 3, progress = []; end
+            python = Tracking.ReferenceWorkflow.python(Runtime.Catalog.action(request.action),cancel);
             timeout = 3600;
             if strcmp(request.action,'track_sequence'), timeout = 86400; end
             folder = tempname; mkdir(folder);
             cleanup = onCleanup(@() rmdir(folder,'s'));
             input = fullfile(folder,'request.json'); output = fullfile(folder,'response.json');
             fid = fopen(input,'w'); guard = onCleanup(@() fclose(fid));
-            fwrite(fid,jsonencode(request),'char'); clear guard
+            fwrite(fid,unicode2native(jsonencode(request),'UTF-8'),'uint8'); clear guard
             root = fileparts(fileparts(mfilename('fullpath')));
             [status, detail] = Wrapper.runPythonProcess( ...
-                {Tracking.ReferenceWorkflow.python(),'-u',fullfile(root,'+Wrapper','reference_video.py'), ...
+                {python,'-u',fullfile(root,'+Wrapper','reference_video.py'), ...
                 '--request',input,'--response',output},'CancelFcn',cancel,'ProgressFcn',progress,'TimeoutSeconds',timeout);
             if status ~= 0, error('Tracking:ReferenceFailed','%s',detail); end
             response = jsondecode(fileread(output));
@@ -213,7 +207,10 @@ classdef ReferenceWorkflow < handle
                 action();
             catch ME
                 obj.Status.Text = ME.message;
-                if ~contains(ME.identifier,'Cancelled')
+                if contains(ME.identifier,'Cancelled'), return;
+                elseif startsWith(ME.identifier,'Runtime:')
+                    Runtime.Settings.failure(obj.App,ME);
+                elseif ~contains(ME.identifier,'Cancelled')
                     uialert(obj.App.CELL_ID,Program.GUIHandling.method_error_message(ME),'Reference workflow');
                 end
             end

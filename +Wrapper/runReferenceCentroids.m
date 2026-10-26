@@ -12,8 +12,7 @@ scale=double(scale_um_xyz(:)'); shape=[size(volume,1) size(volume,2) size(volume
 if numel(scale)~=3 || any(~isfinite(scale) | scale<=0) || isempty(volume) || size(volume,4)~=4 || ndims(volume)>4
     error('Tracking:ReferenceVolume','Supply an RGBW volume and three positive voxel spacings.');
 end
-setting=getenv('NEUROPAL_MOE_WORKSPACE_MIB'); limit=4096;
-if ~isempty(setting), limit=str2double(setting); end
+limit=Runtime.Environment.resource('moe_workspace_mib');
 if ~isfinite(limit) || limit<=1536, error('Tracking:ReferenceBudget','The detector workspace budget must exceed 1536 MiB.'); end
 spacing=scale([2 1 3]); target_spacing=[.4 .4 1.5];
 estimate=@(dims) prod(dims)*4*4*4+prod(max(1,ceil(dims.*spacing./target_spacing)))*4*4*12+1536*2^20;

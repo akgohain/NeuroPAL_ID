@@ -72,7 +72,7 @@ classdef FrameReader < handle
                         '--directory',obj.Directory,'--parent',num2str(feature('getpid'))};
                     args=java.util.ArrayList;
                     for i=1:numel(command), args.add(java.lang.String(command{i})); end
-                    builder=java.lang.ProcessBuilder(args); builder.redirectErrorStream(true);
+                    builder=java.lang.ProcessBuilder(args); Runtime.Environment.apply(builder); builder.redirectErrorStream(true);
                     builder.redirectOutput(java.io.File(fullfile(obj.Directory,'reader.log')));
                     obj.Process=builder.start(); obj.wait('ready.json');
                 end
@@ -107,7 +107,7 @@ classdef FrameReader < handle
         function writeJSON(obj,name,value)
             path=fullfile(obj.Directory,name); temporary=[path '.tmp'];
             fid=fopen(temporary,'w'); cleanup=onCleanup(@() fclose(fid));
-            fwrite(fid,jsonencode(value)); clear cleanup
+            fwrite(fid,unicode2native(jsonencode(value),'UTF-8'),'uint8'); clear cleanup
             movefile(temporary,path,'f');
         end
         function resetTransport(obj)

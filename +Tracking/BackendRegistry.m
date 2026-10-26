@@ -39,24 +39,12 @@ classdef BackendRegistry
                 'summary', '', ...
                 'runtime', '');
             if backend.runnable
-                readiness.summary = sprintf('%s is integrated.', char(backend.name));
-                return
-            end
-
-            env_name = sprintf('NEUROPAL_%s_PYTHON', upper(char(backend.id)));
-            runtime = strtrim(getenv(env_name));
-            readiness.runtime = runtime;
-            if isempty(runtime)
-                readiness.summary = sprintf( ...
-                    '%s contract ready; worker, segmentation, and %s are not configured.', ...
-                    char(backend.name), env_name);
-            elseif exist(runtime, 'file') ~= 2
-                readiness.summary = sprintf('%s points to a missing runtime: %s', ...
-                    env_name, runtime);
+                report=Runtime.Resolver.inspect(char(backend.id));
+                readiness.ready=report.ready; readiness.summary=report.summary;
+                readiness.runtime=report.profile.python;
             else
-                readiness.summary = sprintf( ...
-                    '%s runtime found; app worker and segmentation adapter still pending.', ...
-                    char(backend.name));
+                readiness.ready=false;
+                readiness.summary=sprintf('%s is not implemented in this application.',char(backend.name));
             end
         end
     end

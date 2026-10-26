@@ -47,7 +47,7 @@ classdef npal_mat
         end
 
         function bytes = materialization_limit_bytes()
-            configured = str2double(getenv('NEUROPAL_IMAGE_MAX_MIB'));
+            configured = Runtime.Environment.resource('image_max_mib');
             if ~isfinite(configured) || configured <= 0 || ~isfinite(configured * 1024^2)
                 configured = 512;
             end

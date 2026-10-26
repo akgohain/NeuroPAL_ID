@@ -46,14 +46,8 @@ scale = double(scale_um_xyz(:)');
 if numel(scale) ~= 3 || any(~isfinite(scale)) || any(scale <= 0)
     error('Wrapper:MoEInvalidSpacing', 'Supply three positive voxel spacings in XYZ micrometers.');
 end
-python = char(options.PythonExecutable);
-if isempty(python), python = getenv('NEUROPAL_MOE_PYTHON'); end
-if isempty(python) && isfield(readiness.manifest.configuration, 'python_executable')
-    python = char(readiness.manifest.configuration.python_executable);
-end
-if isempty(python) || exist(python, 'file') ~= 2
-    error('Wrapper:MoEPythonUnavailable', 'Set the MoE Python interpreter in Settings or NEUROPAL_MOE_PYTHON.');
-end
+context=Runtime.Resolver.require('detection_moe',struct('python',char(options.PythonExecutable),'bundle',readiness.bundle_path),options.CancelFcn);
+python=context.python;
 output = char(options.OutputDir);
 if isempty(output), output = tempname; end
 % Each request owns its directory; never delete a caller-owned directory.
@@ -79,7 +73,7 @@ response_path = fullfile(output, 'response.json');
 fid = fopen(request_path, 'w');
 if fid < 0, error('Wrapper:MoEWriteFailed', 'Cannot write request.'); end
 file_cleanup = onCleanup(@() fclose(fid));
-fwrite(fid, jsonencode(request), 'char');
+fwrite(fid,unicode2native(jsonencode(request),'UTF-8'),'uint8');
 clear file_cleanup
 bridge = fullfile(fileparts(mfilename('fullpath')), 'moe_inference.py');
 log_path = fullfile(output, 'inference.log');

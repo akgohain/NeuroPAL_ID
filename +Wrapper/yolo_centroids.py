@@ -7,13 +7,14 @@ import argparse
 import csv
 import json
 import os
+import tempfile
 import subprocess
 import sys
 from pathlib import Path
 
-os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/neuropal_matplotlib")
-os.environ.setdefault("YOLO_CONFIG_DIR", "/private/tmp/neuropal_ultralytics")
-os.environ.setdefault("XDG_CONFIG_HOME", "/private/tmp/neuropal_config")
+os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "neuropal_matplotlib"))
+os.environ.setdefault("YOLO_CONFIG_DIR", str(Path(tempfile.gettempdir()) / "neuropal_ultralytics"))
+os.environ.setdefault("XDG_CONFIG_HOME", str(Path(tempfile.gettempdir()) / "neuropal_config"))
 
 import numpy as np
 from scipy.io import loadmat
@@ -33,9 +34,9 @@ def parse_args() -> argparse.Namespace:
 def run(cmd: list[str]) -> str:
     progress("Running: " + " ".join(cmd[:3]) + " ...")
     env = os.environ.copy()
-    env.setdefault("MPLCONFIGDIR", "/private/tmp/neuropal_matplotlib")
-    env.setdefault("YOLO_CONFIG_DIR", "/private/tmp/neuropal_ultralytics")
-    env.setdefault("XDG_CONFIG_HOME", "/private/tmp/neuropal_config")
+    env.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "neuropal_matplotlib"))
+    env.setdefault("YOLO_CONFIG_DIR", str(Path(tempfile.gettempdir()) / "neuropal_ultralytics"))
+    env.setdefault("XDG_CONFIG_HOME", str(Path(tempfile.gettempdir()) / "neuropal_config"))
     proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
     if proc.returncode:
         raise RuntimeError(f"Command failed ({proc.returncode}): {' '.join(cmd)}\n{proc.stdout}")
