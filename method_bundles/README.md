@@ -5,11 +5,10 @@ example manifest to `method_bundle.json`, place the named assets beside it,
 and either keep the directory here or point NeuroPAL_ID to it in method
 settings.
 
-Environment-variable alternatives:
-
-- `NEUROPAL_SPOTIFLOW_SUPERVISED_BUNDLE`
-- `NEUROPAL_CRF_CELLID_2_BUNDLE`
-- `NEUROPAL_DETECTION_MOE_BUNDLE`
+Use **Tools → Models & runtimes…** to select the method, its complete bundle,
+and a compatible Python executable where required. **Apply** validates the
+installation before saving it outside the Git checkout. Package installations
+are discovered automatically, including installations made with older setup kits.
 
 The application validates the manifest and every required artifact before
 launching inference. Large weights should remain outside Git.
@@ -19,10 +18,10 @@ launching inference. Large weights should remain outside Git.
 1. Copy the relevant `method_bundle.example.json` to `method_bundle.json` in a
    new writable bundle directory.
 2. Place every required artifact at the relative path declared in the manifest.
-3. Select that directory from the method's Settings dialog, or set its
-   environment variable before launching MATLAB.
-4. Select the method. The workflow banner and dropdown tooltip report whether
-   the bundle is ready before inference starts.
+3. Open **Tools → Models & runtimes…**, choose the method and select the bundle.
+4. Choose its Python executable if needed, then click **Apply**. The app checks
+   the installation and remembers it for future launches. **Check** validates
+   without saving; **Details** shows the actual interpreter and package versions.
 
 Most manifests are deliberately checkpoint-agnostic. The recommended
 `spotiflow_supervised` bundle is intentionally stricter: its three model files

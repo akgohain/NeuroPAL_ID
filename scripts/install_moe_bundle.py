@@ -22,9 +22,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('bundle', type=Path)
     parser.add_argument('--yolo-source', type=Path, action='append', default=[])
-    parser.add_argument('--python', type=Path, required=True)
+    parser.add_argument('--python', type=Path, help='Optional legacy runtime check; machine paths are not written to the bundle')
     args = parser.parse_args()
-    if not args.python.is_file(): raise FileNotFoundError(args.python)
+    if args.python is not None and not args.python.is_file(): raise FileNotFoundError(args.python)
     root = args.bundle.resolve()
     expected = json.loads((root/'manifest.json').read_text())
     if expected['source_commit'] != '2276e61dedf9671740c1a36fab7d6d976b86de37' or expected['fold'] != 0:
@@ -46,7 +46,7 @@ def main():
              'checksums':'SHA256SUMS', 'router_policy':'provenance/router.json', 'features':'configuration/ordered_features.json'}
     manifest = dict(schema_version=1, method_id='detection_moe', display_name='MoE',
                     source_revision=expected['source_commit'],
-                    configuration={'python_executable':str(args.python.absolute()),'device':'cpu','dataset_id':'unknown'},
+                    configuration={'device':'cpu','dataset_id':'unknown'},
                     artifacts=[dict(role=k,path=v,required=True) for k,v in roles.items()])
     (root/'method_bundle.json').write_text(json.dumps(manifest,indent=2)+'\n')
     print(f'Installed {root}/method_bundle.json')

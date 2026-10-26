@@ -20,10 +20,12 @@ REQUIRED_APP_FILES = (
     '+Program/+GUI/ManualIDController.m', '+Program/+GUI/ManualIDService.m',
     '+Annotations/Catalog.m', '+Annotations/catalog_v1.json',
     '+Annotations/Store.m', '+Annotations/Exchange.m',
+    '+Runtime/Configuration.m', '+Runtime/Resolver.m', '+Runtime/Settings.m',
+    '+Wrapper/runtime_probe.py',
 )
 KIT_FILES = (
     'Setup-Mac.command', 'Setup-with-Auto-ID.command', 'Start_NeuroPAL.m',
-    'setup_models.py', 'check_models.py', 'START_HERE.md',
+    'setup_models.py', 'runtime_registry.py', 'check_models.py', 'START_HERE.md',
     'lock-macos-arm64-moe.txt', 'lock-macos-arm64-gat.txt',
     'lock-macos-arm64-tracking.txt', 'zephir-1.0.4-py3-none-any.whl',
     'zephir-wheel-provenance.json', 'METHODS.json',
