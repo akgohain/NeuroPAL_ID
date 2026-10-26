@@ -176,9 +176,14 @@ def install(args):
     version = package_version(catalog)
     root = (args.root or default_root()).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
-    if shutil.disk_usage(root).free < 2 * 1024**3:
-        raise RuntimeError('Less than 2 GiB is free. Allow at least 8 GB for a new installation.')
     with install_lock(root):
+        # A terminated setup can leave only unpublished extraction stages.
+        for parent in (root / 'app', root / 'models'):
+            for stage in parent.glob('.install-*'):
+                if stage.is_dir() and not stage.is_symlink():
+                    shutil.rmtree(stage)
+        if shutil.disk_usage(root).free < 2 * 1024**3:
+            raise RuntimeError('Less than 2 GiB is free. Allow at least 8 GB for a new installation.')
         app = unpack(catalog['app_archive'], root / 'app' / catalog['app_commit'][:12], 'NeuroPAL_ID')
         moe_info = catalog['packs']['moe']
         moe = unpack(moe_info, root / 'models' / ('moe-' + moe_info['version']))
