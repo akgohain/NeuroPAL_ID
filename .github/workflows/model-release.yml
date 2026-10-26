@@ -1,0 +1,38 @@
+name: Prepare model release draft
+on:
+  workflow_dispatch:
+    inputs:
+      model_tag:
+        description: New models- release tag (never reused)
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: model-release-draft
+  cancel-in-progress: false
+jobs:
+  draft:
+    if: github.repository == 'akgohain/NeuroPAL_ID'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Prepare and verify reviewed model packs
+        env:
+          MODEL_TAG: ${{ inputs.model_tag }}
+        run: >-
+          python distribution/models/prepare_release.py prepare
+          --source-packs distribution/models/development
+          --source-catalog distribution/models/catalog.json
+          --output "$RUNNER_TEMP/model-candidate" --tag "$MODEL_TAG"
+      - name: Stage verified assets as an unpublished draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python distribution/models/prepare_release.py stage-draft
+          --output "$RUNNER_TEMP/model-candidate"

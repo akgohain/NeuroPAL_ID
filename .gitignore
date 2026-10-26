@@ -255,6 +255,16 @@ rotation_debug.mat
 /scripts/evaluate_nearest_autoid.m
 /scripts/export_nwb_neuron_truth.py
 /distribution/macos/test_*.py
+/distribution/models/test_*.py
+/distribution/models/development/*
+!/distribution/models/development/README.md
+!/distribution/models/development/*.zip
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/model-release.yml
+!/.gitattributes
 /distribution/macos/VALIDATION.md
 /distribution/macos/MISSING_MODELS.md
 

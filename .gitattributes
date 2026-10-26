@@ -1,0 +1,2 @@
+# Development model packs only; stable installs download GitHub release assets.
+distribution/models/development/*.zip filter=lfs diff=lfs merge=lfs -text
