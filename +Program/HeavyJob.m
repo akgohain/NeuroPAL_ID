@@ -2,6 +2,7 @@ classdef HeavyJob < handle
     %HEAVYJOB Own a heavyweight operation across app and worker processes.
     properties (SetAccess = private)
         Token = '';
+        ResourcePolicy = [];
     end
     properties (Access = private)
         File = [];
@@ -10,6 +11,23 @@ classdef HeavyJob < handle
         Registered = false;
     end
     methods (Static)
+        function token = token()
+            token=''; active=Program.HeavyJob.current();
+            if ~isempty(active) && isvalid(active), token=active.Token; end
+        end
+        function resources = resources()
+            active=Program.HeavyJob.current();
+            if ~isempty(active) && isvalid(active) && ~isempty(active.ResourcePolicy)
+                resources=active.ResourcePolicy;
+            else
+                try, config=Runtime.Configuration.read();
+                catch ME
+                    if ~strcmp(ME.identifier,'Runtime:Configuration:Unreadable'), rethrow(ME); end
+                    config=Runtime.Configuration.empty();
+                end
+                resources=config.resources;
+            end
+        end
         function assertIdle(parent_token)
             %ASSERTIDLE Reject source edits while another operation owns the app.
             if nargin < 1, parent_token = ''; end
@@ -28,6 +46,7 @@ classdef HeavyJob < handle
             if ~isempty(active) && isvalid(active)
                 if ~isempty(parent_token) && strcmp(parent_token, active.Token)
                     obj.Token = active.Token;
+                    obj.ResourcePolicy = active.ResourcePolicy;
                     return
                 end
                 error('Program:HeavyJob:Busy', 'Another NeuroPAL heavy job is running. Wait for it to finish or cancel it.');
@@ -67,6 +86,13 @@ classdef HeavyJob < handle
                     delete(obj);
                     rethrow(ME);
                 end
+            end
+            try
+                config=Runtime.Configuration.read(); obj.ResourcePolicy=config.resources;
+            catch ME
+                if strcmp(ME.identifier,'Runtime:Configuration:Unreadable')
+                    config=Runtime.Configuration.empty(); obj.ResourcePolicy=config.resources;
+                else, delete(obj); rethrow(ME); end
             end
             obj.Registered = true;
             Program.HeavyJob.current(obj);

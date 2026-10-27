@@ -67,29 +67,23 @@ classdef ModelSetup
 
         function path_value = yolo(path_value)
             if strlength(strtrim(string(path_value))) == 0
-                root = fileparts(fileparts(mfilename('fullpath')));
-                path_value = fullfile(root, 'External_Dependencies', 'yolo_inf2', 'best.pt');
+                profile = Runtime.Discovery.profile('yolo');
+                path_value = profile.weights;
             end
             path_value = Methods.ModelSetup.requireFile(path_value, 'Wrapper:MissingYoloWeights', 'YOLO weights');
         end
 
         function path_value = cellpose(path_value)
             path_value = strtrim(char(string(path_value)));
-            if isempty(path_value), path_value = strtrim(getenv('NEUROPAL_CELLPOSE_MODEL')); end
+            if isempty(path_value)
+                profile = Runtime.Discovery.profile('cellpose'); path_value = profile.weights;
+            end
             if any(strcmpi(path_value, {'cpsam', 'cyto', 'cyto2', 'nuclei'}))
-                if ~any(strcmpi(strtrim(getenv('NEUROPAL_CELLPOSE_ALLOW_DOWNLOAD')), {'1', 'true', 'yes', 'on'}))
-                    error('Wrapper:MissingCellposeModel', ...
-                        'Choose a local Cellpose weights file. Built-in model downloads require NEUROPAL_CELLPOSE_ALLOW_DOWNLOAD=1.');
-                end
-                return
+                error('Wrapper:MissingCellposeModel', ...
+                    'Choose downloaded Cellpose weights in Tools > Models & runtimes. Model checks never download weights implicitly.');
             end
             if isempty(path_value)
-                root = fileparts(fileparts(mfilename('fullpath')));
-                candidates = {fullfile(root, '+CellPose', 'models', 'cellpose_000715'), ...
-                    fullfile(getenv('HOME'), 'Downloads', 'cellpose_000715')};
-                for i = 1:numel(candidates)
-                    if isfile(candidates{i}), path_value = candidates{i}; break; end
-                end
+                error('Wrapper:MissingCellposeModel','Choose Cellpose weights in Tools > Models & runtimes.');
             end
             % An explicit missing path must not select a different model.
             path_value = Methods.ModelSetup.requireFile(path_value, 'Wrapper:MissingCellposeModel', 'Cellpose weights');

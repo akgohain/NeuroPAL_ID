@@ -14,6 +14,8 @@ import sys
 import tempfile
 import zipfile
 
+from runtime_registry import profiles, register
+
 HERE = Path(__file__).resolve().parent
 
 
@@ -102,7 +104,7 @@ def install_lock(root):
         lock.unlink(missing_ok=True)
 
 
-def environment(name, root):
+def environment(name, root, process_env=None):
     uv = shutil.which('uv')
     if not uv:
         raise RuntimeError('Run Setup-Mac.command to prepare the package installer.')
@@ -118,14 +120,14 @@ def environment(name, root):
         # Only unfinished environments owned by this installer are replaced.
         if folder.exists():
             shutil.rmtree(folder)
-        run([uv, 'venv', '--managed-python', '--python', '3.11', folder])
-        run([uv, 'pip', 'install', '--python', python, '-r', spec])
+        run([uv, 'venv', '--managed-python', '--python', '3.11', folder], env=process_env)
+        run([uv, 'pip', 'install', '--python', python, '-r', spec], env=process_env)
         if name == 'tracking':
-            run([uv, 'pip', 'install', '--python', python, '--no-deps', wheel])
+            run([uv, 'pip', 'install', '--python', python, '--no-deps', wheel], env=process_env)
         marker.write_text(json.dumps({'requirements_sha256': revision}) + '\n')
     elif json.loads(marker.read_text())['requirements_sha256'] != revision:
         raise ValueError('The installed runtime does not match this package.')
-    run([uv, 'pip', 'check', '--python', python])
+    run([uv, 'pip', 'check', '--python', python], env=process_env)
     return python
 
 
@@ -144,11 +146,7 @@ def launcher_text(app, root, config):
     text += 'addpath(' + quote_matlab(app) + ", '-begin');\ncd(" + quote_matlab(app) + ');\n'
     text += "assert(strcmp(which('visualize_light'), fullfile(pwd, 'visualize_light.mlapp')), "
     text += "'Start this package in a fresh MATLAB session.');\n"
-    for key, value in config.items():
-        text += 'setenv(' + quote_matlab(key) + ', ' + quote_matlab(value) + ');\n'
-    text += 'prefs = Program.GUIPreferences.instance();\n'
-    text += 'prefs.prefs_file = ' + quote_matlab(root / 'preferences.mat') + ';\n'
-    text += "if ~isfile(prefs.prefs_file)\n    prefs.set_detection_backend('detection_moe');\n    prefs.save();\nend\n"
+    text += '% Models and runtimes are discovered from the per-user installation registry.\n'
     text += 'app = visualize_light;\n'
     return text
 
@@ -178,9 +176,14 @@ def install(args):
     version = package_version(catalog)
     root = (args.root or default_root()).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
-    if shutil.disk_usage(root).free < 2 * 1024**3:
-        raise RuntimeError('Less than 2 GiB is free. Allow at least 8 GB for a new installation.')
     with install_lock(root):
+        # A terminated setup can leave only unpublished extraction stages.
+        for parent in (root / 'app', root / 'models'):
+            for stage in parent.glob('.install-*'):
+                if stage.is_dir() and not stage.is_symlink():
+                    shutil.rmtree(stage)
+        if shutil.disk_usage(root).free < 2 * 1024**3:
+            raise RuntimeError('Less than 2 GiB is free. Allow at least 8 GB for a new installation.')
         app = unpack(catalog['app_archive'], root / 'app' / catalog['app_commit'][:12], 'NeuroPAL_ID')
         moe_info = catalog['packs']['moe']
         moe = unpack(moe_info, root / 'models' / ('moe-' + moe_info['version']))
@@ -208,13 +211,15 @@ def install(args):
 
         # Register model paths only after the selected components pass their checks.
         run([moe_python, app / 'scripts/install_moe_bundle.py', moe, '--python', moe_python])
+        installation = dict(app=str(app), app_commit=catalog['app_commit'], version='methods-' + version,
+                            platform=platform.platform(), profiles=profiles(config), with_gat=with_gat,
+                            scope='CPU model loading and preprocessing checks; not scientific accuracy validation.')
+        atomic_text(previous, json.dumps(installation, indent=2) + '\n')
+        registry = Path.home() / 'Library/Application Support/NeuroPAL_ID/dependencies.json'
+        register(root, registry)
         text = launcher_text(app, root, config)
         atomic_text(root / 'start_neuropal.m', text)
         atomic_text(HERE / 'installed_launcher.m', 'run(' + quote_matlab(root / 'start_neuropal.m') + ');\n')
-        installation = dict(app=str(app), app_commit=catalog['app_commit'], version='methods-' + version,
-                            platform=platform.platform(), configuration=config, with_gat=with_gat,
-                            scope='CPU model loading and preprocessing checks; not scientific accuracy validation.')
-        atomic_text(previous, json.dumps(installation, indent=2) + '\n')
         print('\nSETUP COMPLETE\nRun Start_NeuroPAL.m from this folder in a fresh MATLAB session.\n'
               'Installed files: ' + str(root), flush=True)
 

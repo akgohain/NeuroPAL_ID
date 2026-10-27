@@ -72,31 +72,25 @@ classdef ReferenceWorkflow < handle
             workflow = Tracking.ReferenceWorkflow(app, info);
             setappdata(app.CELL_ID,key,workflow);
         end
-        function python = python()
-            python = getenv('NEUROPAL_VIDEO_PYTHON');
-            if isempty(python), python = getenv('NEUROPAL_YOLO_PYTHON'); end
-            if isempty(python)
-                root = fileparts(fileparts(mfilename('fullpath')));
-                candidate = fullfile(fileparts(root),'.venv-ai-pipeline','bin','python');
-                if isfile(candidate), python = candidate; end
-            end
-            if isempty(python) || ~isfile(python)
-                error('Tracking:PythonMissing','Set NEUROPAL_VIDEO_PYTHON to the ZephIR Python environment.');
-            end
+        function python = python(capability,cancel)
+            if nargin<1, capability='recording_io'; end
+            if nargin<2, cancel=[]; end
+            python = Runtime.Resolver.python(capability,'',cancel);
         end
         function response = bridge(request, cancel, progress)
             if nargin < 2, cancel = @() false; end
             if nargin < 3, progress = []; end
+            python = Tracking.ReferenceWorkflow.python(Runtime.Catalog.action(request.action),cancel);
             timeout = 3600;
             if strcmp(request.action,'track_sequence'), timeout = 86400; end
             folder = tempname; mkdir(folder);
             cleanup = onCleanup(@() rmdir(folder,'s'));
             input = fullfile(folder,'request.json'); output = fullfile(folder,'response.json');
             fid = fopen(input,'w'); guard = onCleanup(@() fclose(fid));
-            fwrite(fid,jsonencode(request),'char'); clear guard
+            fwrite(fid,unicode2native(jsonencode(request),'UTF-8'),'uint8'); clear guard
             root = fileparts(fileparts(mfilename('fullpath')));
             [status, detail] = Wrapper.runPythonProcess( ...
-                {Tracking.ReferenceWorkflow.python(),'-u',fullfile(root,'+Wrapper','reference_video.py'), ...
+                {python,'-u',fullfile(root,'+Wrapper','reference_video.py'), ...
                 '--request',input,'--response',output},'CancelFcn',cancel,'ProgressFcn',progress,'TimeoutSeconds',timeout);
             if status ~= 0, error('Tracking:ReferenceFailed','%s',detail); end
             response = jsondecode(fileread(output));
@@ -213,7 +207,10 @@ classdef ReferenceWorkflow < handle
                 action();
             catch ME
                 obj.Status.Text = ME.message;
-                if ~contains(ME.identifier,'Cancelled')
+                if contains(ME.identifier,'Cancelled'), return;
+                elseif startsWith(ME.identifier,'Runtime:')
+                    Runtime.Settings.failure(obj.App,ME);
+                elseif ~contains(ME.identifier,'Cancelled')
                     uialert(obj.App.CELL_ID,Program.GUIHandling.method_error_message(ME),'Reference workflow');
                 end
             end
@@ -457,12 +454,14 @@ classdef ReferenceWorkflow < handle
             obj.Status.Text = ['Saved seeds: ' response.directory];
         end
         function saveDialog(obj)
-            folder = uigetdir(fileparts(obj.Source.file),'Save seeds in a new subfolder');
+            folder = Program.GUI.ManualIDService.selectFile(obj.App,'uigetdir', ...
+                fileparts(obj.Source.file),'Save seeds in a new subfolder');
             if isequal(folder,0), return; end
             obj.save(folder);
         end
         function loadDialog(obj)
-            [file,folder] = uigetfile('*.h5','Load annotations.h5');
+            [file,folder] = Program.GUI.ManualIDService.selectFile(obj.App,'uigetfile', ...
+                '*.h5','Load annotations.h5');
             if isequal(file,0), return; end
             obj.load(fullfile(folder,file));
         end
@@ -552,7 +551,8 @@ classdef ReferenceWorkflow < handle
             retained=ismember(excluded,obj.Rows(:,[1 2]),'rows'); obj.Excluded=unique([obj.Excluded;excluded(retained,:)],'rows');
         end
         function openTracking(obj)
-            [file,folder]=uigetfile('tracking.json','Open a saved tracking run',fullfile(obj.OutputRoot,'tracking.json'));
+            [file,folder]=Program.GUI.ManualIDService.selectFile(obj.App,'uigetfile', ...
+                'tracking.json','Open a saved tracking run',fullfile(obj.OutputRoot,'tracking.json'));
             if isequal(file,0), return; end
             if ~isempty(obj.Rows) || ~isempty(obj.Candidates)
                 answer=uiconfirm(obj.App.CELL_ID,'Replace the current neurons and pending candidates with this tracking checkpoint? Unsaved edits will be lost.', ...
@@ -593,7 +593,10 @@ classdef ReferenceWorkflow < handle
         function exportActivity(obj,folder)
             obj.requireAccepted('exporting activity');
             if ~obj.activityCurrent(), error('Tracking:Activity','Extract activity again after changing tracks or measurement settings.'); end
-            if nargin<2, folder=uigetdir(fileparts(obj.Source.file),'Export activity and tracks'); end
+            if nargin<2
+                folder=Program.GUI.ManualIDService.selectFile(obj.App,'uigetdir', ...
+                    fileparts(obj.Source.file),'Export activity and tracks');
+            end
             if isequal(folder,0), return; end
             [~,name]=fileparts(tempname(folder)); destination=fullfile(folder,['activity-' name]);
             stage=fullfile(folder,['.activity-' name]); cleanup=onCleanup(@() obj.removeFolder(stage));

@@ -18,6 +18,14 @@ this package's app and configures the included models automatically. No model
 path editing is required. This is MATLAB source software; it requires MATLAB,
 not just MATLAB Runtime.
 
+The installation is also discoverable when you open a compatible source clone
+directly in MATLAB. Use **Tools → Models & runtimes…** to inspect or change the
+selection. **Choose…** selects an executable or model folder; **Apply** checks
+and saves it. **Import previous setup…** can migrate an older shell-based setup.
+Selections stay outside the repository and experimental files. A normal source
+clone contains no MoE/GAT bundle: **Install package…** can run an extracted
+methods kit; automatic hosted model downloads are not provided by this version.
+
 If macOS won't open a command file, open Terminal, type `/bin/bash ` (with a
 space), drag the command file onto the Terminal window, and press Return.
 No Homebrew, preinstalled Python or administrator password is needed. If setup

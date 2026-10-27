@@ -33,15 +33,17 @@ local_progress(options.ProgressFcn, 'Checking transformer files...');
     options.RepoDir, options.CheckpointPath, 'run_inference.py');
 script_path = fullfile(repo_dir, 'run_inference.py');
 
-python_executable = local_pick_python(char(options.PythonExecutable));
+context=Runtime.Resolver.require('anshita_gat',struct('python',char(options.PythonExecutable),'source',repo_dir,'checkpoint',checkpoint_path),options.CancelFcn);
+python_executable=context.python;
 if isempty(python_executable)
-    error('Wrapper:NoPython', 'Could not resolve Python. Set NEUROPAL_TRANSFORMER_PYTHON or pass PythonExecutable.');
+    error('Wrapper:NoPython', 'Could not resolve Python. Open Tools > Models & runtimes to select the required Python installation.');
 end
 
 local_progress(options.ProgressFcn, 'Staging NWB for transformer preprocessing...');
 test_dir = tempname;
 mkdir(test_dir);
 cleanup = onCleanup(@() local_cleanup(test_dir));
+checkpoint_path=Runtime.Checkpoint.stage(checkpoint_path,fullfile(test_dir,'checkpoint'));
 [~, name, ext] = fileparts(nwb_path);
 dataset_id = char(strtrim(options.DatasetID));
 if isempty(dataset_id)
@@ -68,7 +70,6 @@ if strlength(options.Device) > 0
 end
 
 local_progress(options.ProgressFcn, 'Running transformer preprocessing and inference...');
-local_prepare_python_environment();
 [status, output] = Wrapper.runPythonProcess(command_parts, ...
     'JobToken', job.Token, 'ProgressFcn', options.ProgressFcn, ...
     'CancelFcn', options.CancelFcn, 'TimeoutSeconds', options.TimeoutSeconds, 'WorkingDirectory', repo_dir);
@@ -101,7 +102,7 @@ message = '';
 output_text = lower(char(string(output)));
 if contains(output_text, 'no module named') || contains(output_text, 'modulenotfounderror')
     message = ['Transformer dependencies are not available in the selected Python environment. ' ...
-        'Set NEUROPAL_TRANSFORMER_PYTHON to the GAT environment or install its requirements.'];
+        'Open Tools > Models & runtimes to select the required Python installation.'];
     return
 end
 if contains(output_text, 'checkpoint') || contains(output_text, 'best_model.pt') || ...
@@ -157,60 +158,9 @@ end
 copyfile(source_path, staged_path);
 end
 
-function path_value = local_pick_python(candidate)
-candidate_paths = {
-    char(string(candidate))
-    getenv('NEUROPAL_TRANSFORMER_PYTHON')
-    'python3'
-    'python'
-    };
-path_value = '';
-for i = 1:numel(candidate_paths)
-    resolved = local_realpath_interpreter(candidate_paths{i});
-    if ~isempty(resolved)
-        path_value = resolved;
-        return
-    end
-end
-end
 
-function path_value = local_realpath_interpreter(path_value)
-path_value = char(string(path_value));
-if isempty(strtrim(path_value))
-    path_value = '';
-    return
-end
-if contains(path_value, filesep) && exist(path_value, 'file') == 2
-    return
-end
-[status, output] = system(sprintf('command -v %s', local_shell_quote(path_value)));
-if status == 0
-    path_value = strtrim(output);
-else
-    path_value = '';
-end
-end
 
 function out = local_shell_quote(value)
 value = char(string(value));
 out = ['''', strrep(value, '''', '''"''"'''), ''''];
-end
-
-function local_prepare_python_environment()
-cache_roots = {
-    'MPLCONFIGDIR', fullfile(tempdir, 'neuropal_matplotlib')
-    'XDG_CONFIG_HOME', fullfile(tempdir, 'neuropal_config')
-    };
-for i = 1:size(cache_roots, 1)
-    key = cache_roots{i, 1};
-    value = cache_roots{i, 2};
-    if isempty(strtrim(getenv(key)))
-        setenv(key, value);
-    else
-        value = getenv(key);
-    end
-    if exist(value, 'dir') ~= 7
-        mkdir(value);
-    end
-end
 end

@@ -56,11 +56,16 @@ if ~strcmp(mode, "stub")
     model_path = Methods.ModelSetup.cellpose(options.ModelPath);
 end
 
-python_executable = local_pick_python(repo_root, char(options.PythonExecutable));
+if strcmp(mode,"stub")
+    python_executable=Runtime.Resolver.python('activity',options.PythonExecutable,options.CancelFcn);
+else
+    context=Runtime.Resolver.require('cellpose',struct('python',char(options.PythonExecutable),'weights',model_path),options.CancelFcn);
+    python_executable=context.python;
+end
 if isempty(python_executable)
     error('Wrapper:NoPython', ...
-        ['Could not resolve a Python interpreter. Set NEUROPAL_CELLPOSE_PYTHON, ' ...
-         'pass the PythonExecutable option, or install Cellpose into ./venv.']);
+        ['Could not resolve a Python interpreter. Open Tools > Models & runtimes to select the required Python installation.' ...
+         'Choose a compatible Python executable in Models & runtimes.']);
 end
 
 local_progress(progress_fcn, 'Writing Cellpose request volume...');
@@ -108,11 +113,10 @@ if request_fid == -1
     error('Wrapper:RequestWriteFailed', ...
         'Unable to write Cellpose request manifest: %s', request_path);
 end
-fwrite(request_fid, jsonencode(request_manifest), 'char');
+fwrite(request_fid,unicode2native(jsonencode(request_manifest),'UTF-8'),'uint8');
 fclose(request_fid);
 
 script_path = fullfile(wrapper_dir, 'cellpose_centroids.py');
-local_prepare_python_environment();
 
 command_parts = { ...
     python_executable, script_path, ...
@@ -150,13 +154,13 @@ output_text = lower(char(string(output)));
 if contains(output_text, 'cellpose dependencies are unavailable') || ...
         contains(output_text, 'no module named') || contains(output_text, 'importerror')
     message = ['Cellpose is not available in the selected Python environment. ' ...
-        'Install Cellpose/torch there or set NEUROPAL_CELLPOSE_PYTHON to an environment that has them.'];
+        'Check the Cellpose Python installation in Tools > Models & runtimes.'];
     return
 end
 if contains(output_text, 'urlopen') || contains(output_text, 'download') || ...
         contains(output_text, 'connection') || contains(output_text, 'no such file')
     message = sprintf(['Cellpose could not load model "%s". Provide a local model file via ' ...
-        'NEUROPAL_CELLPOSE_MODEL or the Cellpose method settings.'], char(string(model_path)));
+        'Tools > Models & runtimes.'], char(string(model_path)));
 end
 end
 
@@ -200,27 +204,6 @@ if cleanup_output_dir && exist(output_dir, 'dir') == 7
 end
 end
 
-function path_value = local_pick_python(repo_root, python_candidate)
-path_value = strtrim(char(string(python_candidate)));
-if isempty(path_value)
-    path_value = strtrim(getenv('NEUROPAL_CELLPOSE_PYTHON'));
-end
-candidate_paths = {
-    path_value
-    fullfile(repo_root, 'venv', 'bin', 'python')
-    fullfile(repo_root, 'neuropal_env_new', 'bin', 'python')
-    'python3'
-    'python'
-    };
-path_value = '';
-for i = 1:numel(candidate_paths)
-    resolved = local_realpath_interpreter(candidate_paths{i});
-    if ~isempty(resolved)
-        path_value = resolved;
-        return;
-    end
-end
-end
 
 function path_value = local_realpath(path_value)
 path_value = strtrim(char(string(path_value)));
@@ -233,59 +216,9 @@ if tf
 end
 end
 
-function path_value = local_realpath_interpreter(path_value)
-path_value = strtrim(char(string(path_value)));
-if isempty(path_value)
-    return
-end
-[tf, attr] = fileattrib(path_value);
-if tf && exist(attr.Name, 'file') == 2
-    path_value = attr.Name;
-    return
-end
-if ispc
-    [status, result] = system(['where ' path_value ' 2>nul']);
-else
-    [status, result] = system(['command -v ' path_value ' 2>/dev/null']);
-end
-if status ~= 0
-    path_value = '';
-    return
-end
-result = strtrim(result);
-newline_i = find(result == newline, 1);
-if ~isempty(newline_i)
-    result = result(1:newline_i-1);
-end
-[tf, attr] = fileattrib(result);
-if tf
-    path_value = attr.Name;
-else
-    path_value = result;
-end
-end
 
 function command = local_join_quoted_command(parts)
 quote_part = @(value) ['"' strrep(char(value), '"', '\"') '"'];
 pieces = cellfun(@(value) [quote_part(value) ' '], parts, 'UniformOutput', false);
 command = strtrim([pieces{:}]);
-end
-
-function local_prepare_python_environment()
-cache_roots = {
-    'CELLPOSE_LOCAL_MODELS_PATH', fullfile(tempdir, 'neuropal_cellpose_models')
-    'MPLCONFIGDIR', fullfile(tempdir, 'neuropal_matplotlib')
-    };
-for i = 1:size(cache_roots, 1)
-    key = cache_roots{i, 1};
-    value = cache_roots{i, 2};
-    if isempty(strtrim(getenv(key)))
-        setenv(key, value);
-    else
-        value = getenv(key);
-    end
-    if exist(value, 'dir') ~= 7
-        mkdir(value);
-    end
-end
 end

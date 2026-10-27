@@ -4,7 +4,7 @@ classdef large_file
     methods (Static)
         function bytes = memory_budget_bytes()
             default_mib = 128;
-            configured = str2double(getenv('NEUROPAL_IO_CHUNK_MIB'));
+            configured = Runtime.Environment.resource('io_chunk_mib');
             if ~isfinite(configured) || configured <= 0
                 configured = default_mib;
             end

@@ -31,10 +31,10 @@ classdef DetectionSettings
             if c.Busy, return; end
             c.View.Playback.stop(); window=getappdata(c.Grid,'detection_settings_window');
             if isempty(window) || ~isvalid(window)
-                window=uifigure('Name','Detection settings','Position',[300 300 350 165]);
+                window=uifigure('Name','Detection settings','Position',[300 300 350 205]);
                 window.CloseRequestFcn=@(src,~) set(src,'Visible','off');
                 grid=uigridlayout(window,[3 2]); grid.Padding=[14 12 14 12];
-                grid.RowHeight={28,28,32}; grid.ColumnWidth={'1x',90};
+                grid.RowHeight={28,28,32,32}; grid.ColumnWidth={'1x',90};
                 defaults=uicheckbox(grid,'Text','Use model score threshold','Value',true, ...
                     'ValueChangedFcn',@(~,~) Tracking.DetectionSettings.change(c)); defaults.Layout.Column=[1 2];
                 label=uilabel(grid,'Text','MoE score threshold');
@@ -44,6 +44,8 @@ classdef DetectionSettings
                     'absent from every expert. A custom threshold has not been validated for biological accuracy.'];
                 defaults.Tooltip='Applies to MoE. Spotiflow uses its packaged settings.';
                 done=uibutton(grid,'Text','Done','ButtonPushedFcn',@(~,~) set(window,'Visible','off')); done.Layout.Column=[1 2];
+                setup=uibutton(grid,'Text','Models & runtimes…', ...
+                    'ButtonPushedFcn',@(~,~) Runtime.Settings.open(c.App,c.Detector.Value)); setup.Layout.Column=[1 2];
                 controls=struct('window',window,'defaults',defaults,'score',score,'label',label);
                 setappdata(c.Grid,'detection_settings_window',window); setappdata(c.Grid,'detection_settings_controls',controls);
             end

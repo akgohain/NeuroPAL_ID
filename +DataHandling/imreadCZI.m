@@ -230,9 +230,11 @@ if ~isfile(script_path)
     rethrow(originalError);
 end
 
-python_bin = fullfile(root_dir, 'venv', 'bin', 'python');
-if ~isfile(python_bin)
-    python_bin = 'python3';
+try
+    python_bin = Runtime.Resolver.python('czi_reader');
+catch ME
+    error('Runtime:CZISetup', 'Bio-Formats could not read this file:\n%s\n\nThe optional CZI fallback needs setup:\n%s', ...
+        getReport(originalError,'basic','hyperlinks','off'),ME.message);
 end
 
 output_h5 = [tempname, '.h5'];

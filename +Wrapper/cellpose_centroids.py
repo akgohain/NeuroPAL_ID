@@ -6,12 +6,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import tempfile
 from itertools import permutations
 from pathlib import Path
 from typing import Iterable
 
-os.environ.setdefault("CELLPOSE_LOCAL_MODELS_PATH", "/private/tmp/neuropal_cellpose_models")
-os.environ.setdefault("MPLCONFIGDIR", "/private/tmp/neuropal_matplotlib")
+os.environ.setdefault("CELLPOSE_LOCAL_MODELS_PATH", str(Path(tempfile.gettempdir()) / "neuropal_cellpose_models"))
+os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "neuropal_matplotlib"))
 
 import numpy as np
 from scipy.io import loadmat, savemat

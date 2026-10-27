@@ -8,6 +8,7 @@ arguments
     options.ProgressFcn = []
     options.CancelFcn = []
     options.TimeoutSeconds (1,1) double = 10800
+    options.Environment (1,1) struct = struct()
 end
 if ~isfinite(options.TimeoutSeconds) || options.TimeoutSeconds <= 0
     error('Wrapper:ProcessTimeout', 'TimeoutSeconds must be finite and positive.');
@@ -23,10 +24,17 @@ command = [{parts{1}, '-u', supervisor, '--report', [log_path '.resources.jsonl'
 arguments_list = java.util.ArrayList;
 for i = 1:numel(command), arguments_list.add(java.lang.String(char(string(command{i})))); end
 builder = java.lang.ProcessBuilder(arguments_list);
+Runtime.Environment.apply(builder);
+keys=fieldnames(options.Environment);
+for i=1:numel(keys)
+    if ~any(strcmp(keys{i},{'CUDA_VISIBLE_DEVICES','OMP_NUM_THREADS'}))
+        error('Runtime:WorkerEnvironment','Unsupported worker setting: %s.',keys{i});
+    end
+    builder.environment().put(keys{i},char(string(options.Environment.(keys{i}))));
+end
 builder.environment().put('NEUROPAL_JOB_TOKEN', owner.Token);
 builder.environment().put('NEUROPAL_PARENT_PID', num2str(feature('getpid')));
-settings = {'NEUROPAL_JOB_LOCK', 'NEUROPAL_MAX_JOB_MIB', ...
-    'NEUROPAL_MOE_WORKSPACE_MIB', 'NEUROPAL_ROUTER_MIB', 'NEUROPAL_IMAGE_MAX_MIB'};
+settings = {'NEUROPAL_JOB_LOCK'};
 for i = 1:numel(settings)
     value = getenv(settings{i});
     if ~isempty(value), builder.environment().put(settings{i}, value); end

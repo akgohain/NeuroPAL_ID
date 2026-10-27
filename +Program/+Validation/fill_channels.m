@@ -7,11 +7,11 @@ function fill_channels(data)
         channel_count = size(data, 4);
         new_items = arrayfun(@(x) sprintf('Fluor #%d', x), 1:size(data,4), 'UniformOutput', false);
 
-        for c=1:channel_count
+        % Display roles are fixed; every source channel remains selectable in each row.
+        row_count = Program.Handlers.channels.config{'max_channels'};
+        for c=1:min(channel_count,row_count)
             handle = sprintf(Program.Handlers.channels.handles{'pp_dd'}, c);
-            if ~isprop(app, handle) && ~isgraphics(app.(handle))
-                Program.Handlers.channels.add_channel();
-            end
+            if ~isprop(app, handle) || ~isgraphics(app.(handle)), continue; end
 
             app.(handle).Items = new_items;
             app.(handle).Value = new_items{c};

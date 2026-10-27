@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "adapter_api": 1,
+  "repository": "akgohain/NeuroPAL_ID",
+  "release_tag": "models-20261026-v1",
+  "models": {
+    "moe": {
+      "id": "moe",
+      "file": "neuropal-moe-fold00-v1.zip",
+      "version": "fold00-v1",
+      "url": "https://github.com/akgohain/NeuroPAL_ID/releases/download/models-20261026-v1/neuropal-moe-fold00-v1.zip",
+      "bytes": 277169914,
+      "sha256": "aa986e1318a239356c4dbed6ab3fe4094d1b74ef41d5fbd4e173b8a06c6e890d",
+      "unpacked_bytes": 327345968,
+      "source_commit": "2276e61dedf9671740c1a36fab7d6d976b86de37",
+      "selection": "Fixed fold index; final production model selection remains unresolved",
+      "scope": "Runtime only; historical example/verification paths in manifest.json are omitted"
+    },
+    "gat": {
+      "id": "gat",
+      "file": "neuropal-gat-20260601-v1.zip",
+      "version": "20260601-v1",
+      "url": "https://github.com/akgohain/NeuroPAL_ID/releases/download/models-20261026-v1/neuropal-gat-20260601-v1.zip",
+      "bytes": 1808499,
+      "sha256": "1e8306dcf87f2cd0beb13cacef4a74f9972cd2a55d1d651248e6fdc29e5b9b90",
+      "unpacked_bytes": 2556723,
+      "source_commit": "ac47c6154b69080cd51e8ce5ebfc01d94bc66c72",
+      "scope": "Current local GAT checkpoint and matching source; independent of the MoE fold-00 model"
+    }
+  },
+  "runtimes": {
+    "moe": {
+      "requirements_sha256": "637637bb97d325ef91680104bebda95af47dcb6aa1a44130be35dfc9f31c27b9",
+      "python": "3.11",
+      "platform": "macos-arm64"
+    },
+    "gat": {
+      "requirements_sha256": "c58234c5da700fce65951612d734e845c4767027b35c814ef1a018565edacb6b",
+      "python": "3.11",
+      "platform": "macos-arm64"
+    },
+    "tracking": {
+      "requirements_sha256": "6b11529f081fb0bf32a5c3afdfd4c0eca7619fe1fe367161e83a78cdfeff175c",
+      "python": "3.11",
+      "platform": "macos-arm64"
+    },
+    "bridge": {
+      "requirements_sha256": "c9b0d89c43195d2f02003d40be38fe044a3da636082ac7ad938d7c6cc28fd376",
+      "python": "3.11",
+      "platform": "macos-arm64"
+    }
+  }
+}

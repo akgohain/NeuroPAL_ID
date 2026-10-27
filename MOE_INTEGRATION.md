@@ -24,11 +24,11 @@ nonlinear routing. It does not fit models or choose thresholds on a new image.
      --yolo-source /path/to/base/helper
    ```
 
-5. Choose the handoff directory in MoE Settings, or set
-   `NEUROPAL_DETECTION_MOE_BUNDLE`. The standard workspace location
-   `../artifacts/method_bundles/detection_moe` also resolves automatically.
-   The Python interpreter comes from Settings, `NEUROPAL_MOE_PYTHON`, or the
-   installed manifest, in that order.
+5. Open **Tools → Models & runtimes…**, select **MoE detection**, choose the
+   handoff directory and the Python executable, then click **Apply**. The app
+   validates the bundle and runtime before saving the selection. Existing methods
+   package installations are discovered automatically; no environment-variable
+   setup or particular workspace folder layout is required.
 
 Large models and example datasets remain outside the application repository.
 The original checksums/provenance remain intact; app support and the installed

@@ -567,7 +567,7 @@ classdef ManualIDService
         function [name, folder, filter] = selectFile(app, picker, varargin)
             % Keep the native chooser in front of the app and prevent reentry.
             name = 0; folder = 0; filter = 0;
-            if ~any(strcmp(picker, {'uigetfile', 'uiputfile'}))
+            if ~any(strcmp(picker, {'uigetfile', 'uiputfile', 'uigetdir'}))
                 error('Annotations:FileDialog', 'Choose a supported file dialog.');
             end
             if isequal(getappdata(app.CELL_ID, 'manual_id_file_dialog'), true), return; end
@@ -576,7 +576,11 @@ classdef ManualIDService
             cleanup = onCleanup(@() Program.GUI.ManualIDService.finishFileDialog(app, visible));
             Program.GUI.ManualIDController.close(app);
             app.CELL_ID.Visible = 'off';
-            [name, folder, filter] = feval(picker, varargin{:});
+            if strcmp(picker,'uigetdir')
+                name=feval(picker,varargin{:});
+            else
+                [name, folder, filter] = feval(picker, varargin{:});
+            end
         end
 
         function finishFileDialog(app, visible)

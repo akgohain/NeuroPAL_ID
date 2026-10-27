@@ -57,7 +57,13 @@ classdef ImageSettings
             elseif ~isfinite(number) || number<=0
                 Tracking.ImageSettings.syncTime(c);
                 uialert(getappdata(c.Grid,'image_settings_window'),'Enter a positive acquisition interval or rate. Leave blank if unknown.','Acquisition timing'); return;
-            elseif strcmp(controls.mode.Value,'Rate (Hz)'), value.frame_interval_seconds=1/number;
+            elseif strcmp(controls.mode.Value,'Rate (Hz)')
+                interval=1/number;
+                if ~isfinite(interval) || interval<=0
+                    Tracking.ImageSettings.syncTime(c);
+                    uialert(getappdata(c.Grid,'image_settings_window'),'This rate is outside the supported numeric range.','Acquisition timing'); return;
+                end
+                value.frame_interval_seconds=interval;
             else, value.frame_interval_seconds=number;
             end
             setappdata(c.Grid,'image_metadata',value); Tracking.ImageSettings.axis(c);

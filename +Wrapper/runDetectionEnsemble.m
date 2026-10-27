@@ -30,7 +30,7 @@ if any(~isfinite(thresholds)) || any(thresholds < 0 | thresholds > 1) || ...
         'Expert thresholds must be in [0,1], with positive agreement and nonnegative isolation radii.');
 end
 
-python = local_pick_python(options.PythonExecutable);
+python = Runtime.Resolver.python('ensemble',options.PythonExecutable);
 if isempty(python)
     error('Wrapper:EnsemblePythonUnavailable', ...
         'Could not resolve Python for detection ensemble fusion.');
@@ -60,10 +60,8 @@ request = struct( ...
 local_write_json(request_path, request);
 
 bridge = fullfile(fileparts(mfilename('fullpath')), 'advanced_method_bridge.py');
-command = strjoin(cellfun(@local_quote, ...
-    {python, bridge, 'ensemble', '--request', request_path, '--response', response_path}, ...
-    'UniformOutput', false), ' ');
-[status, output] = system(command);
+[status, output] = Wrapper.runPythonProcess( ...
+    {python, bridge, 'ensemble', '--request', request_path, '--response', response_path});
 if status ~= 0
     error('Wrapper:EnsembleFusionFailed', ...
         'Detection ensemble fusion failed (%d):\n%s', status, output);
@@ -83,34 +81,9 @@ if fid < 0
     error('Wrapper:EnsembleRequestWriteFailed', 'Cannot write %s.', path_value);
 end
 cleanup = onCleanup(@() fclose(fid));
-fwrite(fid, jsonencode(value, PrettyPrint=true), 'char');
+fwrite(fid,unicode2native(jsonencode(value, PrettyPrint=true),'UTF-8'),'uint8');
 end
 
-function python = local_pick_python(explicit)
-candidates = {char(explicit), getenv('NEUROPAL_ENSEMBLE_PYTHON'), ...
-    getenv('NEUROPAL_MOE_PYTHON'), 'python3', 'python'};
-python = '';
-for i = 1:numel(candidates)
-    candidate = strtrim(candidates{i});
-    if isempty(candidate)
-        continue
-    end
-    if contains(candidate, filesep) && exist(candidate, 'file') == 2
-        python = candidate;
-        return
-    end
-    [status, output] = system(sprintf('command -v %s', local_quote(candidate)));
-    if status == 0
-        python = strtrim(output);
-        return
-    end
-end
-end
-
-function value = local_quote(value)
-value = char(string(value));
-value = ['''', strrep(value, '''', '''"''"'''), ''''];
-end
 
 function local_cleanup(output_dir, keep_artifacts)
 if ~keep_artifacts && exist(output_dir, 'dir') == 7

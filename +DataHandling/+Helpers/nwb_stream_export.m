@@ -71,7 +71,7 @@ classdef nwb_stream_export
                 % Reserve room for the input, conversion, and HDF5 buffers.
                 if prod(double(dims(1:2))) * 40 > budget
                     error('DataHandling:NWBExport:PlaneTooLarge', ...
-                        'One XY plane exceeds the export working-memory budget. Crop the image or increase NEUROPAL_IO_CHUNK_MIB.');
+                        'One XY plane exceeds the export working-memory budget. Crop the image or increase IO chunk MiB under Tools > Models & runtimes > Resources.');
                 end
                 output_bytes = output_bytes + prod(double(dims)) * 2;
             end

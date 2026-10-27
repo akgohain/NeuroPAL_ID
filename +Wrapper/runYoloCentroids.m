@@ -58,9 +58,10 @@ if strlength(fuse_option) == 0
 end
 
 weights_path = Methods.ModelSetup.yolo(options.WeightsPath);
-python_executable = local_pick_python(char(options.PythonExecutable));
+context=Runtime.Resolver.require('yolo',struct('python',char(options.PythonExecutable),'weights',weights_path),options.CancelFcn);
+python_executable=context.python;
 if isempty(python_executable)
-    error('Wrapper:NoPython', 'Could not resolve Python. Set NEUROPAL_YOLO_PYTHON or pass PythonExecutable.');
+    error('Wrapper:NoPython', 'Could not resolve Python. Open Tools > Models & runtimes to select the required Python installation.');
 end
 
 infer_script = local_existing_file(infer_option, 'YOLO inference script', 'Wrapper:MissingYoloScript', ...
@@ -116,12 +117,11 @@ manifest = struct( ...
     'line_width', round(clamp(options.LineWidth, 1, 20)));
 
 fid = fopen(request_path, 'w');
-fwrite(fid, jsonencode(manifest), 'char');
+fwrite(fid,unicode2native(jsonencode(manifest),'UTF-8'),'uint8');
 fclose(fid);
 
 wrapper_dir = fileparts(mfilename('fullpath'));
 script_path = fullfile(wrapper_dir, 'yolo_centroids.py');
-local_prepare_python_environment();
 command_parts = {python_executable, script_path, '--request', request_path, '--response', response_path};
 local_progress(options.ProgressFcn, 'Running YOLO detector...');
 [status, output] = Wrapper.runPythonProcess(command_parts, ...
@@ -158,13 +158,13 @@ output_text = lower(char(string(output)));
 if contains(output_text, 'no space left') || contains(output_text, 'requested and 0 written') || ...
         (contains(output_text, 'oserror') && contains(output_text, 'written'))
     message = ['YOLO could not write its temporary volume files because the disk is full. ' ...
-        'Clear old files in artifacts/gui_yolo or choose an output directory with more free space.'];
+        'Choose an output directory with more free space or remove unneeded completed jobs.'];
     return
 end
 if contains(output_text, 'no module named') || contains(output_text, 'modulenotfounderror') || ...
         contains(output_text, 'ultralytics') || contains(output_text, 'torch')
     message = ['YOLO dependencies are not available in the selected Python environment. ' ...
-        'Install ultralytics/torch there or set NEUROPAL_YOLO_PYTHON to the environment that has them.'];
+        'Check the YOLO Python installation in Tools > Models & runtimes.'];
     return
 end
 if contains(output_text, 'no such file') || contains(output_text, 'filenotfounderror') || ...
@@ -243,61 +243,9 @@ if ~keep_artifacts && exist(output_dir, 'dir') == 7
 end
 end
 
-function path_value = local_pick_python(candidate)
-candidate_paths = {
-    char(string(candidate))
-    getenv('NEUROPAL_YOLO_PYTHON')
-    'python3'
-    'python'
-    };
-path_value = '';
-for i = 1:numel(candidate_paths)
-    resolved = local_realpath_interpreter(candidate_paths{i});
-    if ~isempty(resolved)
-        path_value = resolved;
-        return
-    end
-end
-end
 
-function path_value = local_realpath_interpreter(path_value)
-path_value = char(string(path_value));
-if isempty(strtrim(path_value))
-    path_value = '';
-    return
-end
-if contains(path_value, filesep) && exist(path_value, 'file') == 2
-    return
-end
-[status, output] = system(sprintf('command -v %s', local_shell_quote(path_value)));
-if status == 0
-    path_value = strtrim(output);
-else
-    path_value = '';
-end
-end
 
 function out = local_shell_quote(value)
 value = char(string(value));
 out = ['''', strrep(value, '''', '''"''"'''), ''''];
-end
-
-function local_prepare_python_environment()
-cache_roots = {
-    'MPLCONFIGDIR', fullfile(tempdir, 'neuropal_matplotlib')
-    'YOLO_CONFIG_DIR', fullfile(tempdir, 'neuropal_ultralytics')
-    'XDG_CONFIG_HOME', fullfile(tempdir, 'neuropal_config')
-    };
-for i = 1:size(cache_roots, 1)
-    key = cache_roots{i, 1};
-    value = cache_roots{i, 2};
-    if isempty(strtrim(getenv(key)))
-        setenv(key, value);
-    else
-        value = getenv(key);
-    end
-    if exist(value, 'dir') ~= 7
-        mkdir(value);
-    end
-end
 end

@@ -47,10 +47,11 @@ if (~isnan(options.ProbabilityThreshold) && ...
         'ProbabilityThreshold must be NaN or in [0,1], and MinimumDistance must be at least 1.');
 end
 
-python_executable = local_pick_python(options.PythonExecutable);
+context=Runtime.Resolver.require('spotiflow_supervised',struct('python',char(options.PythonExecutable),'bundle',readiness.bundle_path),options.CancelFcn);
+python_executable=context.python;
 if isempty(python_executable)
     error('Wrapper:SpotiflowUnavailable', ...
-        'Could not resolve Python. Set NEUROPAL_SPOTIFLOW_PYTHON or choose it in method settings.');
+        'Could not resolve Python. Open Tools > Models & runtimes to select the required Python installation.');
 end
 
 output_dir = char(options.OutputDir);
@@ -112,7 +113,7 @@ if status ~= 0
     if contains(output_lower, 'no module named') || contains(output_lower, 'modulenotfounderror')
         error('Wrapper:SpotiflowUnavailable', ...
             ['Spotiflow dependencies are missing from %s. Install the bundle environment ' ...
-             'or set NEUROPAL_SPOTIFLOW_PYTHON.\n\n%s'], python_executable, output);
+             'or choose its Python installation in Tools > Models & runtimes.\n\n%s'], python_executable, output);
     end
     error('Wrapper:SpotiflowCommandFailed', 'Spotiflow failed (%d):\n%s', status, output);
 end
@@ -158,28 +159,9 @@ if fid < 0
     error('Wrapper:SpotiflowRequestWriteFailed', 'Cannot write %s.', path_value);
 end
 cleanup = onCleanup(@() fclose(fid));
-fwrite(fid, jsonencode(value, PrettyPrint=true), 'char');
+fwrite(fid,unicode2native(jsonencode(value, PrettyPrint=true),'UTF-8'),'uint8');
 end
 
-function python = local_pick_python(explicit)
-candidates = {char(explicit), getenv('NEUROPAL_SPOTIFLOW_PYTHON'), 'python3', 'python'};
-python = '';
-for i = 1:numel(candidates)
-    candidate = strtrim(candidates{i});
-    if isempty(candidate)
-        continue
-    end
-    if contains(candidate, filesep) && exist(candidate, 'file') == 2
-        python = candidate;
-        return
-    end
-    [status, output] = system(sprintf('command -v %s', local_quote(candidate)));
-    if status == 0
-        python = strtrim(output);
-        return
-    end
-end
-end
 
 function value = local_quote(value)
 value = char(string(value));
