@@ -118,6 +118,7 @@ classdef Settings
             try
                 report=Runtime.Resolver.inspect(id,profile,true,@() ~isvalid(progress) || progress.CancelRequested || ...
                     ~isvalid(window) || isequal(getappdata(window,'runtime_cancel'),true));
+                if ~isvalid(window), return; end
                 setappdata(window,'runtime_report',report);
                 if ~report.ready, c.status.Text=[report.status ': ' report.summary]; return; end
                 if save
@@ -125,7 +126,7 @@ classdef Settings
                     c.status.Text='Ready. Installation saved for subsequent operations and app launches.';
                 else, c.status.Text='Check passed. Click Apply to save this installation.'; end
             catch ME
-                c.status.Text=ME.message;
+                if isvalid(window) && isvalid(c.status), c.status.Text=ME.message; end
             end
         end
         function finish(window,progress)

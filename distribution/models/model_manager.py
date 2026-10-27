@@ -63,9 +63,14 @@ def existing_runtime(name, definition, root, registry):
     candidates = [root]
     try:
         saved = json.loads(registry.read_text(encoding='utf-8'))
-        candidates.extend(Path(p) for p in saved.get('installations', [])[:100])
+        if not isinstance(saved, dict) or not isinstance(saved.get('profiles', {}), dict):
+            raise ValueError('Repair the saved configuration in Models & runtimes before installing components.')
+        installations = saved.get('installations', [])
+        if not isinstance(installations, list):
+            raise ValueError('Repair the installation list in Models & runtimes before installing components.')
+        candidates.extend(Path(p) for p in installations[:100] if isinstance(p, str) and p)
         for profile in saved.get('profiles', {}).values():
-            if isinstance(profile, dict) and profile.get('python'):
+            if isinstance(profile, dict) and isinstance(profile.get('python'), str) and profile['python']:
                 folder = Path(profile['python']).parent.parent
                 try:
                     marker = json.loads((folder / 'neuropal-runtime.json').read_text())
