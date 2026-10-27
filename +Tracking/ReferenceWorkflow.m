@@ -454,12 +454,14 @@ classdef ReferenceWorkflow < handle
             obj.Status.Text = ['Saved seeds: ' response.directory];
         end
         function saveDialog(obj)
-            folder = uigetdir(fileparts(obj.Source.file),'Save seeds in a new subfolder');
+            folder = Program.GUI.ManualIDService.selectFile(obj.App,'uigetdir', ...
+                fileparts(obj.Source.file),'Save seeds in a new subfolder');
             if isequal(folder,0), return; end
             obj.save(folder);
         end
         function loadDialog(obj)
-            [file,folder] = uigetfile('*.h5','Load annotations.h5');
+            [file,folder] = Program.GUI.ManualIDService.selectFile(obj.App,'uigetfile', ...
+                '*.h5','Load annotations.h5');
             if isequal(file,0), return; end
             obj.load(fullfile(folder,file));
         end
@@ -549,7 +551,8 @@ classdef ReferenceWorkflow < handle
             retained=ismember(excluded,obj.Rows(:,[1 2]),'rows'); obj.Excluded=unique([obj.Excluded;excluded(retained,:)],'rows');
         end
         function openTracking(obj)
-            [file,folder]=uigetfile('tracking.json','Open a saved tracking run',fullfile(obj.OutputRoot,'tracking.json'));
+            [file,folder]=Program.GUI.ManualIDService.selectFile(obj.App,'uigetfile', ...
+                'tracking.json','Open a saved tracking run',fullfile(obj.OutputRoot,'tracking.json'));
             if isequal(file,0), return; end
             if ~isempty(obj.Rows) || ~isempty(obj.Candidates)
                 answer=uiconfirm(obj.App.CELL_ID,'Replace the current neurons and pending candidates with this tracking checkpoint? Unsaved edits will be lost.', ...
@@ -590,7 +593,10 @@ classdef ReferenceWorkflow < handle
         function exportActivity(obj,folder)
             obj.requireAccepted('exporting activity');
             if ~obj.activityCurrent(), error('Tracking:Activity','Extract activity again after changing tracks or measurement settings.'); end
-            if nargin<2, folder=uigetdir(fileparts(obj.Source.file),'Export activity and tracks'); end
+            if nargin<2
+                folder=Program.GUI.ManualIDService.selectFile(obj.App,'uigetdir', ...
+                    fileparts(obj.Source.file),'Export activity and tracks');
+            end
             if isequal(folder,0), return; end
             [~,name]=fileparts(tempname(folder)); destination=fullfile(folder,['activity-' name]);
             stage=fullfile(folder,['.activity-' name]); cleanup=onCleanup(@() obj.removeFolder(stage));
