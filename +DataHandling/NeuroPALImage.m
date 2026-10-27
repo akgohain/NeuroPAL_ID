@@ -165,27 +165,8 @@ classdef NeuroPALImage
                 worm = np_data.worm;
             end
             
-            % Get the image file version.
-            version = 0;
-            if isfield(np_data, 'version')
-                version = np_data.version;
-            end
-            
-            % Check the image file version.
-            if version < 1
-
-                % Correct the worm info.
-                worm.body = prefs.body_part;
-                worm.age = 'Adult';
-                worm.sex = 'Unknown';
-                worm.strain = '';
-                worm.notes = '';
-                prefs = rmfield(prefs, 'body_part');
-                
-                % Update the file version.
-                version = ProgramInfo.version;
-                save(image_file, 'version', 'prefs', 'worm', '-append', '-v7.3');
-            end
+            % Read legacy headers in memory; opening an image must not rewrite it.
+            [info,prefs,worm]=DataHandling.Helpers.npal_metadata.normalize(info,prefs,worm,size(data));
 
             % Sanitize prefs to avoid invalid channel indices in the GUI.
             if ~isfield(prefs, 'RGBW') || isempty(prefs.RGBW)

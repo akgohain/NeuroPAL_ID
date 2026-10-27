@@ -102,7 +102,7 @@ end
 function local_check_budget(bytes, budget)
 if bytes * 2.5 > budget
     error('DataHandling:Processing:SliceTooLarge', ...
-        'One processing slice exceeds the working-memory budget. Create a smaller source or increase NEUROPAL_IO_CHUNK_MIB.');
+        'One processing slice exceeds the working-memory budget. Create a smaller source or increase IO chunk MiB under Tools > Models & runtimes > Resources.');
 end
 end
 
