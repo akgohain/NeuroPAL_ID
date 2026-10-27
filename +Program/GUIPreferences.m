@@ -75,16 +75,30 @@ classdef GUIPreferences < handle
              end
         end
         
-        function save()
+        function saved = save()
             %SAVE save the GUI preferences to their file.
             
             % Instantiate the class.
             obj = Program.GUIPreferences.instance();
             
-            % Save the preferences.
-            version = Program.ProgramInfo.version;
-            GUI_prefs = obj;
-            save(obj.prefs_file, 'version', 'GUI_prefs');
+            saved=false;
+            if isequal(getappdata(groot,'npal_prefs_write_blocked'),obj.prefs_file), return; end
+            temporary='';
+            try
+                if isfolder(obj.prefs_file), error('Program:Preferences:Destination','The preference destination is a folder.'); end
+                folder=fileparts(obj.prefs_file);
+                if ~isfolder(folder), mkdir(folder); end
+                temporary=[tempname(folder) '.mat'];
+                version = Program.ProgramInfo.version;
+                GUI_prefs = obj;
+                save(temporary, 'version', 'GUI_prefs');
+                [ok,message]=movefile(temporary,obj.prefs_file,'f');
+                if ~ok, error('Program:Preferences:Write','%s',message); end
+                saved=true;
+            catch ME
+                if ~isempty(temporary) && isfile(temporary), delete(temporary); end
+                warning('Program:Preferences:Write','Display preferences were not saved; this session remains usable. %s',ME.message);
+            end
         end
         
         function is_loaded = load()
@@ -97,8 +111,19 @@ classdef GUIPreferences < handle
             is_loaded = false;
             if exist(obj.prefs_file, 'file')
                 is_loaded = true;
-                prefs = load(obj.prefs_file);
-                Program.GUIPreferences.read(prefs.GUI_prefs);
+                try
+                    prefs = load(obj.prefs_file);
+                    if ~isfield(prefs,'GUI_prefs'), error('Program:Preferences:Format','Missing GUI preferences.'); end
+                    Program.GUIPreferences.read(prefs.GUI_prefs);
+                catch ME
+                    backup=[obj.prefs_file '.unreadable-' char(java.util.UUID.randomUUID()) '.mat'];
+                    ok=false;
+                    if isfile(obj.prefs_file)
+                        try, [ok,~]=copyfile(obj.prefs_file,backup); catch, end
+                    end
+                    if ~ok, setappdata(groot,'npal_prefs_write_blocked',obj.prefs_file); end
+                    warning('Program:Preferences:Read','Saved display preferences could not be read. Defaults remain available. Original preferences: %s. %s',obj.prefs_file,ME.message);
+                end
             end
         end
         
@@ -108,33 +133,43 @@ classdef GUIPreferences < handle
             % Instantiate the class.
             obj = Program.GUIPreferences.instance();
             
-            % Read the preferences.
-            % Keep this machine's preference destination when migrating old files.
-            obj.image_dir = prefs.image_dir;
-            obj.GFP_color = prefs.GFP_color;
-            obj.neuron_dot = prefs.neuron_dot;
-            if ~isfield(obj.neuron_dot, 'marker_size_scale')
-                obj.neuron_dot.marker_size_scale = 0.3;
+            if ~(isstruct(prefs) || isa(prefs,'Program.GUIPreferences')) || ~isscalar(prefs)
+                error('Program:Preferences:Format','Invalid GUI preferences.');
             end
-            if ~isfield(obj.neuron_dot, 'marker_line_scale')
-                obj.neuron_dot.marker_line_scale = 0.3;
+            value=Program.GUIPreferences.value(prefs,'image_dir',obj.image_dir);
+            if (ischar(value) && isrow(value)) || (isstring(value) && isscalar(value) && ~ismissing(value))
+                if isfolder(value), obj.image_dir=char(value); end
             end
-            
-            % Check for new properties.
-            if isprop(prefs, 'is_show_birth_times')
-                obj.is_show_birth_times = prefs.is_show_birth_times;
+            value=Program.GUIPreferences.value(prefs,'GFP_color',[1 1 0]);
+            if ~isnumeric(value) || ~isreal(value) || numel(value)~=3 || any(~isfinite(value(:)) | value(:)<0 | value(:)>1)
+                value=[1 1 0];
             end
-            if isprop(prefs, 'is_auto_name')
-                obj.is_auto_name = prefs.is_auto_name;
+            obj.GFP_color=double(value(:)');
+            dot=struct('marker',struct('selected',100+100*ismac,'unselected',40),'line',2, ...
+                'marker_size_scale',.3,'marker_line_scale',.3);
+            incoming=Program.GUIPreferences.value(prefs,'neuron_dot',struct());
+            if isstruct(incoming) && isscalar(incoming)
+                if isfield(incoming,'marker') && isstruct(incoming.marker) && isscalar(incoming.marker)
+                    for field={'selected','unselected'}
+                        key=field{1}; value=Program.GUIPreferences.value(incoming.marker,key,NaN);
+                        if Program.GUIPreferences.inRange(value,1,100000), dot.marker.(key)=value; end
+                    end
+                end
+                for field={'line','marker_size_scale','marker_line_scale'}
+                    key=field{1};value=Program.GUIPreferences.value(incoming,key,NaN);
+                    if Program.GUIPreferences.inRange(value,eps,50), dot.(key)=value; end
+                end
             end
-            if isprop(prefs, 'is_autoID_updates')
-                obj.is_autoID_updates = prefs.is_autoID_updates;
+            obj.neuron_dot=dot;
+            for field={'is_show_birth_times','is_auto_name','is_autoID_updates','is_MP_detect'}
+                key=field{1}; value=Program.GUIPreferences.value(prefs,key,obj.(key));
+                if (isnumeric(value) || islogical(value)) && isscalar(value) && isreal(value) && ismember(value,[0 1])
+                    obj.(key)=logical(value);
+                end
             end
-            if isprop(prefs, 'detection_backend')
-                obj.detection_backend = char(prefs.detection_backend);
-            end
-            if isprop(prefs, 'is_MP_detect')
-                obj.is_MP_detect = prefs.is_MP_detect;
+            value=Program.GUIPreferences.value(prefs,'detection_backend',obj.detection_backend);
+            if (ischar(value) && isrow(value)) || (isstring(value) && isscalar(value) && ~ismissing(value))
+                obj.detection_backend=char(value);
             end
             obj.detection_backend = Program.GUIPreferences.normalize_detection_backend( ...
                 obj.detection_backend, obj.is_MP_detect);
@@ -205,6 +240,12 @@ classdef GUIPreferences < handle
             dot.marker.selected = round(str2double(answer{1}));
             dot.marker.unselected = round(str2double(answer{2}));
             dot.line = round(str2double(answer{3}));
+            numbers=[dot.marker.selected dot.marker.unselected dot.line];
+            if any(~isfinite(numbers)) || any(numbers(1:2)>100000) || numbers(3)>50
+                dot=[];
+                uialert(Program.window,'Enter finite neuron sizes up to 100000 and a line width up to 50.','Neuron dots');
+                return;
+            end
             
             % Check the user input.
             if dot.marker.selected < 1
@@ -294,6 +335,15 @@ classdef GUIPreferences < handle
     end
 
     methods (Static, Access = private)
+        function value = value(source,name,fallback)
+            value=fallback;
+            if (isstruct(source) && isfield(source,name)) || (isobject(source) && isprop(source,name))
+                value=source.(name);
+            end
+        end
+        function yes = inRange(value,low,high)
+            yes=isnumeric(value) && isreal(value) && isscalar(value) && isfinite(value) && value>=low && value<=high;
+        end
         function backend = normalize_detection_backend(backend, is_mp_detect)
             %NORMALIZE_DETECTION_BACKEND Canonicalize persisted detector backend values.
             if nargin < 1 || isempty(backend)
