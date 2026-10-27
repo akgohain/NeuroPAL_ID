@@ -1,15 +1,24 @@
-function initialize()
-    % Hack: close that weird window that pops up for no reason.
-    % Note: I have to do this because Matlab sucks.
-    close all;
+function initialized = initialize(app)
+    % Keep the researcher's existing MATLAB figures open.
+    initialized=false;
+    if nargin<1, app=Program.ProgramInfo.app(); end
+    existing=getappdata(groot,'neuropal_active_app');
+    if ~isempty(existing) && isvalid(existing) && isgraphics(existing.CELL_ID)
+        if ~isequal(existing,app), delete(app); end
+        figure(existing.CELL_ID);
+        initialized=isequal(existing,app);
+        return;
+    end
+    setappdata(groot,'neuropal_active_app',app);
+    setappdata(app.CELL_ID,'npal_startup_complete',false);
+    initialization_guard=onCleanup(@() finish_startup(app));
 
     % Using mlapptools because Matlab refuses to give me focus control.
     % This warning needs to shut up :-)
     % mlapptools.getWebWindow (line 337)
     warning off MATLAB:ui:javaframe:PropertyToBeRemoved;
 
-    app = Program.GUIHandling.app;
-    window = Program.GUIHandling.window_fig;
+    window = app.CELL_ID;
     % Keep cleanup in user code so App Designer preserves it when saving.
     window.DeleteFcn = @(~, ~) Program.Helpers.cleanup_ui_runtime(app);
 
@@ -22,6 +31,7 @@ function initialize()
     end
 
     d = uiprogressdlg(window, "Title","NeuroPAL ID","Message","Starting NeuroPAL_ID...",'Indeterminate','on');
+    startup_cleanup=onCleanup(@() Runtime.Installer.close(d));
     app.logEvent('Main','Starting NeuroPAL_ID...', 1);
     app.logEvent('Main','Resizing NeuroPAL_ID...', 1);
 
@@ -55,6 +65,7 @@ function initialize()
     Program.GUIHandling.configure_main_detect_id_controls(app);
     Program.GUIHandling.configure_main_z_controls(app);
     Program.GUIHandling.remove_redundant_processing_menus(app);
+    Program.CallbackBoundary.install(app);
     Program.GUIHandling.configure_log_tab(app);
     app.neuron_marker.shape = 'c';
     app.neuron_marker.color.edge = [0,0,0];
@@ -130,4 +141,17 @@ function initialize()
     end
 
     close(d);
+    setappdata(app.CELL_ID,'npal_startup_complete',true);
+    initialized=true;
+end
+
+function finish_startup(app)
+    if isvalid(app) && isgraphics(app.CELL_ID) && ...
+            isequal(getappdata(app.CELL_ID,'npal_startup_complete'),true)
+        return;
+    end
+    if isequal(getappdata(groot,'neuropal_active_app'),app)
+        rmappdata(groot,'neuropal_active_app');
+    end
+    if isvalid(app), delete(app); end
 end

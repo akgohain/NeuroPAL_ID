@@ -29,6 +29,11 @@ classdef ProgramInfo
             %   - handle: The figure handle with the specified name, or
             %       empty if none is found.
         
+            active=getappdata(groot,'neuropal_active_app');
+            if ~isempty(active) && isvalid(active) && isgraphics(active.CELL_ID)
+                handle=active.CELL_ID;
+                return;
+            end
             % Define a persistent variable that caches the figure handle across calls
             persistent window_handle
 
@@ -58,6 +63,11 @@ classdef ProgramInfo
             %   - handle: The handle to the running application instance
             %       (if it exists), or an empty value otherwise.
         
+            active=getappdata(groot,'neuropal_active_app');
+            if ~isempty(active) && isvalid(active) && isgraphics(active.CELL_ID)
+                handle=active;
+                return;
+            end
             % Initiate a persistent reference.
             persistent app_handle
 

@@ -3543,24 +3543,11 @@ classdef GUIHandling
         end
 
         function handle = window_fig()
-            persistent window_handle
-
-            if any(isempty(window_handle)) || any(~isgraphics(window_handle))
-                window_handle = findall(groot, 'Name','NeuroPAL ID');
-            end
-            
-            handle = window_handle;
+            handle = Program.ProgramInfo.window();
         end
 
         function handle = app()
-            persistent app_handle
-
-            if any(isempty(app_handle)) || any(isa(app_handle, "handle")) && any(~isvalid(app_handle))
-                window_handle = Program.ProgramInfo.window();
-                app_handle = window_handle.RunningAppInstance;
-            end
-
-            handle = app_handle;
+            handle = Program.ProgramInfo.app();
         end
 
         function sync_channels(event)
